@@ -1,0 +1,103 @@
+#pragma once
+
+#include <astrotiger/defs.hpp>
+#include <astrotiger/vect.hpp>
+
+#include <utility>
+
+template<class T>
+struct range {
+	vect<T> min;
+	vect<T> max;
+
+public:
+	range() = default;
+	range(const vect<T> &pt) {
+		min = pt;
+		for (int dim = 0; dim < NDIM; dim++) {
+			max[dim] = pt[dim] + 1;
+		}
+	}
+	bool empty() const {
+		return volume() == 0;
+	}
+	bool operator==(const range<T> &other) const {
+		const bool e = empty();
+		if (e == other.empty()) {
+			if (!e) {
+				for (int dim = 0; dim < NDIM; dim++) {
+					if (max[dim] != other.max[dim]) {
+						return false;
+					}
+					if (min[dim] != other.min[dim]) {
+						return false;
+					}
+				}
+				return true;
+			} else {
+				return true;
+			}
+		} else {
+			return false;
+		}
+	}
+	bool operator!=(const range<T> &other) const {
+		return !(*this == other);
+	}
+	range<T> double_() const {
+		range<T> rc;
+		for (int dim = 0; dim < NDIM; dim++) {
+			rc.min[dim] = 2 * min[dim];
+			rc.max[dim] = 2 * max[dim];
+		}
+		return rc;
+	}
+	void set_null() {
+		for (int dim = 0; dim < NDIM; dim++) {
+			min[dim] = max[dim] = 0;
+		}
+	}
+	std::pair<range<T>, range<T>> split() const {
+		int max_dim;
+		int max_span = 0;
+		for (int dim = 0; dim < NDIM; dim++) {
+			const auto span = max[dim] - min[dim];
+			if (span > max_span) {
+				max_span = span;
+				max_dim = dim;
+			}
+		}
+		std::pair<range<T>, range<T>> rc;
+		rc.first = rc.second = *this;
+		const auto mid = (min[max_dim] + max[max_dim]) / 2;
+		rc.first.max[max_dim] = rc.second.min[max_dim] = mid;
+		return rc;
+	}
+	range pad(int i) const {
+		range<T> padded;
+		for (int dim = 0; dim < NDIM; dim++) {
+			padded.min[dim] = min[dim] - i;
+			padded.max[dim] = max[dim] + i;
+		}
+		return padded;
+	}
+	vect<T> dims() const {
+		vect<T> d;
+		for (int dim = 0; dim < NDIM; dim++) {
+			d[dim] = max[dim] - min[dim];
+		}
+		return d;
+	}
+	T volume() const {
+		T vol = T(1);
+		for (int dim = 0; dim < NDIM; dim++) {
+			vol *= std::max(max[dim] - min[dim], T(0));
+		}
+		return vol;
+	}
+	template<class A>
+	void serialize(A &&arc, unsigned) {
+		arc & min;
+		arc & max;
+	}
+};
