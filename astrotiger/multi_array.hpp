@@ -20,28 +20,31 @@ using multi_range = range<index_type>;
 
 class multi_iterator {
 	const multi_range box;
-	multi_index index;
+	multi_index index_	;
 public:
 	multi_iterator(const multi_range &box_) :
 			box(box_) {
-		index = box.min;
+		index_ = box.min;
 	}
 	operator multi_index() const {
-		return index;
+		return index_;
 	}
 	bool end() const {
-		return index == box.max;
+		return index_ == box.max;
 	}
 	index_type operator[](int i) const {
-		return index[i];
+		return index_[i];
+	}
+	multi_index index() const {
+		return index_;
 	}
 	multi_iterator& operator++(int) {
 		int dim = NDIM - 1;
-		while (++index[dim] == box.max[dim]) {
-			index[dim] = box.min[dim];
+		while (++index_[dim] == box.max[dim]) {
+			index_[dim] = box.min[dim];
 			dim--;
 			if (dim == -1) {
-				index = box.max;
+				index_ = box.max;
 				break;
 			}
 		}

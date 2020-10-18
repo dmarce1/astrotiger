@@ -13,7 +13,7 @@
 namespace hpx {
 
 template<class Archive>
-void id_type::load(const Archive& arc, const unsigned) {
+void id_type::load(const Archive &arc, const unsigned) {
 	std::uintptr_t ptr;
 	arc >> rank;
 	arc >> ptr;
@@ -21,7 +21,7 @@ void id_type::load(const Archive& arc, const unsigned) {
 		action_add_ref_count act;
 		auto ptrptr = new (detail::agas_entry_t*)(reinterpret_cast<detail::agas_entry_t*>(ptr));
 		int remote_rank = rank;
-		set_address(ptrptr, [=](detail::agas_entry_t** ptrptr) {
+		set_address(ptrptr, [=](detail::agas_entry_t **ptrptr) {
 			id_type remote;
 			remote.set_rank(remote_rank);
 			act(remote, reinterpret_cast<std::uintptr_t>(*ptrptr), -1);
@@ -33,7 +33,7 @@ void id_type::load(const Archive& arc, const unsigned) {
 }
 
 template<class Archive>
-void id_type::save(Archive& arc, const unsigned) const {
+void id_type::save(Archive &arc, const unsigned) const {
 	arc << rank;
 	if (address != nullptr) {
 		auto ptr = reinterpret_cast<std::uintptr_t>(*(address));
@@ -47,10 +47,8 @@ void id_type::save(Archive& arc, const unsigned) const {
 	}
 }
 
-
-
 template<class Function, class ... Args>
-future<typename Function::return_type> async(const id_type& id, Args&& ... args) {
+future<typename Function::return_type> async(const id_type &id, Args &&... args) {
 	Function function;
 	future<typename Function::return_type> future;
 	if (id.get_rank() == hpx::detail::mpi_comm_rank()) {
@@ -61,6 +59,19 @@ future<typename Function::return_type> async(const id_type& id, Args&& ... args)
 	return future;
 }
 
+namespace lcos {
+template<class Function, class ... Args>
+future<typename std::enable_if<std::is_void<typename Function::return_type>::value, void>::type> broadcast(const std::vector<id_type> &ids, Args &&... args) {
+	std::vector<hpx::future<void>> futs;
+	for (int i = 0; i < ids.size(); i++) {
+		futs.push_back(hpx::async<Function>(ids[i], std::forward<Args>(args)...));
+	}
+	return hpx::when_all(futs.begin(), futs.end()).then([](hpx::future<std::vector<hpx::future<void>>> fut) {
+		auto futs = fut.get();
+		hpx::wait_all(futs.begin(), futs.end());
+	});
+}
+}
 
 }
 

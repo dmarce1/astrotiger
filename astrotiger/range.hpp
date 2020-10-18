@@ -73,6 +73,22 @@ public:
 		rc.first.max[max_dim] = rc.second.min[max_dim] = mid;
 		return rc;
 	}
+	range<T> intersection(const range<T> &other) const {
+		range<T> i;
+		for (int dim = 0; dim < NDIM; dim++) {
+			i.max[dim] = std::min(max[dim], other.max[dim]);
+			i.min[dim] = std::max(min[dim], other.min[dim]);
+		}
+		return i;
+	}
+	range<T> shift(vect<T> d) const {
+		range<T> s;
+		for (int dim = 0; dim < NDIM; dim++) {
+			s.min[dim] = min[dim] + d[dim];
+			s.max[dim] = max[dim] + d[dim];
+		}
+		return s;
+	}
 	range pad(int i) const {
 		range<T> padded;
 		for (int dim = 0; dim < NDIM; dim++) {

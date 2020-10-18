@@ -5,6 +5,7 @@
 #include <hpx/hpx_lite.hpp>
 #else
 #include <hpx/hpx_init.hpp>
+#include <hpx/lcos/broadcast.hpp>
 #include <hpx/async.hpp>
 #include <hpx/include/components.hpp>
 #include <hpx/runtime/actions/plain_action.hpp>

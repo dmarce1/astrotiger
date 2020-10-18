@@ -32,6 +32,7 @@ set(astrotiger_source_files
 	src/options.cpp
 	src/tree.cpp
 	src/tree_client.cpp
+	src/levels.cpp
 )
 
 
@@ -39,6 +40,7 @@ set(astrotiger_header_files
  	astrotiger/defs.hpp	
  	astrotiger/hpx.hpp	
  	astrotiger/hydro_grid.hpp	
+ 	astrotiger/levels.hpp	
  	astrotiger/multi_array.hpp	
  	astrotiger/options.hpp	
  	astrotiger/range.hpp

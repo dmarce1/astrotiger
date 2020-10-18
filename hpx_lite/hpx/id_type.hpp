@@ -93,6 +93,11 @@ public:
 template<class Function, class ... Args>
 future<typename Function::return_type> async(const id_type &id, Args &&... args);
 
+namespace lcos {
+template<class Function, class ... Args>
+future<typename std::enable_if<std::is_void<typename Function::return_type>::value,void>::type> broadcast(const std::vector<id_type> &id, Args &&... args);
+}
+
 inline int get_locality_id_from_id(const id_type &id) {
 	return id.rank;
 

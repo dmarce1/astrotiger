@@ -12,14 +12,28 @@
 #include <astrotiger/multi_array.hpp>
 
 class tree;
+class sibling;
 
 class tree_client {
 	hpx::id_type gid;
 	multi_range box;
 
 public:
+	bool operator==(const tree_client &other) const {
+		return gid == other.gid;
+	}
+
+	bool operator!=(const tree_client &other) const {
+		return gid != other.gid;
+	}
+
 	tree_client() {
+		gid = hpx::id_type();
 		box.set_null();
+	}
+
+	multi_range get_box() const {
+		return box;
 	}
 
 	tree_client(const hpx::id_type id_, multi_range box_) {
@@ -27,8 +41,10 @@ public:
 		box = box_;
 	}
 
-	hpx::future<void> set_family(tree_client p, std::vector<tree_client> c) const;
+	hpx::future<void> clear_family() const;
+	hpx::future<void> set_family(tree_client p, tree_client, std::vector<sibling> c) const;
 	hpx::future<void> initialize() const;
+	hpx::future<std::vector<tree_client>> get_children() const;
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

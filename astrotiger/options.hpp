@@ -2,6 +2,8 @@
 #include <astrotiger/defs.hpp>
 
 #include <string>
+#include <vector>
+
 
 class options {
 public:
@@ -13,11 +15,13 @@ public:
 	int ngrid;
 	int window;
 	int max_level;
+	int max_bw;
 	std::string problem;
 	double refine_slope;
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
+		arc & max_bw;
 		arc & bw;
 		arc & config_file;
 		arc & nhydro;
