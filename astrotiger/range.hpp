@@ -55,7 +55,7 @@ public:
 	std::vector<range<T>> subtract(const range<T> &sub) {
 		std::vector<range<T>> ranges;
 		range<T> mid = *this;
-		printf( "Subtracting (%i,%i),(%i,%i) from (%i,%i),(%i,%i)\n", sub.min[0],sub.max[0],sub.min[1],sub.max[1],(*this).min[0],(*this).max[0],(*this).min[1],(*this).max[1]);
+//		printf( "Subtracting (%i,%i),(%i,%i) from (%i,%i),(%i,%i)\n", sub.min[0],sub.max[0],sub.min[1],sub.max[1],(*this).min[0],(*this).max[0],(*this).min[1],(*this).max[1]);
 		for (int dim = 0; dim < NDIM; dim++) {
 			auto lo = mid;
 			auto hi = mid;
@@ -73,9 +73,9 @@ public:
 				break;
 			}
 		}
-		for( int i = 0; i < ranges.size(); i++) {
-			printf( "++++ %i %i %i %i\n", ranges[i].min[0],ranges[i].max[0],ranges[i].min[1],ranges[i].max[1]);
-		}
+//		for( int i = 0; i < ranges.size(); i++) {
+//			printf( "++++ %i %i %i %i\n", ranges[i].min[0],ranges[i].max[0],ranges[i].min[1],ranges[i].max[1]);
+//		}
 		return ranges;
 	}
 	range<T> double_() const {
