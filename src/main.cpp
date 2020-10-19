@@ -21,7 +21,7 @@ void master(int level, double tmax) {
 		dt[level] = (tmax - tm[level]) / nstep;
 		levels_hydro_substep(level, 0, dt[level]);
 		tm[level] += dt[level];
-		dt[level] = levels_hydro_substep(level, 1, dt[level]);
+		dt[level] = opts.cfl * dx[level] / levels_hydro_substep(level, 1, dt[level]);
 		master(level + 1, tm[level]);
 	} while (nstep != 1.0);
 
