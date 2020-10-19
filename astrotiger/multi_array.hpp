@@ -99,7 +99,19 @@ public:
 	inline T& operator[](const multi_index &I) {
 		return data[index(I)];
 	}
-	T gradient(int dim, const multi_index &I) const {
+	T smooth_gradient(int dim, const multi_index &I) const {
+		const auto i = index(I);
+		const auto ip = i + stride[dim];
+		const auto im = i - stride[dim];
+		assert(ip < data.size());
+		assert(ip >= 0);
+		assert(im < data.size());
+		assert(im >= 0);
+		assert(i < data.size());
+		assert(i >= 0);
+		return data[ip] - data[im];
+	}
+	T minmod_gradient(int dim, const multi_index &I) const {
 		const auto i = index(I);
 		const auto ip = i + stride[dim];
 		const auto im = i - stride[dim];
@@ -137,7 +149,7 @@ public:
 			for (multi_iterator i(grad_box); !i.end(); i++) {
 				const multi_index j = i.index() - grad_box.min + box.min;
 				for (int dim = 0; dim < NDIM; dim++) {
-					grad[dim][i] = gradient(dim, j);
+					grad[dim][i] = minmod_gradient(dim, j);
 				}
 			}
 		}

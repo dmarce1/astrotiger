@@ -9,7 +9,6 @@
 
 HPX_REGISTER_COMPONENT(hpx::components::managed_component<tree>, tree);
 
-
 using get_hydro_boundary_action_type = tree::get_hydro_boundary_action;
 using get_hydro_prolong_action_type = tree::get_hydro_prolong_action;
 using get_hydro_restrict_action_type = tree::get_hydro_restrict_action;
@@ -98,7 +97,10 @@ void tree::get_hydro_boundaries() {
 		}
 		parent_ranges.insert(parent_ranges.end(), these_ranges.begin(), these_ranges.end());
 	}
-
+	for (auto &r : parent_ranges) {
+		printf("%i %i %i %i\n", r.min[0], r.max[0], r.min[1], r.max[1]);
+	}
+	printf( "----\n");
 	std::vector<hpx::future<std::vector<double>>> sib_futs;
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
@@ -202,7 +204,7 @@ std::vector<tree_client> tree::get_children() const {
 }
 
 double tree::hydro_substep(int rk, double dt) {
-	hydro.substep_update(rk,dt);
+	hydro.substep_update(rk, dt);
 	step++;
 	get_hydro_boundaries();
 	const double a = hydro.compute_flux();
@@ -210,13 +212,13 @@ double tree::hydro_substep(int rk, double dt) {
 }
 
 double tree::initialize(int this_level) {
-	double amax;
+	double amax = 0.0;
 	if (this_level == level) {
 		hydro.resize(dx, box.pad(opts.hbw));
 		hydro.initialize();
 		amax = hydro.compute_flux();
 	} else {
-		if (this_level == level - 1) {
+		if (this_level == level + 1) {
 			hydro.compute_refinement_criteria();
 			auto boxes = hydro.refined_ranges();
 
@@ -225,7 +227,9 @@ double tree::initialize(int this_level) {
 			for (int i = 0; i < boxes.size(); i++) {
 				futs[i] = allocate(level + 1, boxes[i].double_());
 			}
+			children.resize(boxes.size());
 			for (int i = 0; i < futs.size(); i++) {
+//				printf("%i %i %i %i\n", boxes[i].min[0], boxes[i].max[0], boxes[i].min[1], boxes[i].max[1]);
 				children[i] = futs[i].get();
 			}
 		}
@@ -233,7 +237,6 @@ double tree::initialize(int this_level) {
 		for (int i = 0; i < children.size(); i++) {
 			futs[i] = children[i].initialize(this_level);
 		}
-		amax = 0.0;
 		for (int i = 0; i < children.size(); i++) {
 			amax = std::max(amax, futs[i].get());
 		}

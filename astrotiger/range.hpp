@@ -53,20 +53,23 @@ public:
 		return rc;
 	}
 	std::vector<range<T>> subtract(const range<T> &sub) {
-		std::vector<range<T>>  ranges;
+		std::vector<range<T>> ranges;
 		range<T> mid = *this;
 		for (int dim = 0; dim < NDIM; dim++) {
 			auto lo = mid;
 			auto hi = mid;
 			lo.max[dim] = std::min(sub.min[dim], lo.max[dim]);
 			hi.min[dim] = std::max(sub.max[dim], hi.min[dim]);
-			mid.max[dim] = hi.min[dim];
-			mid.min[dim] = lo.max[dim];
-			if( !lo.empty() ){
+			mid.max[dim] = std::min(hi.min[dim], mid.max[dim]);
+			mid.min[dim] = std::max(lo.max[dim], mid.min[dim]);
+			if (!lo.empty()) {
 				ranges.push_back(lo);
 			}
-			if( !hi.empty() ){
+			if (!hi.empty()) {
 				ranges.push_back(hi);
+			}
+			if (mid.empty()) {
+				break;
 			}
 		}
 		return ranges;

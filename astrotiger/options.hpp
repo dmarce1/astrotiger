@@ -18,9 +18,13 @@ public:
 	std::string problem;
 	double refine_slope;
 	double gamma;
+	double cfl;
+	double tmax;
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
+		arc & tmax;
+		arc & cfl;
 		arc & nrk;
 		arc & config_file;
 		arc & nhydro;

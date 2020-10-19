@@ -17,7 +17,7 @@ double hydro_grid::compute_flux() {
 	double amax = 0.0;
 	std::vector<multi_array<double>> UR(opts.nhydro);
 	std::vector<multi_array<double>> UL(opts.nhydro);
-	const auto urlbox = box.pad(-1);
+	const auto urlbox = box.pad(2 - opts.hbw);
 	const auto grad_box = box.pad(-opts.hbw + 1);
 	for (int i = 0; i < opts.nhydro; i++) {
 		UR[i].resize(urlbox);
@@ -25,15 +25,17 @@ double hydro_grid::compute_flux() {
 	}
 	for (int dim = 0; dim < NDIM; dim++) {
 		for (int i = 0; i < opts.nhydro; i++) {
-			for (multi_iterator j(fbox[dim]); !j.end(); j++) {
-				const auto du = 0.5 * U[i].gradient(dim, j);
+			auto this_box = fbox[dim];
+			this_box.min[dim]--;
+			for (multi_iterator j(this_box); !j.end(); j++) {
+				const auto du = 0.5 * U[i].minmod_gradient(dim, j);
 				UR[i][j] = U[i][j] - du;
 				auto jp1 = j.index();
 				jp1[dim]++;
 				UL[i][jp1] = U[i][j] + du;
 			}
 		}
-		std::vector<double> ur, ul, flux;
+		std::vector<double> ur(opts.nhydro), ul(opts.nhydro), flux(opts.nhydro);
 		for (multi_iterator j(fbox[dim]); !j.end(); j++) {
 			for (int f = 0; f < opts.nhydro; f++) {
 				ur[f] = UR[f][j];
@@ -52,6 +54,11 @@ void hydro_grid::substep_update(int rk, double dt) {
 	const double beta = rk == 0 ? 1.0 : 0.5;
 	const double onembeta = 1.0 - beta;
 	const double lambda = dt / dx;
+	if (rk == 0) {
+		for (int f = 0; f < opts.nhydro; f++) {
+			U0[f] = U[f];
+		}
+	}
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		for (int dim = 0; dim < NDIM; dim++) {
 			multi_index ip1 = i;
@@ -77,7 +84,10 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 	for (int i = 0; i < opts.nhydro; i++) {
 		U0[i].resize(box);
 		U[i].resize(box);
-		for (int dim = 0; dim < NDIM; dim++) {
+	}
+	for (int dim = 0; dim < NDIM; dim++) {
+		F[dim].resize(opts.nhydro);
+		for (int i = 0; i < opts.nhydro; i++) {
 			fbox[dim] = box.pad(-opts.hbw);
 			fbox[dim].max[dim]++;
 			F[dim][i].resize(fbox[dim]);
@@ -97,8 +107,9 @@ void hydro_grid::compute_refinement_criteria() {
 	for (multi_iterator i(ibox); !i.end(); i++) {
 		double max_grad_rho = 0.0;
 		for (int dim = 0; dim < NDIM; dim++) {
-			max_grad_rho = std::max(max_grad_rho, std::abs(U[rho_i].gradient(dim, i)));
+			max_grad_rho = std::max(max_grad_rho, std::abs(U[rho_i].smooth_gradient(dim, i)));
 		}
+	//	printf("%e\n", max_grad_rho);
 		bool res = max_grad_rho / U[rho_i][i] > opts.refine_slope;
 		if (res) {
 			R[i] = true;
@@ -117,7 +128,7 @@ void hydro_grid::initialize() {
 				U[sx_i + dim][i] = 0.0;
 			}
 			double xsum = 0.0;
-			for (int dim = 0; dim < NDIM; dim++) {
+			for (int dim = 0; dim < 1; dim++) {
 				xsum += coord(i[dim]) - 0.5;
 			}
 			if (xsum < 0.0) {

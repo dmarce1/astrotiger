@@ -3,13 +3,28 @@
 
 static tree_client root;
 
-double master(int level) {
-	if (level > 0) {
+std::vector<double> dx;
+std::vector<double> dt;
+std::vector<double> tm;
+
+void master(int level, double tmax) {
+	if (level > opts.max_level) {
+		return;
+	}
+	if (level > 0 && tm[level] == 0.0) {
 		levels_set_child_families(level - 1);
 	}
-	if (level < opts.max_level) {
-		master(level + 1);
-	}
+
+	double nstep;
+	do {
+		nstep = std::ceil((tmax - tm[level]) / dt[level]);
+		dt[level] = (tmax - tm[level]) / nstep;
+		levels_hydro_substep(level, 0, dt[level]);
+		tm[level] += dt[level];
+		dt[level] = levels_hydro_substep(level, 1, dt[level]);
+		master(level + 1, tm[level]);
+	} while (nstep != 1.0);
+
 }
 
 int hpx_main(int argc, char *argv[]) {
@@ -41,11 +56,22 @@ int hpx_main(int argc, char *argv[]) {
 			sibs.push_back(sib);
 		}
 	}
-	for (int l = 0; l < opts.max_level; l++) {
-		root.initialize(l).get();
+	dx.resize(opts.max_level + 1);
+	dt.resize(opts.max_level + 1);
+	tm.resize(opts.max_level + 1);
+	for (int l = 0; l <= opts.max_level; l++) {
+		dx[l] = 1.0 / (opts.max_box * (1 << l));
+		tm[l] = 0.0;
+		auto fut = root.initialize(l);
+		auto amax = fut.get();
+		if (amax != 0.0) {
+			dt[l] = opts.cfl * dx[l] / amax;
+		} else {
+			dt[l] = 0.0;
+		}
 	}
 	root.set_family(tree_client(), root, sibs).get();
-	master(0);
+	master(0, opts.tmax);
 	return hpx::finalize();
 }
 
