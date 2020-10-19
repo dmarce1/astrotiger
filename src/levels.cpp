@@ -36,7 +36,7 @@ void levels_remove_entry(int level, tree *ptr) {
 
 void levels_set_child_families(int level) {
 	std::vector<hpx::future<void>> futs;
-	if (hpx::get_locality_id() == 0) {
+	if (hpx::get_locality_id() == 0 && other_localities.size()) {
 		futs.push_back(hpx::lcos::broadcast < levels_set_child_families_action > (other_localities, level));
 	}
 	for (auto *ptr : levels[level]) {
@@ -50,7 +50,7 @@ void levels_set_child_families(int level) {
 double levels_hydro_substep(int level, int rk, double dt) {
 	std::vector<hpx::future<double>> futs;
 	hpx::future<std::vector<double>> fut;
-	if (hpx::get_locality_id() == 0) {
+	if (hpx::get_locality_id() == 0 && other_localities.size()) {
 		fut = hpx::lcos::broadcast < levels_hydro_substep_action > (other_localities, level, rk, dt);
 	}
 	for (auto *ptr : levels[level]) {

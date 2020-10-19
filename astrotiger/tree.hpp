@@ -56,7 +56,7 @@ public:
 	std::vector<double> get_hydro_restrict(multi_range);
 	double hydro_substep(int, double);
 
-	void get_hydro_boundaries();
+	void get_hydro_boundaries(bool amr);
 
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_prolong);

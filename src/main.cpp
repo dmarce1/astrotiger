@@ -19,7 +19,7 @@ void master(int level, double tmax) {
 	do {
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
 		dt[level] = (tmax - tm[level]) / nstep;
-		printf("Advancing level %i from %e to %e\n", tm[level], tm[level] + dt[level]);
+		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		levels_hydro_substep(level, 0, dt[level]);
 		tm[level] += dt[level];
 		dt[level] = opts.cfl * dx[level] / levels_hydro_substep(level, 1, dt[level]);

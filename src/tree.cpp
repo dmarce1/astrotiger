@@ -58,7 +58,7 @@ std::vector<double> tree::get_hydro_restrict(multi_range b) {
 	return hydro.pack_restrict(b);
 }
 
-void tree::get_hydro_boundaries() {
+void tree::get_hydro_boundaries(bool amr) {
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
 	std::vector<multi_range> sib_ranges;
@@ -83,11 +83,11 @@ void tree::get_hydro_boundaries() {
 		}
 		sib_ranges.push_back(inter);
 	}
-	if (level > 0) {
+	if (level > 0 && amr) {
 		for (int i = 0; i < bnd_ranges.size(); i++) {
 			std::vector<multi_range> tmp;
 			std::vector<multi_range> these_ranges(1, bnd_ranges[i]);
-	//		printf( "Siblings %i\n", siblings.size());
+			//		printf( "Siblings %i\n", siblings.size());
 			for (const auto &sib : siblings) {
 				tmp.resize(0);
 				for (int j = 0; j < these_ranges.size(); j++) {
@@ -99,10 +99,6 @@ void tree::get_hydro_boundaries() {
 			parent_ranges.insert(parent_ranges.end(), these_ranges.begin(), these_ranges.end());
 		}
 	}
-//	for (auto &r : parent_ranges) {
-//		printf("%i %i %i %i\n", r.min[0], r.max[0], r.min[1], r.max[1]);
-//	}
-//	printf("----\n");
 	std::vector<hpx::future<std::vector<double>>> sib_futs;
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
@@ -110,7 +106,7 @@ void tree::get_hydro_boundaries() {
 			sib_futs.push_back(siblings[i].client.get_hydro_boundary(shifted_box, step % opts.nrk));
 		}
 	}
-	if (parent != tree_client()) {
+	if (parent != tree_client() && amr) {
 		auto parent_fut = parent.get_hydro_prolong(parent_ranges, t);
 		const auto datas = parent_fut.get();
 		for (int i = 0; i < datas.size(); i++) {
@@ -208,8 +204,12 @@ std::vector<tree_client> tree::get_children() const {
 double tree::hydro_substep(int rk, double dt) {
 	hydro.substep_update(rk, dt);
 	step++;
-	get_hydro_boundaries();
+	get_hydro_boundaries(true);
 	const double a = hydro.compute_flux();
+	if (rk == opts.nrk - 1) {
+		t0 = t;
+		t += dt;
+	}
 	return a;
 }
 
