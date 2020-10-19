@@ -26,6 +26,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("problem", po::value < std::string > (&problem)->default_value("sod"), "Problem 1 - sod\n") //
 	("max_box", po::value<int>(&max_box)->default_value(32), "maximum (box volume)^(1/3)") //
 	("max_level", po::value<int>(&max_level)->default_value(1), "maximum refinement level") //
+	("gamma", po::value<double>(&gamma)->default_value(5.0 / 3.0), "fluid gamma") //
 	("refine_slope", po::value<double>(&refine_slope)->default_value(0.1), "refinement slope criteria") //
 	("ngroup", po::value<int>(&ngroup)->default_value(1), "number of frequency groups") //
 			;
@@ -49,14 +50,10 @@ bool options::process_options(int argc, char *argv[]) {
 	po::notify(vm);
 
 	nhydro = 4;
-	ngrid = 1;
-	bw.resize(ngrid);
-	bw[hydro_i] = 2;
+	hbw = 2;
+	max_bw = 2;
 	window = 1;
-	max_bw = 0;
-	for (int i = 0; i < ngrid; i++) {
-		max_bw = std::max(max_bw, bw[i]);
-	}
+	nrk = 2;
 
 	const auto loc = hpx::find_all_localities();
 	const auto sz = loc.size();

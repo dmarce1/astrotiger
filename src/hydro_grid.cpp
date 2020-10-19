@@ -6,8 +6,63 @@
  */
 
 #include <astrotiger/hydro_grid.hpp>
+#include <astrotiger/hydro_flux.hpp>
+#include <astrotiger/multi_array.hpp>
+#include <vector>
 
 hydro_grid::hydro_grid() {
+}
+
+double hydro_grid::compute_flux() {
+	double amax = 0.0;
+	std::vector<multi_array<double>> UR(opts.nhydro);
+	std::vector<multi_array<double>> UL(opts.nhydro);
+	const auto urlbox = box.pad(-1);
+	const auto grad_box = box.pad(-opts.hbw + 1);
+	for (int i = 0; i < opts.nhydro; i++) {
+		UR[i].resize(urlbox);
+		UL[i].resize(urlbox);
+	}
+	for (int dim = 0; dim < NDIM; dim++) {
+		for (int i = 0; i < opts.nhydro; i++) {
+			for (multi_iterator j(fbox[dim]); !j.end(); j++) {
+				const auto du = 0.5 * U[i].gradient(dim, j);
+				UR[i][j] = U[i][j] - du;
+				auto jp1 = j.index();
+				jp1[dim]++;
+				UL[i][jp1] = U[i][j] + du;
+			}
+		}
+		std::vector<double> ur, ul, flux;
+		for (multi_iterator j(fbox[dim]); !j.end(); j++) {
+			for (int f = 0; f < opts.nhydro; f++) {
+				ur[f] = UR[f][j];
+				ul[f] = UL[f][j];
+			}
+			amax = std::max(amax, hydro_flux(flux, ul, ur, dim));
+			for (int f = 0; f < opts.nhydro; f++) {
+				F[dim][f][j] = flux[f];
+			}
+		}
+	}
+	return amax;
+}
+
+void hydro_grid::substep_update(int rk, double dt) {
+	const double beta = rk == 0 ? 1.0 : 0.5;
+	const double onembeta = 1.0 - beta;
+	const double lambda = dt / dx;
+	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+		for (int dim = 0; dim < NDIM; dim++) {
+			multi_index ip1 = i;
+			ip1[dim]++;
+			for (int f = 0; f < NDIM; f++) {
+				auto &u = U[f][i];
+				u -= (F[dim][f][ip1] - F[dim][f][i]) * lambda;
+				u += +onembeta * (U0[f][i] - u);
+			}
+		}
+	}
 }
 
 void hydro_grid::resize(double dx_, multi_range box_) {
@@ -18,10 +73,15 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 	double *u1 = new double[sz];
 	int j = 0;
 	U0.resize(opts.nhydro);
-	U1.resize(opts.nhydro);
+	U.resize(opts.nhydro);
 	for (int i = 0; i < opts.nhydro; i++) {
 		U0[i].resize(box);
-		U1[i].resize(box);
+		U[i].resize(box);
+		for (int dim = 0; dim < NDIM; dim++) {
+			fbox[dim] = box.pad(-opts.hbw);
+			fbox[dim].max[dim]++;
+			F[dim][i].resize(fbox[dim]);
+		}
 	}
 	R.resize(box);
 }
@@ -30,20 +90,16 @@ hydro_grid::~hydro_grid() {
 }
 
 void hydro_grid::compute_refinement_criteria() {
-	const auto ibox = box.pad(-opts.bw[hydro_i]);
+	const auto ibox = box.pad(-opts.hbw);
 	for (multi_iterator i(box); !i.end(); i++) {
 		R[i] = false;
 	}
 	for (multi_iterator i(ibox); !i.end(); i++) {
 		double max_grad_rho = 0.0;
 		for (int dim = 0; dim < NDIM; dim++) {
-			vect<index_type> ip = i;
-			vect<index_type> im = i;
-			ip[dim]++;
-			im[dim]--;
-			max_grad_rho = std::max(max_grad_rho, std::abs(U0[rho_i][ip] - U0[rho_i][im]));
+			max_grad_rho = std::max(max_grad_rho, std::abs(U[rho_i].gradient(dim, i)));
 		}
-		bool res = max_grad_rho / U0[rho_i][i] > opts.refine_slope;
+		bool res = max_grad_rho / U[rho_i][i] > opts.refine_slope;
 		if (res) {
 			R[i] = true;
 			auto window = range<index_type>(i).pad(opts.window);
@@ -58,18 +114,18 @@ void hydro_grid::initialize() {
 	for (multi_iterator i(box); !i.end(); i++) {
 		if (opts.problem == "sod") {
 			for (int dim = 0; dim < NDIM; dim++) {
-				U0[sx_i + dim][i] = 0.0;
+				U[sx_i + dim][i] = 0.0;
 			}
 			double xsum = 0.0;
 			for (int dim = 0; dim < NDIM; dim++) {
 				xsum += coord(i[dim]) - 0.5;
 			}
 			if (xsum < 0.0) {
-				U0[rho_i][i] = 1.0;
-				U0[egas_i][i] = 1.0;
+				U[rho_i][i] = 1.0;
+				U[egas_i][i] = 1.0;
 			} else {
-				U0[rho_i][i] = 0.1;
-				U0[egas_i][i] = 0.125;
+				U[rho_i][i] = 0.1;
+				U[egas_i][i] = 0.125;
 			}
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());
@@ -90,7 +146,7 @@ std::vector<multi_range> hydro_grid::refined_ranges() const {
 	std::vector<multi_range> tmp;
 	std::vector<multi_range> finished;
 	multi_range range;
-	const auto ibox = box.pad(-opts.bw[hydro_i]);
+	const auto ibox = box.pad(-opts.hbw);
 	range.min = box.max;
 	range.max = box.min;
 	for (multi_iterator i(ibox); !i.end(); i++) {
@@ -143,5 +199,48 @@ std::vector<multi_range> hydro_grid::refined_ranges() const {
 		} while (change);
 	}
 	return std::move(finished);
+}
+
+std::vector<double> hydro_grid::pack_boundary(multi_range bbox) {
+	std::vector<double> data;
+	for (int f = 0; f < opts.nhydro; f++) {
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			data.push_back(U[f][i]);
+		}
+	}
+	return data;
+}
+
+std::vector<double> hydro_grid::pack_prolong(multi_range bbox, double w) {
+	std::vector<double> data;
+	for (int f = 0; f < opts.nhydro; f++) {
+		auto pro0 = U[f].prolong(bbox);
+		auto pro1 = U[f].prolong(bbox);
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			data.push_back(w * pro0[i] + (1.0 - w) * pro1[i]);
+		}
+	}
+	return data;
+}
+
+std::vector<double> hydro_grid::pack_restrict(multi_range bbox) {
+	std::vector<double> data;
+	for (int f = 0; f < opts.nhydro; f++) {
+		auto res = U[f].restrict_(bbox);
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			data.push_back(res[i]);
+		}
+	}
+	return data;
+}
+
+void hydro_grid::unpack(const std::vector<double> &data, multi_range bbox) {
+	int k = 0;
+	for (int f = 0; f < opts.nhydro; f++) {
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			assert(k < data.size());
+			U[f][i] = data[k];
+		}
+	}
 }
 

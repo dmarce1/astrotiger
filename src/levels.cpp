@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 HPX_PLAIN_ACTION (levels_set_child_families);
+HPX_PLAIN_ACTION (levels_hydro_substep);
 
 static std::vector<std::unordered_set<tree*>> levels;
 static mutex_type mtx;
@@ -45,3 +46,28 @@ void levels_set_child_families(int level) {
 	}
 	hpx::wait_all(futs.begin(), futs.end());
 }
+
+double levels_hydro_substep(int level, int rk, double dt) {
+	std::vector<hpx::future<double>> futs;
+	hpx::future<std::vector<double>> fut;
+	if (hpx::get_locality_id() == 0) {
+		fut = hpx::lcos::broadcast < levels_hydro_substep_action > (other_localities, level, rk, dt);
+	}
+	for (auto *ptr : levels[level]) {
+		futs.push_back(hpx::async([rk, ptr, dt]() {
+			return ptr->hydro_substep(rk, dt);
+		}));
+	}
+	double a = 0.0;
+	for (int i = 0; i < futs.size(); i++) {
+		a = std::max(a, futs[i].get());
+	}
+	if (fut.valid()) {
+		auto others = fut.get();
+		for (int i = 0; i < others.size(); i++) {
+			a = std::max(a, others[i]);
+		}
+	}
+	return a;
+}
+

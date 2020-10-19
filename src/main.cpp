@@ -41,8 +41,9 @@ int hpx_main(int argc, char *argv[]) {
 			sibs.push_back(sib);
 		}
 	}
-
-	root.initialize().get();
+	for (int l = 0; l < opts.max_level; l++) {
+		root.initialize(l).get();
+	}
 	root.set_family(tree_client(), root, sibs).get();
 	master(0);
 	return hpx::finalize();

@@ -39,6 +39,7 @@ set(astrotiger_source_files
 set(astrotiger_header_files
  	astrotiger/defs.hpp	
  	astrotiger/hpx.hpp	
+ 	astrotiger/hydro_flux.hpp	
  	astrotiger/hydro_grid.hpp	
  	astrotiger/levels.hpp	
  	astrotiger/multi_array.hpp	

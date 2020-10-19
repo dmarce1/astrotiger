@@ -43,8 +43,11 @@ public:
 
 	hpx::future<void> clear_family() const;
 	hpx::future<void> set_family(tree_client p, tree_client, std::vector<sibling> c) const;
-	hpx::future<void> initialize() const;
+	hpx::future<double> initialize(int) const;
 	hpx::future<std::vector<tree_client>> get_children() const;
+	hpx::future<std::vector<double>> get_hydro_boundary(multi_range b, int);
+	hpx::future<std::vector<std::vector<double>>> get_hydro_prolong(std::vector<multi_range> b, double t);
+	hpx::future<std::vector<double>> get_hydro_restrict(multi_range b);
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

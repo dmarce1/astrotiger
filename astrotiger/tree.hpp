@@ -12,8 +12,7 @@
 #include <astrotiger/levels.hpp>
 #include <astrotiger/range.hpp>
 #include <astrotiger/tree_client.hpp>
-#include "hydro_grid.hpp"
-#include "multi_array.hpp"
+#include <astrotiger/hydro_grid.hpp>
 
 struct sibling {
 	tree_client client;
@@ -30,14 +29,16 @@ struct sibling {
 
 class tree: public hpx::components::managed_component_base<tree> {
 	multi_range box;
-	std::vector<std::shared_ptr<grid>> grids;
-	std::shared_ptr<hydro_grid> hydro;
+	hydro_grid hydro;
 	tree_client parent;
 	tree_client self;
 	std::vector<tree_client> children;
 	std::vector<sibling> siblings;
 	int level;
+	std::atomic<int> step;
 	double dx;
+	double t0;
+	double t;
 public:
 
 	static hpx::future<tree_client> allocate(int, multi_range box);
@@ -45,12 +46,21 @@ public:
 	tree();
 	~tree();
 	tree(int, multi_range);
-	void initialize();
+	double initialize(int);
 	std::vector<tree_client> get_children() const;
 	void set_family(tree_client, tree_client, std::vector<sibling>);
 	void clear_family();
 	void set_child_family();
+	std::vector<double> get_hydro_boundary(multi_range, int);
+	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
+	std::vector<double> get_hydro_restrict(multi_range);
+	double hydro_substep(int, double);
 
+	void get_hydro_boundaries();
+
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_boundary);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_prolong);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_restrict);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_children);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,initialize);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_family);
@@ -59,6 +69,8 @@ public:
 	HPX_SERIALIZATION_SPLIT_MEMBER();
 	template<class A>
 	void save(A &&arc, unsigned) const {
+		arc & t;
+		arc & t0;
 		arc & level;
 		arc & dx;
 		arc & box;
@@ -66,7 +78,7 @@ public:
 		arc & self;
 		arc & children;
 		arc & siblings;
-		arc & *hydro;
+		arc & hydro;
 	}
 	template<class A>
 	void load(A &&arc, unsigned) {
@@ -80,7 +92,7 @@ public:
 		arc & parent;
 		arc & children;
 		arc & siblings;
-		arc & *hydro;
+		arc & hydro;
 	}
 };
 

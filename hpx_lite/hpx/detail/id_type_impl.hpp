@@ -71,6 +71,25 @@ future<typename std::enable_if<std::is_void<typename Function::return_type>::val
 		hpx::wait_all(futs.begin(), futs.end());
 	});
 }
+
+template<class Function, class ... Args>
+future<std::vector<typename std::enable_if<!std::is_void<typename Function::return_type>::value, typename Function::return_type>::type>> broadcast(
+		const std::vector<id_type> &ids, Args &&... args) {
+	using type = typename Function::return_type;
+	std::vector < hpx::future < type >> futs;
+	for (int i = 0; i < ids.size(); i++) {
+		futs.push_back(hpx::async<Function>(ids[i], std::forward<Args>(args)...));
+	}
+	return hpx::when_all(futs.begin(), futs.end()).then([](hpx::future<std::vector<hpx::future<type>>> fut) {
+		auto futs = fut.get();
+		std::vector<type> res(futs.size());
+		for (int i = 0; i < res.size(); i++) {
+			res[i] = futs[i].get();
+		}
+		return res;
+	});
+}
+
 }
 
 }

@@ -4,33 +4,35 @@
 #include <string>
 #include <vector>
 
-
 class options {
 public:
 	std::string config_file;
 	int nhydro;
 	int ngroup;
 	int max_box;
-	std::vector<int> bw;
-	int ngrid;
+	int hbw;
+	int max_bw;
 	int window;
 	int max_level;
-	int max_bw;
+	int nrk;
 	std::string problem;
 	double refine_slope;
+	double gamma;
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
-		arc & max_bw;
-		arc & bw;
+		arc & nrk;
 		arc & config_file;
 		arc & nhydro;
 		arc & ngroup;
+		arc & hbw;
+		arc & max_bw;
 		arc & refine_slope;
 		arc & max_box;
-		arc & ngrid;
 		arc & window;
 		arc & max_level;
+		arc & problem;
+		arc & gamma;
 	}
 
 	static void set(options);

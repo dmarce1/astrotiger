@@ -44,6 +44,33 @@ public:
 	bool operator!=(const range<T> &other) const {
 		return !(*this == other);
 	}
+	range<T> half() const {
+		range<T> rc;
+		for (int dim = 0; dim < NDIM; dim++) {
+			rc.min[dim] = (min[dim] - min[dim] % 2) / 2;
+			rc.max[dim] = (max[dim] - max[dim] % 2) / 2;
+		}
+		return rc;
+	}
+	std::vector<range<T>> subtract(const range<T> &sub) {
+		std::vector<range<T>>  ranges;
+		range<T> mid = *this;
+		for (int dim = 0; dim < NDIM; dim++) {
+			auto lo = mid;
+			auto hi = mid;
+			lo.max[dim] = std::min(sub.min[dim], lo.max[dim]);
+			hi.min[dim] = std::max(sub.max[dim], hi.min[dim]);
+			mid.max[dim] = hi.min[dim];
+			mid.min[dim] = lo.max[dim];
+			if( !lo.empty() ){
+				ranges.push_back(lo);
+			}
+			if( !hi.empty() ){
+				ranges.push_back(hi);
+			}
+		}
+		return ranges;
+	}
 	range<T> double_() const {
 		range<T> rc;
 		for (int dim = 0; dim < NDIM; dim++) {
