@@ -83,24 +83,26 @@ void tree::get_hydro_boundaries() {
 		}
 		sib_ranges.push_back(inter);
 	}
-
-	for (int i = 0; i < bnd_ranges.size(); i++) {
-		std::vector<multi_range> tmp;
-		std::vector<multi_range> these_ranges(1, bnd_ranges[i]);
-		for (const auto &sib : siblings) {
-			tmp.resize(0);
-			for (int j = 0; j < these_ranges.size(); j++) {
-				auto new_ranges = these_ranges[j].subtract(sib.box());
-				tmp.insert(tmp.end(), new_ranges.begin(), new_ranges.end());
+	if (level > 0) {
+		for (int i = 0; i < bnd_ranges.size(); i++) {
+			std::vector<multi_range> tmp;
+			std::vector<multi_range> these_ranges(1, bnd_ranges[i]);
+			printf( "Siblings %i\n", siblings.size());
+			for (const auto &sib : siblings) {
+				tmp.resize(0);
+				for (int j = 0; j < these_ranges.size(); j++) {
+					auto new_ranges = these_ranges[j].subtract(sib.box());
+					tmp.insert(tmp.end(), new_ranges.begin(), new_ranges.end());
+				}
+				these_ranges = std::move(tmp);
 			}
-			these_ranges = std::move(tmp);
+			parent_ranges.insert(parent_ranges.end(), these_ranges.begin(), these_ranges.end());
 		}
-		parent_ranges.insert(parent_ranges.end(), these_ranges.begin(), these_ranges.end());
 	}
 	for (auto &r : parent_ranges) {
 		printf("%i %i %i %i\n", r.min[0], r.max[0], r.min[1], r.max[1]);
 	}
-	printf( "----\n");
+	printf("----\n");
 	std::vector<hpx::future<std::vector<double>>> sib_futs;
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
@@ -189,7 +191,7 @@ void tree::set_child_family() {
 		for (const auto &cs : child_sibs) {
 			const auto inter = cbox.intersection(cs.box());
 			if (!inter.empty()) {
-				if (cs.client != c) {
+				if (cs.client != c || cs.shift != vect<index_type>(0)) {
 					these_sibs.push_back(cs);
 				}
 			}

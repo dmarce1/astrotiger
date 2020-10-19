@@ -140,17 +140,14 @@ public:
 	multi_array prolong(const multi_range &pro_box) const {
 		multi_range grad_box;
 		for (int dim = 0; dim < NDIM; dim++) {
-			grad_box.min[dim] = (pro_box.min[dim] - (pro_box.min[dim] % 2)) / 2;
-			grad_box.max[dim] = (pro_box.max[dim] + (pro_box.max[dim] % 2)) / 2;
+			grad_box.min[dim] = (pro_box.min[dim] - (pro_box.min[dim] % 2)) / 2 - 1;
+			grad_box.max[dim] = (pro_box.max[dim] + (pro_box.max[dim] % 2)) / 2 + 1;
 		}
 		multi_array grad[NDIM];
 		for (int dim = 0; dim < NDIM; dim++) {
 			grad[dim].resize(grad_box);
 			for (multi_iterator i(grad_box); !i.end(); i++) {
-				const multi_index j = i.index() - grad_box.min + box.min;
-				for (int dim = 0; dim < NDIM; dim++) {
-					grad[dim][i] = minmod_gradient(dim, j);
-				}
+				grad[dim][i] = minmod_gradient(dim, i);
 			}
 		}
 		multi_array pro(pro_box);
