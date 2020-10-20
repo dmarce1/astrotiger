@@ -48,9 +48,20 @@ public:
 		range<T> rc;
 		for (int dim = 0; dim < NDIM; dim++) {
 			rc.min[dim] = (min[dim] - min[dim] % 2) / 2;
-			rc.max[dim] = (max[dim] - max[dim] % 2) / 2;
+			rc.max[dim] = (max[dim] + max[dim] % 2) / 2;
 		}
 		return rc;
+	}
+	std::string to_string() const {
+		std::string str;
+		for( int dim = 0; dim < NDIM; dim++) {
+			str += "(";
+			str += std::to_string(min[dim]);
+			str += ",";
+			str += std::to_string(max[dim]);
+			str += ")";
+		}
+		return str;
 	}
 	std::vector<range<T>> subtract(const range<T> &sub) {
 		std::vector<range<T>> ranges;

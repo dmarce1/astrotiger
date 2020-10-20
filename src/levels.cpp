@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 HPX_PLAIN_ACTION (levels_set_child_families);
+HPX_PLAIN_ACTION (levels_hydro_initialize);
 HPX_PLAIN_ACTION (levels_hydro_substep);
 
 static std::vector<std::unordered_set<tree*>> levels;
@@ -47,15 +48,28 @@ void levels_set_child_families(int level) {
 	hpx::wait_all(futs.begin(), futs.end());
 }
 
-double levels_hydro_substep(int level, int rk, double dt) {
+void levels_hydro_substep(int level, int rk, double dt) {
+	std::vector<hpx::future<void>> futs;
+	if (hpx::get_locality_id() == 0 && other_localities.size()) {
+		futs.push_back(hpx::lcos::broadcast < levels_hydro_substep_action > (other_localities, level, rk, dt));
+	}
+	for (auto *ptr : levels[level]) {
+		futs.push_back(hpx::async([ptr, rk, dt]() {
+			ptr->hydro_substep(rk, dt);
+		}));
+	}
+	hpx::wait_all(futs.begin(), futs.end());
+}
+
+double levels_hydro_initialize(int level) {
 	std::vector<hpx::future<double>> futs;
 	hpx::future<std::vector<double>> fut;
 	if (hpx::get_locality_id() == 0 && other_localities.size()) {
-		fut = hpx::lcos::broadcast < levels_hydro_substep_action > (other_localities, level, rk, dt);
+		fut = hpx::lcos::broadcast < levels_hydro_initialize_action > (other_localities, level);
 	}
 	for (auto *ptr : levels[level]) {
-		futs.push_back(hpx::async([rk, ptr, dt]() {
-			return ptr->hydro_substep(rk, dt);
+		futs.push_back(hpx::async([ptr]() {
+			return ptr->hydro_initialize();
 		}));
 	}
 	double a = 0.0;

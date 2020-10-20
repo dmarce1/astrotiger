@@ -17,12 +17,14 @@ void master(int level, double tmax) {
 
 	double nstep;
 	do {
+		dt[level] = levels_hydro_initialize(level);
+		dt[level] = opts.cfl * dx[level] / dt[level];
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
 		dt[level] = (tmax - tm[level]) / nstep;
 		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		levels_hydro_substep(level, 0, dt[level]);
+		levels_hydro_substep(level, 1, dt[level]);
 		tm[level] += dt[level];
-		dt[level] = opts.cfl * dx[level] / levels_hydro_substep(level, 1, dt[level]);
 		master(level + 1, tm[level]);
 	} while (nstep != 1.0);
 

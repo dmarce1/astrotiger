@@ -53,8 +53,9 @@ public:
 	void set_child_family();
 	std::vector<double> get_hydro_boundary(multi_range, int);
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
-	std::vector<double> get_hydro_restrict(multi_range);
-	double hydro_substep(int, double);
+	std::vector<double> get_hydro_restrict();
+	void hydro_substep(int, double);
+	double hydro_initialize();
 
 	void get_hydro_boundaries(bool amr);
 

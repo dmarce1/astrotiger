@@ -34,7 +34,7 @@ hpx::future<tree_client> tree::allocate(int level, multi_range box) {
 }
 
 std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
-	while (step % opts.nrk != this_step) {
+	while (step % (opts.nrk + 1) != this_step % (opts.nrk + 1)) {
 		hpx::this_thread::yield();
 	}
 	return hydro.pack_boundary(b);
@@ -54,8 +54,22 @@ std::vector<std::vector<double>> tree::get_hydro_prolong(std::vector<multi_range
 	return p;
 }
 
-std::vector<double> tree::get_hydro_restrict(multi_range b) {
-	return hydro.pack_restrict(b);
+std::vector<double> tree::get_hydro_restrict() {
+	return hydro.pack_restrict(box.half());
+}
+
+double tree::hydro_initialize() {
+	std::vector<hpx::future<std::vector<double>>> futs;
+	for (int i = 0; i < children.size(); i++) {
+		futs.push_back(children[i].get_hydro_restrict());
+	}
+	for (int i = 0; i < children.size(); i++) {
+		hydro.unpack(futs[i].get(), children[i].get_box());
+	}
+	step++;
+	get_hydro_boundaries(false);
+	return hydro.compute_flux();
+
 }
 
 void tree::get_hydro_boundaries(bool amr) {
@@ -103,7 +117,7 @@ void tree::get_hydro_boundaries(bool amr) {
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
 			auto shifted_box = sib_ranges[i].shift(-siblings[i].shift);
-			sib_futs.push_back(siblings[i].client.get_hydro_boundary(shifted_box, step % opts.nrk));
+			sib_futs.push_back(siblings[i].client.get_hydro_boundary(shifted_box, step));
 		}
 	}
 	if (parent != tree_client() && amr) {
@@ -201,16 +215,17 @@ std::vector<tree_client> tree::get_children() const {
 	return children;
 }
 
-double tree::hydro_substep(int rk, double dt) {
+void tree::hydro_substep(int rk, double dt) {
+	if( rk > 0 ) {
+		hydro.compute_flux();
+	}
 	hydro.substep_update(rk, dt);
 	step++;
 	get_hydro_boundaries(true);
-	const double a = hydro.compute_flux();
 	if (rk == opts.nrk - 1) {
 		t0 = t;
 		t += dt;
 	}
-	return a;
 }
 
 double tree::initialize(int this_level) {
@@ -231,7 +246,6 @@ double tree::initialize(int this_level) {
 			}
 			children.resize(boxes.size());
 			for (int i = 0; i < futs.size(); i++) {
-//				printf("%i %i %i %i\n", boxes[i].min[0], boxes[i].max[0], boxes[i].min[1], boxes[i].max[1]);
 				children[i] = futs[i].get();
 			}
 		}

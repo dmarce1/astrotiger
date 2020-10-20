@@ -32,6 +32,6 @@ hpx::future<std::vector<std::vector<double>>> tree_client::get_hydro_prolong(std
 	return hpx::async<tree::get_hydro_prolong_action>(gid, std::move(b), t);
 }
 
-hpx::future<std::vector<double>> tree_client::get_hydro_restrict(multi_range b) {
-	return hpx::async<tree::get_hydro_restrict_action>(gid, b);
+hpx::future<std::vector<double>> tree_client::get_hydro_restrict() {
+	return hpx::async<tree::get_hydro_restrict_action>(gid);
 }
