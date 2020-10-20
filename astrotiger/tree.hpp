@@ -50,6 +50,7 @@ public:
 	~tree();
 	tree(int, multi_range);
 	double initialize(int);
+	std::vector<multi_range> get_amr_boxes() const;
 	std::vector<tree_client> get_children() const;
 	void set_family(tree_client, tree_client, std::vector<sibling>);
 	void clear_family();
@@ -58,11 +59,13 @@ public:
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
 	std::vector<double> get_hydro_restrict();
 	void hydro_substep(int, double);
-	double hydro_initialize();
+	double hydro_initialize(bool);
 	std::string output(DBfile* db) const;
+	std::vector<multi_range> get_child_boxes() const;
 
 	void get_hydro_boundaries(bool amr);
 
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_child_boxes);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_prolong);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_restrict);

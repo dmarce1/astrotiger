@@ -24,14 +24,21 @@ hpx::future<std::vector<tree_client>> tree_client::get_children() const {
 	return hpx::async<tree::get_children_action>(gid);
 }
 
-hpx::future<std::vector<double>> tree_client::get_hydro_boundary(multi_range b, int step) {
+hpx::future<std::vector<double>> tree_client::get_hydro_boundary(multi_range b, int step) const {
 	return hpx::async<tree::get_hydro_boundary_action>(gid, b, step);
 }
 
-hpx::future<std::vector<std::vector<double>>> tree_client::get_hydro_prolong(std::vector<multi_range> b, double t) {
+hpx::future<std::vector<std::vector<double>>> tree_client::get_hydro_prolong(std::vector<multi_range> b, double t) const {
 	return hpx::async<tree::get_hydro_prolong_action>(gid, std::move(b), t);
 }
 
-hpx::future<std::vector<double>> tree_client::get_hydro_restrict() {
+hpx::future<std::vector<double>> tree_client::get_hydro_restrict() const {
 	return hpx::async<tree::get_hydro_restrict_action>(gid);
 }
+
+
+hpx::future<std::vector<multi_range>> tree_client::get_child_boxes() const {
+	return hpx::async<tree::get_child_boxes_action>(gid);
+}
+
+

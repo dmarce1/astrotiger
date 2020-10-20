@@ -42,8 +42,8 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 	const auto al = sqrt(opts.gamma * pl * rholinv) + abs(vl);
 	const auto a = max(ar, al);
 	flux.resize(opts.nhydro);
-	for (int f = 0; f < NDIM; f++) {
-		flux[f] = 0.5 * ((ur[f] * vr + ul[f] * vl) - a * (ur[f] - ul[f]));
+	for (int f = 0; f < opts.nhydro; f++) {
+		flux[f] = 0.5 * ((ur[f] * vr + ul[f] * vl)) - a * (ur[f] - ul[f]);
 	}
 	flux[sx_i + dim] += 0.5 * (pr + pl);
 	flux[egas_i] += 0.5 * (pr * vr + pl * vl);

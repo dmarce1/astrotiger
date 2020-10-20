@@ -63,7 +63,7 @@ void hydro_grid::substep_update(int rk, double dt) {
 		for (int dim = 0; dim < NDIM; dim++) {
 			multi_index ip1 = i;
 			ip1[dim]++;
-			for (int f = 0; f < NDIM; f++) {
+			for (int f = 0; f < opts.nhydro; f++) {
 				auto &u = U[f][i];
 				u -= (F[dim][f][ip1] - F[dim][f][i]) * lambda;
 				u += +onembeta * (U0[f][i] - u);
@@ -151,7 +151,7 @@ double hydro_grid::coord(index_type i) const {
 	return (i + 0.5) * dx;
 }
 
-std::vector<multi_range> hydro_grid::refined_ranges() const {
+std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_range> &amr_boxes) const {
 
 	std::vector<multi_range> boxes;
 	std::vector<multi_range> tmp;
@@ -170,6 +170,14 @@ std::vector<multi_range> hydro_grid::refined_ranges() const {
 	}
 	if (!range.empty()) {
 		boxes.push_back(range);
+		for (const auto &amr : amr_boxes) {
+			tmp.resize(0);
+			for (const auto &b : boxes) {
+				auto tmp2 = b.subtract(amr.pad(1));
+				tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
+			}
+			boxes = std::move(tmp);
+		}
 		bool change;
 		const auto max_vol = std::pow(opts.max_box / 2, NDIM);
 		do {

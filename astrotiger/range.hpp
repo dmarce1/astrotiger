@@ -63,7 +63,7 @@ public:
 		}
 		return str;
 	}
-	std::vector<range<T>> subtract(const range<T> &sub) {
+	std::vector<range<T>> subtract(const range<T> &sub) const {
 		std::vector<range<T>> ranges;
 		range<T> mid = *this;
 //		printf( "Subtracting (%i,%i),(%i,%i) from (%i,%i),(%i,%i)\n", sub.min[0],sub.max[0],sub.min[1],sub.max[1],(*this).min[0],(*this).max[0],(*this).min[1],(*this).max[1]);

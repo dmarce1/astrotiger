@@ -62,15 +62,15 @@ void levels_hydro_substep(int level, int rk, double dt) {
 	hpx::wait_all(futs.begin(), futs.end());
 }
 
-double levels_hydro_initialize(int level) {
+double levels_hydro_initialize(int level, bool refine) {
 	std::vector<hpx::future<double>> futs;
 	hpx::future<std::vector<double>> fut;
 	if (hpx::get_locality_id() == 0 && other_localities.size()) {
-		fut = hpx::lcos::broadcast < levels_hydro_initialize_action > (other_localities, level);
+		fut = hpx::lcos::broadcast < levels_hydro_initialize_action > (other_localities, level, refine);
 	}
 	for (auto *ptr : levels[level]) {
-		futs.push_back(hpx::async([ptr]() {
-			return ptr->hydro_initialize();
+		futs.push_back(hpx::async([ptr, refine]() {
+			return ptr->hydro_initialize(refine);
 		}));
 	}
 	double a = 0.0;

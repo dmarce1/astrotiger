@@ -16,6 +16,8 @@ using set_family_action_type = tree::set_family_action;
 using clear_family_action_type = tree::clear_family_action;
 using initialize_action_type = tree::initialize_action;
 using get_children_action_type = tree::get_children_action;
+using get_child_boxes_action_type = tree::get_child_boxes_action;
+HPX_REGISTER_ACTION (get_child_boxes_action_type);
 HPX_REGISTER_ACTION (get_hydro_boundary_action_type);
 HPX_REGISTER_ACTION (get_hydro_prolong_action_type);
 HPX_REGISTER_ACTION (get_hydro_restrict_action_type);
@@ -58,7 +60,11 @@ std::vector<double> tree::get_hydro_restrict() {
 	return hydro.pack_restrict(box.half());
 }
 
-double tree::hydro_initialize() {
+std::vector<multi_range> tree::get_child_boxes() const {
+
+}
+
+double tree::hydro_initialize(bool refine) {
 	std::vector<hpx::future<std::vector<double>>> futs;
 	for (int i = 0; i < children.size(); i++) {
 		futs.push_back(children[i].get_hydro_restrict());
@@ -129,7 +135,7 @@ void tree::get_hydro_boundaries(bool amr) {
 					parent_shifts[j][dim] += nx;
 				}
 			}
-	//		printf("%s %i %i\n", r.to_string().c_str(), parent_shifts[j][0], parent_shifts[j][1]);
+			//		printf("%s %i %i\n", r.to_string().c_str(), parent_shifts[j][0], parent_shifts[j][1]);
 			j++;
 		}
 	}
@@ -189,7 +195,31 @@ void tree::clear_family() {
 	parent = tree_client();
 	self = tree_client();
 	siblings.resize(0);
-	children.resize(0);
+}
+
+std::vector<multi_range> tree::get_amr_boxes() const {
+	std::vector<multi_range> amr_ranges;
+	if (level > 0) {
+		const auto bnd_ranges = box.pad(opts.max_bw).subtract(box);
+		for (int i = 0; i < bnd_ranges.size(); i++) {
+			std::vector<multi_range> tmp;
+			std::vector<multi_range> these_ranges(1, bnd_ranges[i]);
+	//		printf( "%i\n", siblings.size());
+			for (const auto &sib : siblings) {
+				tmp.resize(0);
+				for (int j = 0; j < these_ranges.size(); j++) {
+					auto new_ranges = these_ranges[j].subtract(sib.box());
+					tmp.insert(tmp.end(), new_ranges.begin(), new_ranges.end());
+				}
+				these_ranges = std::move(tmp);
+			}
+			amr_ranges.insert(amr_ranges.end(), these_ranges.begin(), these_ranges.end());
+		}
+	}
+//	for( int i = 0; i < amr_ranges.size(); i++) {
+//		printf( "%s %s\n",  box.to_string().c_str(), amr_ranges[i].to_string().c_str());
+//	}
+	return amr_ranges;
 }
 
 void tree::set_child_family() {
@@ -257,7 +287,7 @@ double tree::initialize(int this_level) {
 	} else {
 		if (this_level == level + 1) {
 			hydro.compute_refinement_criteria();
-			auto boxes = hydro.refined_ranges();
+			auto boxes = hydro.refined_ranges(get_amr_boxes());
 
 			std::vector<hpx::future<tree_client>> futs(boxes.size());
 			children.resize(boxes.size());

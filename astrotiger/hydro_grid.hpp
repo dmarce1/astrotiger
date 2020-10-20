@@ -39,7 +39,7 @@ public:
 	double compute_flux();
 	void initialize();
 	void compute_refinement_criteria();
-	std::vector<multi_range> refined_ranges() const;
+	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&) const;
 	double coord(index_type i) const;
 	std::vector<double> pack_field(int f, multi_range) const;
 	std::vector<double> pack_boundary(multi_range bbox) const;
