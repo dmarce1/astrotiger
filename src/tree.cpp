@@ -216,7 +216,7 @@ std::vector<tree_client> tree::get_children() const {
 }
 
 void tree::hydro_substep(int rk, double dt) {
-	if( rk > 0 ) {
+	if (rk > 0) {
 		hydro.compute_flux();
 	}
 	hydro.substep_update(rk, dt);
@@ -259,3 +259,51 @@ double tree::initialize(int this_level) {
 	}
 	return amax;
 }
+
+void tree::output(DBfile *db) const {
+	std::array<double*, NDIM> coords;
+	std::array<int, NDIM> dims1;
+	std::array<int, NDIM> dims2;
+	char *coordnames[NDIM];
+	std::vector<std::vector<double>> vars;
+	vars.resize(opts.nhydro);
+	for (int dim = 0; dim < NDIM; dim++) {
+		dims1[dim] = box.dims()[dim];
+		dims2[dim] = dims1[dim] + 1;
+		coordnames[dim] = new char[2];
+		coordnames[dim][0] = 'x' + dim;
+		coordnames[dim][1] = '\0';
+		coords[dim] = new double[dims2[dim]];
+		for (int i = box.min[dim]; i <= box.max[dim]; i++) {
+			coords[dim][i - box.min[dim]] = hydro.coord(i) - 0.5 * dx;
+		}
+	}
+	for (int f = 0; f < opts.nhydro; f++) {
+		vars[f] = hydro.pack_field(f);
+	}
+	std::string mesh_name;
+	for (int dim = 0; dim < NDIM; dim++) {
+		mesh_name += std::string(coordnames[dim]) + "_";
+		mesh_name += std::to_string(box.min[dim]) + "_" + std::to_string(box.max[dim]);
+		if (dim != NDIM - 1) {
+			mesh_name += std::string("_");
+		}
+	}
+	SILO_CHECK(DBPutQuadmesh(db, mesh_name.c_str(), coordnames, coords.data(), dims2.data(), NDIM, DB_DOUBLE, DB_COLLINEAR, NULL));
+
+	auto var_names = hydro_grid::field_names();
+	for (int f = 0; f < opts.nhydro; f++) {
+		var_names[f] += "_" + mesh_name;
+	}
+
+	for (int f = 0; f < opts.nhydro; f++) {
+//		printf("%s\n", var_names[f].c_str());
+		SILO_CHECK(DBPutQuadvar1(db, var_names[f].c_str(), mesh_name.c_str(), vars[f].data(), dims1.data(), NDIM, NULL, 0, DB_DOUBLE, DB_ZONECENT, NULL));
+	}
+
+	for (int dim = 0; dim < NDIM; dim++) {
+		delete[] coordnames[dim];
+		delete[] coords[dim];
+	}
+}
+

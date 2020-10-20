@@ -9,6 +9,7 @@
 HPX_PLAIN_ACTION (levels_set_child_families);
 HPX_PLAIN_ACTION (levels_hydro_initialize);
 HPX_PLAIN_ACTION (levels_hydro_substep);
+HPX_PLAIN_ACTION (levels_output_silo);
 
 static std::vector<std::unordered_set<tree*>> levels;
 static mutex_type mtx;
@@ -83,5 +84,27 @@ double levels_hydro_initialize(int level) {
 		}
 	}
 	return a;
+}
+
+void levels_output_silo(int level, const std::string filename) {
+	DBfile *db;
+
+	if (level == 0 && hpx::get_locality_id() == 0) {
+		db = DBCreateReal(filename.c_str(), DB_CLOBBER, DB_LOCAL, "Astro-Tiger", DB_PDB);
+	} else {
+		db = DBOpenReal(filename.c_str(), DB_PDB, DB_APPEND);
+	}
+	if (db == nullptr) {
+		printf("Unable to open %s for writing\n", filename.c_str());
+	} else {
+		for (auto *ptr : levels[level]) {
+			ptr->output(db);
+		}
+		SILO_CHECK(DBClose(db));
+		auto localities = hpx::find_all_localities();
+		if (hpx::get_locality_id() != localities.size() - 1) {
+			levels_output_silo_action()(localities[hpx::get_locality_id() + 1], level, filename);
+		}
+	}
 }
 

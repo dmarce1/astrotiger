@@ -74,7 +74,13 @@ int hpx_main(int argc, char *argv[]) {
 		}
 	}
 	root.set_family(tree_client(), root, sibs).get();
-	master(0, opts.tmax);
+	for (int l = 0; l <= opts.max_level; l++) {
+		levels_output_silo(l, "X.0.silo");
+	}
+	master(0, 0.25);
+	for (int l = 0; l <= opts.max_level; l++) {
+		levels_output_silo(l, "X.1.silo");
+	}
 	return hpx::finalize();
 }
 

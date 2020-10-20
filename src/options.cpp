@@ -51,7 +51,7 @@ bool options::process_options(int argc, char *argv[]) {
 	}
 	po::notify(vm);
 
-	nhydro = 4;
+	nhydro = 2 + NDIM;
 	hbw = 2;
 	max_bw = 2;
 	window = 1;

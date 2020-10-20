@@ -14,6 +14,13 @@
 #include <astrotiger/tree_client.hpp>
 #include <astrotiger/hydro_grid.hpp>
 
+#include <silo.h>
+
+#define SILO_CHECK(b) \
+	if( b != 0 ) { \
+		printf( "SILO call failed in %s on line %i\n", __FILE__, __LINE__); \
+	}
+
 struct sibling {
 	tree_client client;
 	vect<int> shift;
@@ -56,6 +63,7 @@ public:
 	std::vector<double> get_hydro_restrict();
 	void hydro_substep(int, double);
 	double hydro_initialize();
+	void output(DBfile* db) const;
 
 	void get_hydro_boundaries(bool amr);
 

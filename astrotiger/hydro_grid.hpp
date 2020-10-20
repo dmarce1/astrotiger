@@ -41,11 +41,14 @@ public:
 	void compute_refinement_criteria();
 	std::vector<multi_range> refined_ranges() const;
 	double coord(index_type i) const;
-	std::vector<double> pack_boundary(multi_range bbox);
-	std::vector<double> pack_prolong(multi_range bbox, double w);
-	std::vector<double> pack_restrict(multi_range bbox);
+	std::vector<double> pack_field(int f) const;
+	std::vector<double> pack_boundary(multi_range bbox) const;
+	std::vector<double> pack_prolong(multi_range bbox, double w) const;
+	std::vector<double> pack_restrict(multi_range bbox) const;
 	void unpack(const std::vector<double>&, multi_range bbox);
 	void substep_update(int rk, double dt);
+
+	static std::vector<std::string> field_names();
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

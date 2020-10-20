@@ -109,7 +109,7 @@ void hydro_grid::compute_refinement_criteria() {
 		for (int dim = 0; dim < NDIM; dim++) {
 			max_grad_rho = std::max(max_grad_rho, std::abs(U[rho_i].smooth_gradient(dim, i)));
 		}
-	//	printf("%e\n", max_grad_rho);
+		//	printf("%e\n", max_grad_rho);
 		bool res = max_grad_rho / U[rho_i][i] > opts.refine_slope;
 		if (res) {
 			R[i] = true;
@@ -131,7 +131,9 @@ void hydro_grid::initialize() {
 			for (int dim = 0; dim < 1; dim++) {
 				xsum += coord(i[dim]) - 0.5;
 			}
-			if (xsum < 0.0) {
+//			U[sx_i][i] = coord(i[0]);
+//			U[sy_i][i] = coord(i[1]);
+			if ((xsum > -0.5 && xsum < 0.0) || (xsum > 0.5)) {
 				U[rho_i][i] = 1.0;
 				U[egas_i][i] = 1.0;
 			} else {
@@ -212,7 +214,8 @@ std::vector<multi_range> hydro_grid::refined_ranges() const {
 	return std::move(finished);
 }
 
-std::vector<double> hydro_grid::pack_boundary(multi_range bbox) {
+std::vector<double> hydro_grid::pack_boundary(multi_range bbox) const {
+	printf( "Packing %s\n",bbox.to_string().c_str());
 	std::vector<double> data;
 	for (int f = 0; f < opts.nhydro; f++) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
@@ -222,7 +225,20 @@ std::vector<double> hydro_grid::pack_boundary(multi_range bbox) {
 	return data;
 }
 
-std::vector<double> hydro_grid::pack_prolong(multi_range bbox, double w) {
+std::vector<double> hydro_grid::pack_field(int f) const {
+	std::vector<double> data;
+	const auto bbox = box.pad(-opts.hbw);
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		multi_index j = i.index();
+		if ( NDIM > 1) {
+			std::swap(j[0], j[NDIM - 1]);
+		}
+		data.push_back(U[f][j]);
+	}
+	return data;
+}
+
+std::vector<double> hydro_grid::pack_prolong(multi_range bbox, double w) const {
 	std::vector<double> data;
 	for (int f = 0; f < opts.nhydro; f++) {
 		auto pro0 = U[f].prolong(bbox);
@@ -234,7 +250,7 @@ std::vector<double> hydro_grid::pack_prolong(multi_range bbox, double w) {
 	return data;
 }
 
-std::vector<double> hydro_grid::pack_restrict(multi_range bbox) {
+std::vector<double> hydro_grid::pack_restrict(multi_range bbox) const {
 	std::vector<double> data;
 	for (int f = 0; f < opts.nhydro; f++) {
 		auto res = U[f].restrict_(bbox);
@@ -246,12 +262,24 @@ std::vector<double> hydro_grid::pack_restrict(multi_range bbox) {
 }
 
 void hydro_grid::unpack(const std::vector<double> &data, multi_range bbox) {
+	printf( "unpacking %s\n",bbox.to_string().c_str());
 	int k = 0;
 	for (int f = 0; f < opts.nhydro; f++) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
 			assert(k < data.size());
 			U[f][i] = data[k];
+			k++;
 		}
 	}
+}
+
+std::vector<std::string> hydro_grid::field_names() {
+	std::vector<std::string> names;
+	names.push_back("D");
+	names.push_back("E");
+	for (int dim = 0; dim < NDIM; dim++) {
+		names.push_back(std::string("S") + char('x' + dim));
+	}
+	return names;
 }
 
