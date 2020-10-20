@@ -86,9 +86,9 @@ double levels_hydro_initialize(int level) {
 	return a;
 }
 
-void levels_output_silo(int level, const std::string filename) {
+std::vector<std::string> levels_output_silo(int level, const std::string filename) {
 	DBfile *db;
-
+	std::vector<std::string> mnames;
 	if (level == 0 && hpx::get_locality_id() == 0) {
 		db = DBCreateReal(filename.c_str(), DB_CLOBBER, DB_LOCAL, "Astro-Tiger", DB_PDB);
 	} else {
@@ -98,13 +98,15 @@ void levels_output_silo(int level, const std::string filename) {
 		printf("Unable to open %s for writing\n", filename.c_str());
 	} else {
 		for (auto *ptr : levels[level]) {
-			ptr->output(db);
+			mnames.push_back(ptr->output(db));
 		}
 		SILO_CHECK(DBClose(db));
 		auto localities = hpx::find_all_localities();
 		if (hpx::get_locality_id() != localities.size() - 1) {
-			levels_output_silo_action()(localities[hpx::get_locality_id() + 1], level, filename);
+			auto other_names = levels_output_silo_action()(localities[hpx::get_locality_id() + 1], level, filename);
+			mnames.insert(mnames.end(), other_names.begin(), other_names.end());
 		}
 	}
+	return mnames;
 }
 

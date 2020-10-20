@@ -128,12 +128,10 @@ void hydro_grid::initialize() {
 				U[sx_i + dim][i] = 0.0;
 			}
 			double xsum = 0.0;
-			for (int dim = 0; dim < 1; dim++) {
+			for (int dim = 0; dim < NDIM; dim++) {
 				xsum += coord(i[dim]) - 0.5;
 			}
-//			U[sx_i][i] = coord(i[0]);
-//			U[sy_i][i] = coord(i[1]);
-			if ((xsum > -0.5 && xsum < 0.0) || (xsum > 0.5)) {
+			if (xsum > 0.0) {
 				U[rho_i][i] = 1.0;
 				U[egas_i][i] = 1.0;
 			} else {
@@ -225,9 +223,8 @@ std::vector<double> hydro_grid::pack_boundary(multi_range bbox) const {
 	return data;
 }
 
-std::vector<double> hydro_grid::pack_field(int f) const {
+std::vector<double> hydro_grid::pack_field(int f, multi_range bbox) const {
 	std::vector<double> data;
-	auto bbox = box.pad(-opts.hbw);
 	if ( NDIM > 1) {
 		std::swap(bbox.min[0], bbox.min[NDIM - 1]);
 		std::swap(bbox.max[0], bbox.max[NDIM - 1]);

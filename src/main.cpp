@@ -1,5 +1,6 @@
 #include <astrotiger/tree.hpp>
 #include <astrotiger/levels.hpp>
+#include <astrotiger/output.hpp>
 
 static tree_client root;
 
@@ -23,6 +24,7 @@ void master(int level, double tmax) {
 		dt[level] = (tmax - tm[level]) / nstep;
 		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		levels_hydro_substep(level, 0, dt[level]);
+		printf( "...\n");
 		levels_hydro_substep(level, 1, dt[level]);
 		tm[level] += dt[level];
 		master(level + 1, tm[level]);
@@ -74,13 +76,9 @@ int hpx_main(int argc, char *argv[]) {
 		}
 	}
 	root.set_family(tree_client(), root, sibs).get();
-	for (int l = 0; l <= opts.max_level; l++) {
-		levels_output_silo(l, "X.0.silo");
-	}
+	output_silo("X.0.silo");
 	master(0, 0.25);
-	for (int l = 0; l <= opts.max_level; l++) {
-		levels_output_silo(l, "X.1.silo");
-	}
+	output_silo("X.1.silo");
 	return hpx::finalize();
 }
 

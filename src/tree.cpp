@@ -75,6 +75,7 @@ double tree::hydro_initialize() {
 void tree::get_hydro_boundaries(bool amr) {
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
+	std::vector<vect<index_type>> parent_shifts;
 	std::vector<multi_range> sib_ranges;
 	for (int dim = 0; dim < NDIM; dim++) {
 		auto this_box = box;
@@ -112,6 +113,25 @@ void tree::get_hydro_boundaries(bool amr) {
 			}
 			parent_ranges.insert(parent_ranges.end(), these_ranges.begin(), these_ranges.end());
 		}
+		const int nx = (1 << level) * opts.max_box;
+		parent_shifts.resize(parent_ranges.size());
+		int j = 0;
+		for (auto &r : parent_ranges) {
+			parent_shifts[j] = vect<index_type>(0);
+			for (int dim = 0; dim < NDIM; dim++) {
+				if (r.min[dim] < 0) {
+					r.min[dim] += nx;
+					r.max[dim] += nx;
+					parent_shifts[j][dim] -= nx;
+				} else if (r.max[dim] > nx) {
+					r.min[dim] -= nx;
+					r.max[dim] -= nx;
+					parent_shifts[j][dim] += nx;
+				}
+			}
+	//		printf("%s %i %i\n", r.to_string().c_str(), parent_shifts[j][0], parent_shifts[j][1]);
+			j++;
+		}
 	}
 	std::vector<hpx::future<std::vector<double>>> sib_futs;
 	for (int i = 0; i < sib_ranges.size(); i++) {
@@ -124,7 +144,7 @@ void tree::get_hydro_boundaries(bool amr) {
 		auto parent_fut = parent.get_hydro_prolong(parent_ranges, t);
 		const auto datas = parent_fut.get();
 		for (int i = 0; i < datas.size(); i++) {
-			hydro.unpack(datas[i], parent_ranges[i]);
+			hydro.unpack(datas[i], parent_ranges[i].shift(parent_shifts[i]));
 		}
 	}
 	int j = 0;
@@ -260,7 +280,10 @@ double tree::initialize(int this_level) {
 	return amax;
 }
 
-void tree::output(DBfile *db) const {
+std::string tree::output(DBfile *db) const {
+	auto options = DBMakeOptlist(1);
+	int one = 1;
+	DBAddOption(options, DBOPT_HIDE_FROM_GUI, &one);
 	std::array<double*, NDIM> coords;
 	std::array<int, NDIM> dims1;
 	std::array<int, NDIM> dims2;
@@ -268,18 +291,18 @@ void tree::output(DBfile *db) const {
 	std::vector<std::vector<double>> vars;
 	vars.resize(opts.nhydro);
 	for (int dim = 0; dim < NDIM; dim++) {
-		dims1[dim] = box.dims()[dim];
+		dims1[dim] = box.dims()[dim]/* + 2* opts.hbw*/;
 		dims2[dim] = dims1[dim] + 1;
 		coordnames[dim] = new char[2];
 		coordnames[dim][0] = 'x' + dim;
 		coordnames[dim][1] = '\0';
 		coords[dim] = new double[dims2[dim]];
-		for (int i = box.min[dim]; i <= box.max[dim]; i++) {
-			coords[dim][i - box.min[dim]] = hydro.coord(i) - 0.5 * dx;
+		for (int i = box.min[dim]/* - opts.hbw*/; i <= box.max[dim] /*+ opts.hbw*/; i++) {
+			coords[dim][i - box.min[dim]/* + opts.hbw*/] = hydro.coord(i) - 0.5 * dx;
 		}
 	}
 	for (int f = 0; f < opts.nhydro; f++) {
-		vars[f] = hydro.pack_field(f);
+		vars[f] = hydro.pack_field(f, box/*.pad(opts.hbw)*/);
 	}
 	std::string mesh_name;
 	for (int dim = 0; dim < NDIM; dim++) {
@@ -289,7 +312,7 @@ void tree::output(DBfile *db) const {
 			mesh_name += std::string("_");
 		}
 	}
-	SILO_CHECK(DBPutQuadmesh(db, mesh_name.c_str(), coordnames, coords.data(), dims2.data(), NDIM, DB_DOUBLE, DB_COLLINEAR, NULL));
+	SILO_CHECK(DBPutQuadmesh(db, mesh_name.c_str(), coordnames, coords.data(), dims2.data(), NDIM, DB_DOUBLE, DB_COLLINEAR, options));
 
 	auto var_names = hydro_grid::field_names();
 	for (int f = 0; f < opts.nhydro; f++) {
@@ -298,12 +321,14 @@ void tree::output(DBfile *db) const {
 
 	for (int f = 0; f < opts.nhydro; f++) {
 //		printf("%s\n", var_names[f].c_str());
-		SILO_CHECK(DBPutQuadvar1(db, var_names[f].c_str(), mesh_name.c_str(), vars[f].data(), dims1.data(), NDIM, NULL, 0, DB_DOUBLE, DB_ZONECENT, NULL));
+		SILO_CHECK(DBPutQuadvar1(db, var_names[f].c_str(), mesh_name.c_str(), vars[f].data(), dims1.data(), NDIM, NULL, 0, DB_DOUBLE, DB_ZONECENT,options));
 	}
 
 	for (int dim = 0; dim < NDIM; dim++) {
 		delete[] coordnames[dim];
 		delete[] coords[dim];
 	}
+	DBFreeOptlist(options);
+	return mesh_name;
 }
 

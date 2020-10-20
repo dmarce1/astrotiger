@@ -156,14 +156,14 @@ public:
 			for (int dim = 0; dim < NDIM; dim++) {
 				c0[dim] = 0.25 * (2 * (i[dim] % 2) - 1);
 			}
-			multi_index j = i.index() + box.min * 2 - pro_box.min;
+			multi_index j = i.index();
 			for (int dim = 0; dim < NDIM; dim++) {
 				j[dim] = (j[dim] - j[dim] % 2) / 2;
 			}
 			const multi_index k = j + grad_box.min - box.min;
 			double sum = (*this)[j];
 			for (int dim = 0; dim < NDIM; dim++) {
-				sum += c0[dim] * grad[dim][k];
+	//			sum += c0[dim] * grad[dim][k];
 			}
 			pro[i] = sum;
 		}
