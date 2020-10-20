@@ -160,10 +160,9 @@ public:
 			for (int dim = 0; dim < NDIM; dim++) {
 				j[dim] = (j[dim] - j[dim] % 2) / 2;
 			}
-			const multi_index k = j + grad_box.min - box.min;
 			double sum = (*this)[j];
 			for (int dim = 0; dim < NDIM; dim++) {
-	//			sum += c0[dim] * grad[dim][k];
+				sum += c0[dim] * grad[dim][j];
 			}
 			pro[i] = sum;
 		}
