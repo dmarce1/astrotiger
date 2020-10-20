@@ -215,7 +215,7 @@ std::vector<multi_range> hydro_grid::refined_ranges() const {
 }
 
 std::vector<double> hydro_grid::pack_boundary(multi_range bbox) const {
-	printf( "Packing %s\n",bbox.to_string().c_str());
+//	printf("Packing %s\n", bbox.to_string().c_str());
 	std::vector<double> data;
 	for (int f = 0; f < opts.nhydro; f++) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
@@ -227,7 +227,11 @@ std::vector<double> hydro_grid::pack_boundary(multi_range bbox) const {
 
 std::vector<double> hydro_grid::pack_field(int f) const {
 	std::vector<double> data;
-	const auto bbox = box.pad(-opts.hbw);
+	auto bbox = box.pad(-opts.hbw);
+	if ( NDIM > 1) {
+		std::swap(bbox.min[0], bbox.min[NDIM - 1]);
+		std::swap(bbox.max[0], bbox.max[NDIM - 1]);
+	}
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		multi_index j = i.index();
 		if ( NDIM > 1) {
@@ -251,6 +255,7 @@ std::vector<double> hydro_grid::pack_prolong(multi_range bbox, double w) const {
 }
 
 std::vector<double> hydro_grid::pack_restrict(multi_range bbox) const {
+//	printf( "pack restrict %s\n", bbox.to_string().c_str());
 	std::vector<double> data;
 	for (int f = 0; f < opts.nhydro; f++) {
 		auto res = U[f].restrict_(bbox);
@@ -262,7 +267,7 @@ std::vector<double> hydro_grid::pack_restrict(multi_range bbox) const {
 }
 
 void hydro_grid::unpack(const std::vector<double> &data, multi_range bbox) {
-	printf( "unpacking %s\n",bbox.to_string().c_str());
+//	printf("unpacking %s\n", bbox.to_string().c_str());
 	int k = 0;
 	for (int f = 0; f < opts.nhydro; f++) {
 		for (multi_iterator i(bbox); !i.end(); i++) {

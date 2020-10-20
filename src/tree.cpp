@@ -64,7 +64,7 @@ double tree::hydro_initialize() {
 		futs.push_back(children[i].get_hydro_restrict());
 	}
 	for (int i = 0; i < children.size(); i++) {
-		hydro.unpack(futs[i].get(), children[i].get_box());
+		hydro.unpack(futs[i].get(), children[i].get_box().half());
 	}
 	step++;
 	get_hydro_boundaries(false);
@@ -283,7 +283,7 @@ void tree::output(DBfile *db) const {
 	}
 	std::string mesh_name;
 	for (int dim = 0; dim < NDIM; dim++) {
-		mesh_name += std::string(coordnames[dim]) + "_";
+		mesh_name += std::to_string(level) + std::string("_") + std::string(coordnames[dim]) + "_";
 		mesh_name += std::to_string(box.min[dim]) + "_" + std::to_string(box.max[dim]);
 		if (dim != NDIM - 1) {
 			mesh_name += std::string("_");
