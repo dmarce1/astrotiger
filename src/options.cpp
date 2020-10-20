@@ -25,7 +25,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("config_file", po::value < std::string > (&config_file)->default_value(""), "configuration file") //
 	("problem", po::value < std::string > (&problem)->default_value("sod"), "Problem 1 - sod\n") //
 	("max_box", po::value<int>(&max_box)->default_value(32), "maximum (box volume)^(1/3)") //
-	("max_level", po::value<int>(&max_level)->default_value(1), "maximum refinement level") //
+	("max_level", po::value<int>(&max_level)->default_value(2), "maximum refinement level") //
 	("tmax", po::value<double>(&tmax)->default_value(0.25), "maximum simulation time") //
 	("cfl", po::value<double>(&cfl)->default_value(0.2), "cfl factor") //
 	("gamma", po::value<double>(&gamma)->default_value(5.0 / 3.0), "fluid gamma") //
