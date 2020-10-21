@@ -49,7 +49,8 @@ public:
 	hpx::future<std::vector<std::vector<double>>> get_hydro_prolong(std::vector<multi_range> b, double t) const;
 	hpx::future<std::vector<double>> get_hydro_restrict() const;
 	hpx::future<std::vector<multi_range>> get_child_boxes() const;
-
+	hpx::future<std::vector<multi_range>> get_grandchild_boxes(int) const;
+	hpx::future<std::shared_ptr<tree>> get_ptr() const;
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

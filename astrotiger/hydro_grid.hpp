@@ -38,11 +38,11 @@ public:
 
 	double compute_flux();
 	void initialize();
-	void compute_refinement_criteria();
+	void compute_refinement_criteria(const std::vector<multi_range>& forced);
 	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&) const;
 	double coord(index_type i) const;
 	std::vector<double> pack_field(int f, multi_range) const;
-	std::vector<double> pack_boundary(multi_range bbox) const;
+	std::vector<double> pack(multi_range bbox) const;
 	std::vector<double> pack_prolong(multi_range bbox, double w) const;
 	std::vector<double> pack_restrict(multi_range bbox) const;
 	void unpack(const std::vector<double>&, multi_range bbox);

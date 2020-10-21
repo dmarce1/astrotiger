@@ -42,3 +42,11 @@ hpx::future<std::vector<multi_range>> tree_client::get_child_boxes() const {
 }
 
 
+hpx::future<std::vector<multi_range>> tree_client::get_grandchild_boxes(int step) const {
+	return hpx::async<tree::get_grandchild_boxes_action>(gid, step);
+}
+
+
+hpx::future<std::shared_ptr<tree>> tree_client::get_ptr() const {
+	return hpx::async<tree::get_ptr_action>(gid);
+}

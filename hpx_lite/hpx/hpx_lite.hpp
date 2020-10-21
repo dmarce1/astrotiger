@@ -59,6 +59,8 @@
 #include "detail/hpx_decl.hpp"
 #include "detail/hpx_impl.hpp"
 
+
+
 namespace hpx {
 const static id_type invalid_id;
 namespace naming {

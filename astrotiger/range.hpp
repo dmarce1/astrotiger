@@ -54,7 +54,7 @@ public:
 	}
 	std::string to_string() const {
 		std::string str;
-		for( int dim = 0; dim < NDIM; dim++) {
+		for (int dim = 0; dim < NDIM; dim++) {
 			str += "(";
 			str += std::to_string(min[dim]);
 			str += ",";
@@ -155,6 +155,14 @@ public:
 			vol *= std::max(max[dim] - min[dim], T(0));
 		}
 		return vol;
+	}
+	bool contains(const vect<T> &pt) const {
+		for (int dim = 0; dim < NDIM; dim++) {
+			if (pt[dim] < min[dim] || pt[dim] >= max[dim]) {
+				return false;
+			}
+		}
+		return true;
 	}
 	template<class A>
 	void serialize(A &&arc, unsigned) {

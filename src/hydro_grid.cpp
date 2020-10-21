@@ -99,7 +99,7 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 hydro_grid::~hydro_grid() {
 }
 
-void hydro_grid::compute_refinement_criteria() {
+void hydro_grid::compute_refinement_criteria(const std::vector<multi_range> &forced) {
 	const auto ibox = box.pad(-opts.hbw);
 	for (multi_iterator i(box); !i.end(); i++) {
 		R[i] = false;
@@ -109,8 +109,15 @@ void hydro_grid::compute_refinement_criteria() {
 		for (int dim = 0; dim < NDIM; dim++) {
 			max_grad_rho = std::max(max_grad_rho, std::abs(U[rho_i].smooth_gradient(dim, i)));
 		}
-		//	printf("%e\n", max_grad_rho);
 		bool res = max_grad_rho / U[rho_i][i] > opts.refine_slope;
+		if (!res) {
+			for (const auto &f : forced) {
+				if (f.contains(i)) {
+					res = true;
+					break;
+				}
+			}
+		}
 		if (res) {
 			R[i] = true;
 			auto window = range<index_type>(i).pad(opts.window);
@@ -173,7 +180,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 		for (const auto &amr : amr_boxes) {
 			tmp.resize(0);
 			for (const auto &b : boxes) {
-				auto tmp2 = b.subtract(amr.pad(1));
+				auto tmp2 = b.subtract(amr.pad(opts.window));
 				tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
 			}
 			boxes = std::move(tmp);
@@ -220,7 +227,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 	return std::move(finished);
 }
 
-std::vector<double> hydro_grid::pack_boundary(multi_range bbox) const {
+std::vector<double> hydro_grid::pack(multi_range bbox) const {
 //	printf("Packing %s\n", bbox.to_string().c_str());
 	std::vector<double> data;
 	for (int f = 0; f < opts.nhydro; f++) {
@@ -250,10 +257,17 @@ std::vector<double> hydro_grid::pack_field(int f, multi_range bbox) const {
 std::vector<double> hydro_grid::pack_prolong(multi_range bbox, double w) const {
 	std::vector<double> data;
 	for (int f = 0; f < opts.nhydro; f++) {
-		auto pro0 = U[f].prolong(bbox);
-		auto pro1 = U[f].prolong(bbox);
-		for (multi_iterator i(bbox); !i.end(); i++) {
-			data.push_back(w * pro0[i] + (1.0 - w) * pro1[i]);
+		if (w == 0.0 || w == 1.0) {
+			auto pro = w == 0.0 ? U0[f].prolong(bbox) : U[f].prolong(bbox);
+			for (multi_iterator i(bbox); !i.end(); i++) {
+				data.push_back(pro[i]);
+			}
+		} else {
+			auto pro0 = U0[f].prolong(bbox);
+			auto pro1 = U[f].prolong(bbox);
+			for (multi_iterator i(bbox); !i.end(); i++) {
+				data.push_back((1.0 - w) * pro0[i] + w * pro1[i]);
+			}
 		}
 	}
 	return data;
