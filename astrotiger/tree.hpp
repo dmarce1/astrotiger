@@ -122,14 +122,14 @@ public:
 	void hydro_substep(int, double);
 	double hydro_initialize(bool);
 	std::string output(DBfile *db) const;
-	std::vector<multi_range> get_child_boxes() const;
 	std::vector<multi_range> get_grandchild_boxes(int) const;
+	tree_client truncate(tree_client, multi_range box);
 
 	void get_hydro_boundaries(bool amr);
 
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,truncate);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_ptr);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_grandchild_boxes);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_child_boxes);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_prolong);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_restrict);

@@ -81,7 +81,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	root.set_family(tree_client(), root, sibs).get();
 	output_silo("X.0.silo");
-	master(0, 0.25);
+	master(0, 0.00001);
 	output_silo("X.1.silo");
 	return hpx::finalize();
 }

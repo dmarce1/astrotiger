@@ -41,6 +41,7 @@ public:
 		box = box_;
 	}
 
+	hpx::future<tree_client> truncate(multi_range box) const;
 	hpx::future<void> clear_family() const;
 	hpx::future<void> set_family(tree_client p, tree_client, std::vector<sibling> c) const;
 	hpx::future<double> initialize(int) const;
@@ -48,7 +49,6 @@ public:
 	hpx::future<std::vector<double>> get_hydro_boundary(multi_range b, int) const;
 	hpx::future<std::vector<std::vector<double>>> get_hydro_prolong(std::vector<multi_range> b, double t) const;
 	hpx::future<std::vector<double>> get_hydro_restrict() const;
-	hpx::future<std::vector<multi_range>> get_child_boxes() const;
 	hpx::future<std::vector<multi_range>> get_grandchild_boxes(int) const;
 	hpx::future<std::shared_ptr<tree>> get_ptr() const;
 

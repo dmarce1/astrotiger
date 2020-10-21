@@ -37,10 +37,9 @@ hpx::future<std::vector<double>> tree_client::get_hydro_restrict() const {
 }
 
 
-hpx::future<std::vector<multi_range>> tree_client::get_child_boxes() const {
-	return hpx::async<tree::get_child_boxes_action>(gid);
+hpx::future<tree_client> tree_client::truncate( multi_range box) const {
+	return hpx::async<tree::truncate_action>(gid, *this, box);
 }
-
 
 hpx::future<std::vector<multi_range>> tree_client::get_grandchild_boxes(int step) const {
 	return hpx::async<tree::get_grandchild_boxes_action>(gid, step);
