@@ -82,27 +82,30 @@ std::shared_ptr<tree> tree::get_ptr() {
 
 tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 //	printf("%s %s\n", box.to_string().c_str(), trunc_box.to_string().c_str());
-	std::vector<hpx::future<tree_client>> futs;
 	const auto new_box = trunc_box.intersection(box);
-	assert( new_box.volume());
-	for (const auto &c : children) {
-		if (!c.get_box().intersection(new_box.double_()).empty()) {
-			futs.push_back(c.truncate(new_box.double_()));
-		} else {
-			futs.push_back(hpx::make_ready_future(c));
-		}
-	}
-	for (int i = 0; i < children.size(); i++) {
-		if (!children[i].get_box().intersection(new_box.double_()).empty()) {
-			children[i] = futs[i].get();
-		}
-	}
+	assert(new_box.volume());
+
 	tree_client rclient;
 	if (new_box == box) {
+		std::vector<hpx::future<tree_client>> futs;
+		for (const auto &c : children) {
+			assert(c != tree_client());
+			if (!c.get_box().intersection(new_box.double_()).empty()) {
+				futs.push_back(c.truncate(new_box.double_()));
+			}
+		}
+		std::vector<tree_client> new_children;
+		for (int i = 0; i < futs.size(); i++) {
+			new_children.push_back(futs[i].get());
+		}
+		children = std::move(new_children);
 		rclient = self;
 	} else {
-		printf( "TRUNCACTING %s %s\n", box.to_string().c_str(), trunc_box.to_string().c_str());
-		clear_family();
+		if( truncated++ == 0 ) {
+			self = tree_client();
+			parent = tree_client();
+			siblings.resize(0);
+		}
 		tree new_tree(level, new_box);
 		new_tree.hydro.resize(new_tree.dx, new_box.pad(opts.hbw));
 		new_tree.t = new_tree.t0 = t;
@@ -114,6 +117,7 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 		}
 		auto fut = hpx::new_<tree>(hpx::find_here(), std::move(new_tree));
 		rclient = tree_client(fut.get(), new_box);
+		rclient.truncate(new_box).get();
 	}
 	return rclient;
 }
@@ -230,6 +234,7 @@ double tree::hydro_initialize(bool refine) {
 		children = std::move(new_children);
 		std::vector<hpx::future<tree_client>> tfuts;
 		for (int i = unchanged_cnt; i < children.size(); i++) {
+			assert(children[i] != tree_client());
 			tfuts.push_back(children[i].truncate(children[i].get_box()));
 		}
 		int j = 0;
@@ -333,7 +338,7 @@ void tree::get_hydro_boundaries(bool amr) {
 }
 
 tree::tree() :
-		hydro_step(0), refine_step(0) {
+		hydro_step(0), refine_step(0), truncated(0) {
 	level = -1;
 }
 
@@ -345,7 +350,7 @@ tree::~tree() {
 }
 
 tree::tree(int level_, multi_range box_) :
-		hydro_step(0), refine_step(0) {
+		hydro_step(0), refine_step(0), truncated(0) {
 	t0 = 0.0;
 	t = 0.0;
 	level = level_;
@@ -368,12 +373,9 @@ void tree::clear_family() {
 	for (const auto &c : children) {
 		futs.push_back(c.clear_family());
 	}
-	{
-		std::lock_guard<mutex_type> lock(mtx);
-		parent = tree_client();
-		self = tree_client();
-		siblings.resize(0);
-	}
+	parent = tree_client();
+	self = tree_client();
+	siblings.resize(0);
 	hpx::wait_all(futs.begin(), futs.end());
 }
 

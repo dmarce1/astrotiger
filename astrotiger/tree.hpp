@@ -39,6 +39,7 @@ class tree: public hpx::components::managed_component_base<tree> {
 	int level;
 	std::atomic<int> hydro_step;
 	std::atomic<int> refine_step;
+	std::atomic<int> truncated;
 	std::vector<multi_range> grandchild_boxes;
 	mutex_type mtx;
 	double dx;
@@ -49,7 +50,7 @@ public:
 	static hpx::future<tree_client> allocate(int, multi_range box);
 
 	tree(tree &&other) :
-			hydro_step(0), refine_step(0) {
+			hydro_step(0), refine_step(0), truncated(0) {
 		box = std::move(other.box);
 		hydro = std::move(other.hydro);
 		parent = std::move(other.parent);
@@ -65,7 +66,7 @@ public:
 //		printf("Adding entry %i\n", level);
 	}
 	tree(const tree &other) :
-			hydro_step(0), refine_step(0) {
+			hydro_step(0), refine_step(0), truncated(0) {
 		box = other.box;
 		hydro = other.hydro;
 		parent = other.parent;
