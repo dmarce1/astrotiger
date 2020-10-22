@@ -21,6 +21,8 @@ void master(int level, double tmax) {
 		bool refine = nstep == -1;
 		dt[level] = levels_hydro_initialize(level, true);
 		if (dt[level] == 0.0) {
+			tm[level] = tm[level - 1];
+			master(level + 1, tm[level]);
 			return;
 		}
 		levels_show();
