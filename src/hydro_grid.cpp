@@ -106,10 +106,13 @@ void hydro_grid::compute_refinement_criteria(const std::vector<multi_range> &for
 	}
 	for (multi_iterator i(ibox); !i.end(); i++) {
 		double max_grad_rho = 0.0;
+		double max_grad_egas = 0.0;
 		for (int dim = 0; dim < NDIM; dim++) {
 			max_grad_rho = std::max(max_grad_rho, std::abs(U[rho_i].smooth_gradient(dim, i)));
+			max_grad_egas = std::max(max_grad_egas, std::abs(U[egas_i].smooth_gradient(dim, i)));
 		}
 		bool res = max_grad_rho / U[rho_i][i] > opts.refine_slope;
+		res = res || max_grad_egas / U[egas_i][i] > opts.refine_slope;
 		if (!res) {
 			for (const auto &f : forced) {
 				if (f.contains(i)) {
@@ -200,11 +203,24 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 		}
 		bool change;
 		const auto max_vol = std::pow(opts.max_box / 2, NDIM);
+		const auto min_vol = std::pow(opts.min_box / 2, NDIM);
 		do {
 			tmp.resize(0);
 			for (const auto &b : boxes) {
-				if (b.volume() > max_vol) {
+				assert(b.volume());
+				int count = 0;
+				for (multi_iterator i(b); !i.end(); i++) {
+					if (R[i]) {
+						count++;
+					}
+				}
+				const auto this_vol = b.volume();
+				const double efficiency = (double) count / (double) this_vol;
+				if (this_vol > max_vol || (efficiency < opts.efficiency && this_vol >= min_vol)) {
 					auto new_boxes = b.split();
+					assert(b.volume());
+					assert(new_boxes.first.volume());
+					assert(new_boxes.second.volume());
 					range.min = new_boxes.first.max;
 					range.max = new_boxes.first.min;
 					for (multi_iterator i(new_boxes.first); !i.end(); i++) {
@@ -227,9 +243,16 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 						}
 					}
 					new_boxes.second = range;
-					tmp.push_back(new_boxes.first);
-					tmp.push_back(new_boxes.second);
+					if (new_boxes.first.volume()) {
+						tmp.push_back(new_boxes.first);
+					}
+					if (new_boxes.second.volume()) {
+						tmp.push_back(new_boxes.second);
+
+					}
+					assert(new_boxes.second.volume() || new_boxes.first.volume());
 				} else {
+					assert(b.volume());
 					finished.push_back(b);
 				}
 			}

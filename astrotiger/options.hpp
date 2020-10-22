@@ -10,6 +10,7 @@ public:
 	int nhydro;
 	int ngroup;
 	int max_box;
+	int min_box;
 	int hbw;
 	int max_bw;
 	int window;
@@ -20,9 +21,12 @@ public:
 	double gamma;
 	double cfl;
 	double tmax;
+	double efficiency;
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
+		arc & efficiency;
+		arc & min_box;
 		arc & tmax;
 		arc & cfl;
 		arc & nrk;

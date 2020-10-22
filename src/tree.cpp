@@ -100,6 +100,7 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 	if (new_box == box) {
 		rclient = self;
 	} else {
+		printf("truncating\n");
 		clear_family();
 		tree new_tree(level + 1, new_box);
 		new_tree.hydro.resize(new_tree.dx, new_box.pad(opts.hbw));
@@ -218,7 +219,7 @@ double tree::hydro_initialize(bool refine) {
 			}
 			for (int j = 0; j < old_grandchildren.size(); j++) {
 				for (auto &gc : old_grandchildren[j]) {
-		//			printf( "%s %s\n", gc.get_box().half().to_string().c_str(),new_boxes[i].to_string().c_str());
+					//			printf( "%s %s\n", gc.get_box().half().to_string().c_str(),new_boxes[i].to_string().c_str());
 					if (!gc.get_box().double_().intersection(new_boxes[i]).empty()) {
 						np->children.push_back(gc);
 					}
@@ -243,7 +244,7 @@ double tree::hydro_initialize(bool refine) {
 		}
 //		printf("Waiting\n");
 		hpx::wait_all(old_children_futs.begin(), old_children_futs.end());
-		printf("Done refining level %i\n", level);
+		//	printf("Done refining level %i\n", level);
 	}
 
 	hydro_step++;
@@ -395,6 +396,9 @@ std::vector<multi_range> tree::get_amr_boxes() const {
 				tmp.resize(0);
 				for (int j = 0; j < these_ranges.size(); j++) {
 					auto new_ranges = these_ranges[j].subtract(sib.box());
+					for (const auto &b : new_ranges) {
+						assert(b.volume());
+					}
 					tmp.insert(tmp.end(), new_ranges.begin(), new_ranges.end());
 				}
 				these_ranges = std::move(tmp);
@@ -541,7 +545,6 @@ std::string tree::output(DBfile *db) const {
 	}
 
 	for (int f = 0; f < opts.nhydro; f++) {
-//		printf("%s\n", var_names[f].c_str());
 		SILO_CHECK(DBPutQuadvar1(db, var_names[f].c_str(), mesh_name.c_str(), vars[f].data(), dims1.data(), NDIM, NULL, 0, DB_DOUBLE, DB_ZONECENT,options));
 	}
 
