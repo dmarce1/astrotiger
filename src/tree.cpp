@@ -93,7 +93,7 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 		}
 	}
 	for (int i = 0; i < children.size(); i++) {
-		if (!children[i].get_box().intersection(new_box).empty()) {
+		if (!children[i].get_box().intersection(new_box.double_()).empty()) {
 			children[i] = futs[i].get();
 		}
 	}
