@@ -109,7 +109,7 @@ public:
 		assert(im >= 0);
 		assert(i < data.size());
 		assert(i >= 0);
-		return data[ip] - data[im];
+		return 0.5 *( data[ip] - data[im]);
 	}
 	T minmod_gradient(int dim, const multi_index &I) const {
 		const auto i = index(I);

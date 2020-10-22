@@ -259,7 +259,6 @@ double tree::hydro_initialize(bool refine) {
 void tree::get_hydro_boundaries(bool amr) {
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
-	std::vector<vect<index_type>> parent_shifts;
 	std::vector<multi_range> sib_ranges;
 	for (int dim = 0; dim < NDIM; dim++) {
 		auto this_box = box;
@@ -300,33 +299,6 @@ void tree::get_hydro_boundaries(bool amr) {
 			}
 			parent_ranges.insert(parent_ranges.end(), these_ranges.begin(), these_ranges.end());
 		}
-		const int nx = (1 << level) * opts.max_box;
-		parent_shifts.resize(parent_ranges.size());
-		int j = 0;
-		for (auto &r : parent_ranges) {
-			parent_shifts[j] = vect<index_type>(0);
-			const auto o = r;
-//			for (int dim = 0; dim < NDIM; dim++) {
-//				if (r.min[dim] < 0) {
-//					r.min[dim] += nx;
-//					r.max[dim] += nx;
-//					parent_shifts[j][dim] -= nx;
-//				}
-//				if (r.max[dim] > nx) {
-//					r.min[dim] -= nx;
-//					r.max[dim] -= nx;
-//					parent_shifts[j][dim] += nx;
-//				}
-//			}
-			if(!parent.get_box().pad(opts.max_bw).double_().contains(r)) {
-				printf( "O %s\n", o.to_string().c_str());
-				printf( "R %s\n", r.to_string().c_str());
-				printf( "P %s\n", parent.get_box().to_string().c_str());
-				abort();
-			}
-			//		printf("%s %i %i\n", r.to_string().c_str(), parent_shifts[j][0], parent_shifts[j][1]);
-			j++;
-		}
 	}
 	std::vector<hpx::future<std::vector<double>>> sib_futs;
 	for (int i = 0; i < sib_ranges.size(); i++) {
@@ -343,7 +315,7 @@ void tree::get_hydro_boundaries(bool amr) {
 		auto parent_fut = parent.get_hydro_prolong(parent_ranges, t);
 		const auto datas = parent_fut.get();
 		for (int i = 0; i < datas.size(); i++) {
-			hydro.unpack(datas[i], parent_ranges[i].shift(parent_shifts[i]));
+			hydro.unpack(datas[i], parent_ranges[i]);
 		}
 	}
 	int j = 0;
