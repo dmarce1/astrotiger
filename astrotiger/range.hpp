@@ -47,8 +47,8 @@ public:
 	range<T> half() const {
 		range<T> rc;
 		for (int dim = 0; dim < NDIM; dim++) {
-			rc.min[dim] = (min[dim] - min[dim] % 2) / 2;
-			rc.max[dim] = (max[dim] + max[dim] % 2) / 2;
+			rc.min[dim] = (min[dim] - std::abs(min[dim] % 2)) / 2;
+			rc.max[dim] = (max[dim] + std::abs(max[dim] % 2)) / 2;
 		}
 		return rc;
 	}
@@ -101,6 +101,14 @@ public:
 		for (int dim = 0; dim < NDIM; dim++) {
 			min[dim] = max[dim] = 0;
 		}
+	}
+	bool contains(const range<T> &other) const {
+		for (int dim = 0; dim < NDIM; dim++) {
+			if (other.min[dim] < min[dim] || other.max[dim] > max[dim]) {
+				return false;
+			}
+		}
+		return true;
 	}
 	std::pair<range<T>, range<T>> split() const {
 		int max_dim;

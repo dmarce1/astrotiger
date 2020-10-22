@@ -140,8 +140,8 @@ public:
 	multi_array prolong(const multi_range &pro_box) const {
 		multi_range grad_box;
 		for (int dim = 0; dim < NDIM; dim++) {
-			grad_box.min[dim] = (pro_box.min[dim] - (pro_box.min[dim] % 2)) / 2;
-			grad_box.max[dim] = (pro_box.max[dim] + (pro_box.max[dim] % 2)) / 2;
+			grad_box.min[dim] = (pro_box.min[dim] - std::abs(pro_box.min[dim] % 2)) / 2;
+			grad_box.max[dim] = (pro_box.max[dim] + std::abs(pro_box.max[dim] % 2)) / 2;
 		}
 		multi_array grad[NDIM];
 		for (int dim = 0; dim < NDIM; dim++) {
@@ -154,11 +154,11 @@ public:
 		for (multi_iterator i(pro_box); !i.end(); i++) {
 			vect<double> c0;
 			for (int dim = 0; dim < NDIM; dim++) {
-				c0[dim] = 0.25 * (2 * (i[dim] % 2) - 1);
+				c0[dim] = 0.25 * (2 * (std::abs(i[dim] % 2)) - 1);
 			}
 			multi_index j = i.index();
 			for (int dim = 0; dim < NDIM; dim++) {
-				j[dim] = (j[dim] - j[dim] % 2) / 2;
+				j[dim] = (j[dim] - std::abs(j[dim] % 2)) / 2;
 			}
 			double sum = (*this)[j];
 			for (int dim = 0; dim < NDIM; dim++) {

@@ -57,7 +57,6 @@ bool options::process_options(int argc, char *argv[]) {
 	nhydro = 2 + NDIM;
 	hbw = 2;
 	max_bw = 2;
-	window = 1;
 	nrk = 2;
 
 	const auto loc = hpx::find_all_localities();

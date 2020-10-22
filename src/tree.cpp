@@ -19,6 +19,8 @@ using get_children_action_type = tree::get_children_action;
 using get_grandchild_boxes_action_type = tree::get_grandchild_boxes_action;
 using get_ptr_action_type = tree::get_ptr_action;
 using truncate_action_type = tree::truncate_action;
+using get_box_action_type = tree::get_box_action;
+HPX_REGISTER_ACTION (get_box_action_type);
 HPX_REGISTER_ACTION (truncate_action_type);
 HPX_REGISTER_ACTION (get_ptr_action_type);
 HPX_REGISTER_ACTION (get_grandchild_boxes_action_type);
@@ -37,6 +39,10 @@ hpx::future<tree_client> tree::allocate(int level, multi_range box) {
 		return tree_client(id, box);
 	});
 	return fut2;
+}
+
+multi_range tree::get_box() const {
+	return box;
 }
 
 std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
@@ -101,11 +107,9 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 		children = std::move(new_children);
 		rclient = self;
 	} else {
-		if( truncated++ == 0 ) {
-			self = tree_client();
-			parent = tree_client();
-			siblings.resize(0);
-		}
+		self = tree_client();
+		parent = tree_client();
+		siblings.resize(0);
 		tree new_tree(level, new_box);
 		new_tree.hydro.resize(new_tree.dx, new_box.pad(opts.hbw));
 		new_tree.t = new_tree.t0 = t;
@@ -221,7 +225,7 @@ double tree::hydro_initialize(bool refine) {
 			}
 			for (int j = 0; j < old_grandchildren.size(); j++) {
 				for (auto &gc : old_grandchildren[j]) {
-					if (!gc.get_box().intersection(new_boxes[i].double_()).empty()) {
+					if (!gc.get_box().intersection(b.double_()).empty()) {
 						np->children.push_back(gc);
 					}
 				}
@@ -291,6 +295,9 @@ void tree::get_hydro_boundaries(bool amr) {
 				}
 				these_ranges = std::move(tmp);
 			}
+			for (int j = 0; j < these_ranges.size(); j++) {
+				assert(parent.get_box().pad(opts.max_bw).double_().contains(these_ranges[j]));
+			}
 			parent_ranges.insert(parent_ranges.end(), these_ranges.begin(), these_ranges.end());
 		}
 		const int nx = (1 << level) * opts.max_box;
@@ -298,16 +305,24 @@ void tree::get_hydro_boundaries(bool amr) {
 		int j = 0;
 		for (auto &r : parent_ranges) {
 			parent_shifts[j] = vect<index_type>(0);
-			for (int dim = 0; dim < NDIM; dim++) {
-				if (r.min[dim] < 0) {
-					r.min[dim] += nx;
-					r.max[dim] += nx;
-					parent_shifts[j][dim] -= nx;
-				} else if (r.max[dim] > nx) {
-					r.min[dim] -= nx;
-					r.max[dim] -= nx;
-					parent_shifts[j][dim] += nx;
-				}
+			const auto o = r;
+//			for (int dim = 0; dim < NDIM; dim++) {
+//				if (r.min[dim] < 0) {
+//					r.min[dim] += nx;
+//					r.max[dim] += nx;
+//					parent_shifts[j][dim] -= nx;
+//				}
+//				if (r.max[dim] > nx) {
+//					r.min[dim] -= nx;
+//					r.max[dim] -= nx;
+//					parent_shifts[j][dim] += nx;
+//				}
+//			}
+			if(!parent.get_box().pad(opts.max_bw).double_().contains(r)) {
+				printf( "O %s\n", o.to_string().c_str());
+				printf( "R %s\n", r.to_string().c_str());
+				printf( "P %s\n", parent.get_box().to_string().c_str());
+				abort();
 			}
 			//		printf("%s %i %i\n", r.to_string().c_str(), parent_shifts[j][0], parent_shifts[j][1]);
 			j++;
@@ -321,6 +336,10 @@ void tree::get_hydro_boundaries(bool amr) {
 		}
 	}
 	if (parent != tree_client() && amr) {
+		assert(parent.get_box().double_().contains(box));
+		for (int i = 0; i < parent_ranges.size(); i++) {
+			assert(parent.get_box().pad(opts.max_bw).double_().contains(parent_ranges[i]));
+		}
 		auto parent_fut = parent.get_hydro_prolong(parent_ranges, t);
 		const auto datas = parent_fut.get();
 		for (int i = 0; i < datas.size(); i++) {
@@ -338,7 +357,7 @@ void tree::get_hydro_boundaries(bool amr) {
 }
 
 tree::tree() :
-		hydro_step(0), refine_step(0), truncated(0) {
+		hydro_step(0), refine_step(0) {
 	level = -1;
 }
 
@@ -350,7 +369,7 @@ tree::~tree() {
 }
 
 tree::tree(int level_, multi_range box_) :
-		hydro_step(0), refine_step(0), truncated(0) {
+		hydro_step(0), refine_step(0) {
 	t0 = 0.0;
 	t = 0.0;
 	level = level_;
@@ -365,6 +384,9 @@ void tree::set_family(tree_client p, tree_client s, std::vector<sibling> sibs) {
 	parent = p;
 	self = s;
 	siblings = std::move(sibs);
+	if (p != tree_client()) {
+		assert(p.get_box().double_().contains(box));
+	}
 }
 
 void tree::clear_family() {
@@ -430,6 +452,7 @@ void tree::set_child_family() {
 	}
 	std::vector<hpx::future<void>> set_futs;
 	for (const auto &c : children) {
+		assert(box.double_().contains(c.get_box()));
 		std::vector<sibling> these_sibs;
 		auto cbox = c.get_box();
 		cbox = cbox.pad(opts.max_bw);

@@ -193,14 +193,6 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 	}
 	if (!range.empty()) {
 		boxes.push_back(range);
-		for (const auto &amr : amr_boxes) {
-			tmp.resize(0);
-			for (const auto &b : boxes) {
-				auto tmp2 = b.subtract(amr.pad(opts.window));
-				tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
-			}
-			boxes = std::move(tmp);
-		}
 		bool change;
 		const auto max_vol = std::pow(opts.max_box / 2, NDIM);
 		const auto min_vol = std::pow(opts.min_box / 2, NDIM);
@@ -259,8 +251,22 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 			change = tmp.size();
 			boxes = std::move(tmp);
 		} while (change);
+		boxes = std::move(finished);
+		for (const auto &amr : amr_boxes) {
+			tmp.resize(0);
+			for (const auto &b : boxes) {
+				const auto amrbox = amr.pad(opts.window);
+				if (!amrbox.intersection(b).empty()) {
+					auto tmp2 = b.subtract(amrbox);
+					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
+				} else {
+					tmp.push_back(b);
+				}
+			}
+			boxes = std::move(tmp);
+		}
 	}
-	return std::move(finished);
+	return std::move(boxes);
 }
 
 std::vector<double> hydro_grid::pack(multi_range bbox) const {
