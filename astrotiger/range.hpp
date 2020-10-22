@@ -63,6 +63,22 @@ public:
 		}
 		return str;
 	}
+	range<T> union_(const range<T> &other) const {
+		range<T> u;
+		if (!other.empty()) {
+			if (!empty()) {
+				for (int dim = 0; dim < NDIM; dim++) {
+					u.max[dim] = std::max(max[dim], other.max[dim]);
+					u.min[dim] = std::min(min[dim], other.min[dim]);
+				}
+			} else {
+				u = other;
+			}
+		} else {
+			u = *this;
+		}
+		return u;
+	}
 	std::vector<range<T>> subtract(const range<T> &sub) const {
 		std::vector<range<T>> ranges;
 		range<T> mid = *this;

@@ -260,26 +260,27 @@ void tree::get_hydro_boundaries(bool amr) {
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
 	std::vector<multi_range> sib_ranges;
-	for (int dim = 0; dim < NDIM; dim++) {
-		auto this_box = box;
-		this_box.max[dim] = this_box.min[dim];
-		this_box.min[dim] -= opts.hbw;
-		bnd_ranges.push_back(this_box);
-		this_box = box;
-		this_box.min[dim] = this_box.max[dim];
-		this_box.max[dim] += opts.hbw;
-		bnd_ranges.push_back(this_box);
+	if (children.size()) {
+		bnd_ranges = box.pad(opts.hbw).subtract(box);
+	} else {
+		for (int dim = 0; dim < NDIM; dim++) {
+			auto this_box = box;
+			this_box.max[dim] = this_box.min[dim];
+			this_box.min[dim] -= opts.hbw;
+			bnd_ranges.push_back(this_box);
+			this_box = box;
+			this_box.min[dim] = this_box.max[dim];
+			this_box.max[dim] += opts.hbw;
+			bnd_ranges.push_back(this_box);
+		}
 	}
 	for (const auto &sib : siblings) {
 		multi_range inter;
 		inter.set_null();
 		for (int i = 0; i < bnd_ranges.size(); i++) {
 			inter = sib.box().intersection(bnd_ranges[i]);
-			if (!inter.empty()) {
-				break;
-			}
+			sib_ranges.push_back(inter);
 		}
-		sib_ranges.push_back(inter);
 	}
 	if (level > 0 && amr) {
 		for (int i = 0; i < bnd_ranges.size(); i++) {
@@ -299,6 +300,17 @@ void tree::get_hydro_boundaries(bool amr) {
 			}
 			parent_ranges.insert(parent_ranges.end(), these_ranges.begin(), these_ranges.end());
 		}
+	}
+	auto tmp = std::move(sib_ranges);
+	sib_ranges.resize(0);
+	for (const auto &s : siblings) {
+		multi_range this_range;
+		this_range.set_null();
+		for (const auto &range : tmp) {
+			const auto inter = range.intersection(s.box());
+			this_range = this_range.union_(inter);
+		}
+		sib_ranges.push_back(this_range);
 	}
 	std::vector<hpx::future<std::vector<double>>> sib_futs;
 	for (int i = 0; i < sib_ranges.size(); i++) {
