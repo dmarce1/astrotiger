@@ -153,7 +153,7 @@ void hydro_grid::initialize() {
 			U[rho_i][i] = 1.0;
 			for (int dim = 0; dim < NDIM; dim++) {
 				U[sx_i + dim][i] = 0.0;
-				r += std::pow(coord(i[dim]) - 0.5, 2);
+				r += std::pow(coord(i[dim]) - (dim == 0 ? 0.65 : 0.6), 2);
 			}
 			r = std::sqrt(r);
 			if (r < 0.1) {

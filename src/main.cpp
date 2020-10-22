@@ -89,8 +89,14 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	root.set_family(tree_client(), root, sibs).get();
 	output_silo("X.0.silo");
-	master(0, opts.tmax);
-	output_silo("X.1.silo");
+	int i = 0;
+	const auto dt = 0.01;
+	for (double t = 0.0; t < opts.tmax; t += dt) {
+		i++;
+		master(0, t + dt);
+		std::string fname = "X." + std::to_string(i) + ".silo";
+		output_silo(fname);
+	}
 	return hpx::finalize();
 }
 

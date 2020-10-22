@@ -39,11 +39,12 @@ void levels_remove_entry(int level, tree *ptr) {
 }
 
 void levels_set_child_families(int level) {
+	auto these_levels = levels;
 	std::vector<hpx::future<void>> futs;
 	if (hpx::get_locality_id() == 0 && other_localities.size()) {
 		futs.push_back(hpx::lcos::broadcast < levels_set_child_families_action > (other_localities, level));
 	}
-	for (auto *ptr : levels[level]) {
+	for (auto *ptr : these_levels[level]) {
 		futs.push_back(hpx::async([ptr]() {
 			ptr->set_child_family();
 		}));
@@ -52,11 +53,12 @@ void levels_set_child_families(int level) {
 }
 
 void levels_hydro_substep(int level, int rk, double dt) {
+	auto these_levels = levels;
 	std::vector<hpx::future<void>> futs;
 	if (hpx::get_locality_id() == 0 && other_localities.size()) {
 		futs.push_back(hpx::lcos::broadcast < levels_hydro_substep_action > (other_localities, level, rk, dt));
 	}
-	for (auto *ptr : levels[level]) {
+	for (auto *ptr : these_levels[level]) {
 		futs.push_back(hpx::async([ptr, rk, dt]() {
 			ptr->hydro_substep(rk, dt);
 		}));
@@ -71,12 +73,13 @@ void levels_show() {
 }
 
 double levels_hydro_initialize(int level, bool refine) {
+	auto these_levels = levels;
 	std::vector<hpx::future<double>> futs;
 	hpx::future<std::vector<double>> fut;
 	if (hpx::get_locality_id() == 0 && other_localities.size()) {
 		fut = hpx::lcos::broadcast < levels_hydro_initialize_action > (other_localities, level, refine);
 	}
-	for (auto *ptr : levels[level]) {
+	for (auto *ptr : these_levels[level]) {
 		futs.push_back(hpx::async([ptr, refine]() {
 			return ptr->hydro_initialize(refine);
 		}));
@@ -96,6 +99,7 @@ double levels_hydro_initialize(int level, bool refine) {
 
 std::vector<std::string> levels_output_silo(int level, const std::string filename) {
 	DBfile *db;
+	auto these_levels = levels;
 	std::vector<std::string> mnames;
 	if (level == 0 && hpx::get_locality_id() == 0) {
 		db = DBCreateReal(filename.c_str(), DB_CLOBBER, DB_LOCAL, "Astro-Tiger", DB_PDB);
@@ -105,7 +109,7 @@ std::vector<std::string> levels_output_silo(int level, const std::string filenam
 	if (db == nullptr) {
 		printf("Unable to open %s for writing\n", filename.c_str());
 	} else {
-		for (auto *ptr : levels[level]) {
+		for (auto *ptr : these_levels[level]) {
 			mnames.push_back(ptr->output(db));
 		}
 		SILO_CHECK(DBClose(db));

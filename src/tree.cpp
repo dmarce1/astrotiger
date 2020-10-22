@@ -84,9 +84,10 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 //	printf("%s %s\n", box.to_string().c_str(), trunc_box.to_string().c_str());
 	std::vector<hpx::future<tree_client>> futs;
 	const auto new_box = trunc_box.intersection(box);
+	assert( new_box.volume());
 	for (const auto &c : children) {
-		if (!c.get_box().intersection(new_box).empty()) {
-			futs.push_back(c.truncate(trunc_box));
+		if (!c.get_box().intersection(new_box.double_()).empty()) {
+			futs.push_back(c.truncate(new_box.double_()));
 		} else {
 			futs.push_back(hpx::make_ready_future(c));
 		}
@@ -100,9 +101,9 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 	if (new_box == box) {
 		rclient = self;
 	} else {
-		printf("truncating\n");
+		printf( "TRUNCACTING %s %s\n", box.to_string().c_str(), trunc_box.to_string().c_str());
 		clear_family();
-		tree new_tree(level + 1, new_box);
+		tree new_tree(level, new_box);
 		new_tree.hydro.resize(new_tree.dx, new_box.pad(opts.hbw));
 		new_tree.t = new_tree.t0 = t;
 		new_tree.hydro.unpack(hydro.pack(new_box), new_box);
@@ -157,7 +158,6 @@ double tree::hydro_initialize(bool refine) {
 			}
 			force_refine_boxes.insert(force_refine_boxes.begin(), tmp.begin(), tmp.end());
 		}
-//		printf("sibling grandchildren done\n");
 		for (auto &b : force_refine_boxes) {
 			for (int dim = 0; dim < NDIM; dim++) {
 				b.min[dim] = b.min[dim] / 4;
@@ -203,8 +203,6 @@ double tree::hydro_initialize(bool refine) {
 		for (auto &f : cpfuts) {
 			old_ptrs.push_back(f.get());
 		}
-//		printf("%i %i\n", unchanged_cnt, new_boxes.size());
-//		printf("Making\n");
 		for (int i = 0; i < new_boxes.size(); i++) {
 			const auto &b = new_boxes[i];
 			auto np = std::make_shared<tree>(level + 1, b);
@@ -219,19 +217,16 @@ double tree::hydro_initialize(bool refine) {
 			}
 			for (int j = 0; j < old_grandchildren.size(); j++) {
 				for (auto &gc : old_grandchildren[j]) {
-					//			printf( "%s %s\n", gc.get_box().half().to_string().c_str(),new_boxes[i].to_string().c_str());
-					if (!gc.get_box().double_().intersection(new_boxes[i]).empty()) {
+					if (!gc.get_box().intersection(new_boxes[i].double_()).empty()) {
 						np->children.push_back(gc);
 					}
 				}
 			}
 			new_children_futs.push_back(hpx::new_<tree>(hpx::find_here(), std::move(*np)));
 		}
-//		printf("made\n");
 		for (int i = 0; i < new_boxes.size(); i++) {
 			new_children.push_back(tree_client(new_children_futs[i].get(), new_boxes[i]));
 		}
-//		printf("moving\n");
 		children = std::move(new_children);
 		std::vector<hpx::future<tree_client>> tfuts;
 		for (int i = unchanged_cnt; i < children.size(); i++) {
@@ -242,9 +237,7 @@ double tree::hydro_initialize(bool refine) {
 			children[i] = tfuts[j].get();
 			j++;
 		}
-//		printf("Waiting\n");
 		hpx::wait_all(old_children_futs.begin(), old_children_futs.end());
-		//	printf("Done refining level %i\n", level);
 	}
 
 	hydro_step++;
