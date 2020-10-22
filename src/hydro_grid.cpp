@@ -60,14 +60,14 @@ void hydro_grid::substep_update(int rk, double dt) {
 		}
 	}
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
-		for (int dim = 0; dim < NDIM; dim++) {
-			multi_index ip1 = i;
-			ip1[dim]++;
-			for (int f = 0; f < opts.nhydro; f++) {
-				auto &u = U[f][i];
+		for (int f = 0; f < opts.nhydro; f++) {
+			auto &u = U[f][i];
+			for (int dim = 0; dim < NDIM; dim++) {
+				multi_index ip1 = i;
+				ip1[dim]++;
 				u -= (F[dim][f][ip1] - F[dim][f][i]) * lambda;
-				u += +onembeta * (U0[f][i] - u);
 			}
+			u += +onembeta * (U0[f][i] - u);
 		}
 	}
 }
@@ -135,7 +135,7 @@ void hydro_grid::initialize() {
 				U[sx_i + dim][i] = 0.0;
 			}
 			double xsum = 0.0;
-			for (int dim = 0; dim < NDIM; dim++) {
+			for (int dim = 0; dim < 1; dim++) {
 				xsum += coord(i[dim]) - 0.5;
 			}
 			if (xsum > 0.0) {
@@ -144,6 +144,19 @@ void hydro_grid::initialize() {
 			} else {
 				U[rho_i][i] = 0.1;
 				U[egas_i][i] = 0.125;
+			}
+		} else if (opts.problem == "blast") {
+			double r = 0.0;
+			U[rho_i][i] = 1.0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				U[sx_i + dim][i] = 0.0;
+				r += std::pow(coord(i[dim]) - 0.5, 2);
+			}
+			r = std::sqrt(r);
+			if (r < 0.1) {
+				U[egas_i][i] = 1.0;
+			} else {
+				U[egas_i][i] = 1.0e-3;
 			}
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());

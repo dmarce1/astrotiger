@@ -40,6 +40,7 @@ class tree: public hpx::components::managed_component_base<tree> {
 	std::atomic<int> hydro_step;
 	std::atomic<int> refine_step;
 	std::vector<multi_range> grandchild_boxes;
+	mutex_type mtx;
 	double dx;
 	double t0;
 	double t;
@@ -47,7 +48,8 @@ public:
 
 	static hpx::future<tree_client> allocate(int, multi_range box);
 
-	tree(tree &&other) {
+	tree(tree &&other) :
+			hydro_step(0), refine_step(0) {
 		box = std::move(other.box);
 		hydro = std::move(other.hydro);
 		parent = std::move(other.parent);
@@ -60,8 +62,10 @@ public:
 		t0 = std::move(other.t0);
 		t = std::move(other.t);
 		levels_add_entry(level, this);
+//		printf("Adding entry %i\n", level);
 	}
-	tree(const tree &other) {
+	tree(const tree &other) :
+			hydro_step(0), refine_step(0) {
 		box = other.box;
 		hydro = other.hydro;
 		parent = other.parent;
@@ -74,6 +78,7 @@ public:
 		t0 = other.t0;
 		t = other.t;
 		levels_add_entry(level, this);
+//		printf("Adding entry %i\n", level);
 	}
 	HPX_SERIALIZATION_SPLIT_MEMBER ();
 	template<class A>

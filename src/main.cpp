@@ -19,14 +19,20 @@ void master(int level, double tmax) {
 			levels_set_child_families(level - 1);
 		}
 		bool refine = nstep == -1;
-		dt[level] = levels_hydro_initialize(level, refine);
+		dt[level] = levels_hydro_initialize(level, true);
+		if (dt[level] == 0.0) {
+			return;
+		}
+		levels_show();
 		dt[level] = opts.cfl * dx[level] / dt[level];
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
 		dt[level] = (tmax - tm[level]) / nstep;
 		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		levels_hydro_substep(level, 0, dt[level]);
 		printf("...\n");
-		levels_hydro_substep(level, 1, dt[level]);
+		if (opts.nrk > 1) {
+			levels_hydro_substep(level, 1, dt[level]);
+		}
 		tm[level] += dt[level];
 		master(level + 1, tm[level]);
 	} while (nstep != 1.0);
@@ -81,7 +87,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	root.set_family(tree_client(), root, sibs).get();
 	output_silo("X.0.silo");
-	master(0, 0.00001);
+	master(0, opts.tmax);
 	output_silo("X.1.silo");
 	return hpx::finalize();
 }

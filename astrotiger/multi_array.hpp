@@ -56,7 +56,6 @@ template<class T>
 class multi_array {
 	multi_index dims;
 	multi_index stride;
-	multi_range box;
 	std::size_t size;
 	std::vector<T> data;
 	inline index_type index(const multi_index &I) const {
@@ -68,6 +67,7 @@ class multi_array {
 		return i;
 	}
 public:
+	multi_range box;
 	inline multi_array() {
 		dims = 0.0;
 		size = 0;

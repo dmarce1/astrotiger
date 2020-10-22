@@ -28,11 +28,13 @@ void levels_init() {
 
 void levels_add_entry(int level, tree *ptr) {
 	std::lock_guard<mutex_type> lock(mtx);
+	assert(levels[level].find(ptr) == levels[level].end());
 	levels[level].insert(ptr);
 }
 
 void levels_remove_entry(int level, tree *ptr) {
 	std::lock_guard<mutex_type> lock(mtx);
+	assert(levels[level].find(ptr) != levels[level].end());
 	levels[level].erase(ptr);
 }
 
@@ -60,6 +62,12 @@ void levels_hydro_substep(int level, int rk, double dt) {
 		}));
 	}
 	hpx::wait_all(futs.begin(), futs.end());
+}
+
+void levels_show() {
+	for (int l = 0; l <= opts.max_level; l++) {
+		printf("%i on level %i\n", levels[l].size(), l);
+	}
 }
 
 double levels_hydro_initialize(int level, bool refine) {
