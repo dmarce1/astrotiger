@@ -87,7 +87,7 @@ std::shared_ptr<tree> tree::get_ptr() {
 }
 
 tree_client tree::truncate(tree_client self, multi_range trunc_box) {
-//	printf("%s %s\n", box.to_string().c_str(), trunc_box.to_string().c_str());
+//	printf("TRUNCATE %i %s %s %i\n", level, box.to_string().c_str(), trunc_box.to_string().c_str(), children.size());
 	const auto new_box = trunc_box.intersection(box);
 	assert(new_box.volume());
 
@@ -115,7 +115,7 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 		new_tree.t = new_tree.t0 = t;
 		new_tree.hydro.unpack(hydro.pack(new_box), new_box);
 		for (auto &c : children) {
-			if (!c.get_box().intersection(new_box).empty()) {
+			if (!c.get_box().intersection(new_box.double_()).empty()) {
 				new_tree.children.push_back(c);
 			}
 		}
