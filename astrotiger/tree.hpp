@@ -40,7 +40,6 @@ class tree: public hpx::components::managed_component_base<tree> {
 	std::atomic<int> hydro_step;
 	std::atomic<int> refine_step;
 	std::vector<multi_range> grandchild_boxes;
-	mutex_type mtx;
 	double dx;
 	double t0;
 	double t;
@@ -61,7 +60,6 @@ public:
 		dx = std::move(other.dx);
 		t0 = std::move(other.t0);
 		t = std::move(other.t);
-		levels_add_entry(level, this);
 //		printf("Adding entry %i\n", level);
 	}
 	tree(const tree &other) :
@@ -77,27 +75,10 @@ public:
 		dx = other.dx;
 		t0 = other.t0;
 		t = other.t;
-		levels_add_entry(level, this);
 //		printf("Adding entry %i\n", level);
 	}
-	HPX_SERIALIZATION_SPLIT_MEMBER ();
 	template<class A>
-	void load(A &&arc, unsigned) {
-		arc & box;
-		arc & hydro;
-		arc & parent;
-		arc & self;
-		arc & children;
-		arc & siblings;
-		arc & level;
-		arc & grandchild_boxes;
-		arc & dx;
-		arc & t0;
-		arc & t;
-		levels_add_entry(level, this);
-	}
-	template<class A>
-	void save(A &&arc, unsigned) const {
+	void serialize(A &&arc, unsigned) {
 		arc & box;
 		arc & hydro;
 		arc & parent;
@@ -119,7 +100,8 @@ public:
 	std::vector<multi_range> get_amr_boxes() const;
 	std::vector<tree_client> get_children() const;
 	void set_family(tree_client, tree_client, std::vector<sibling>);
-	void clear_family();
+	void delist();
+	void list();
 	void set_child_family();
 	std::vector<double> get_hydro_boundary(multi_range, int);
 	std::pair<std::vector<std::uint8_t>,std::vector<multi_range>> get_refinement_boundary(multi_range, int);
@@ -142,9 +124,11 @@ public:
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_prolong);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_restrict);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_children);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,initialize);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_family);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,clear_family);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,list);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,delist);
+
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,initialize);
 
 };
 

@@ -7,9 +7,14 @@
 
 #include <astrotiger/tree.hpp>
 
-hpx::future<void> tree_client::clear_family() const {
+hpx::future<void> tree_client::delist() const {
 	assert(gid!=hpx::invalid_id);
-	return hpx::async<tree::clear_family_action>(gid);
+	return hpx::async<tree::delist_action>(gid);
+}
+
+hpx::future<void> tree_client::list() const {
+	assert(gid!=hpx::invalid_id);
+	return hpx::async<tree::list_action>(gid);
 }
 
 hpx::future<void> tree_client::set_family(tree_client p, tree_client s, std::vector<sibling> c) const {

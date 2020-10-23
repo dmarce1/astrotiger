@@ -13,13 +13,15 @@ using get_hydro_boundary_action_type = tree::get_hydro_boundary_action;
 using get_hydro_prolong_action_type = tree::get_hydro_prolong_action;
 using get_hydro_restrict_action_type = tree::get_hydro_restrict_action;
 using set_family_action_type = tree::set_family_action;
-using clear_family_action_type = tree::clear_family_action;
+using delist_action_type = tree::delist_action;
 using initialize_action_type = tree::initialize_action;
 using get_children_action_type = tree::get_children_action;
 using get_ptr_action_type = tree::get_ptr_action;
 using truncate_action_type = tree::truncate_action;
 using get_box_action_type = tree::get_box_action;
 using get_refinement_boundary_action_type = tree::get_refinement_boundary_action;
+using list_action_type = tree::list_action;
+HPX_REGISTER_ACTION (list_action_type);
 HPX_REGISTER_ACTION (get_refinement_boundary_action_type);
 HPX_REGISTER_ACTION (get_box_action_type);
 HPX_REGISTER_ACTION (truncate_action_type);
@@ -28,7 +30,7 @@ HPX_REGISTER_ACTION (get_hydro_boundary_action_type);
 HPX_REGISTER_ACTION (get_hydro_prolong_action_type);
 HPX_REGISTER_ACTION (get_hydro_restrict_action_type);
 HPX_REGISTER_ACTION (set_family_action_type);
-HPX_REGISTER_ACTION (clear_family_action_type);
+HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
 
@@ -109,11 +111,6 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 		children = std::move(new_children);
 		rclient = self;
 	} else {
-		std::unique_lock<mutex_type> lock(mtx);
-		this->self = tree_client();
-		parent = tree_client();
-		siblings.resize(0);
-		lock.unlock();
 		tree new_tree(level, new_box);
 		new_tree.hydro.resize(new_tree.dx, new_box.pad(opts.hbw));
 		new_tree.t = new_tree.t0 = t;
@@ -186,7 +183,7 @@ double tree::hydro_initialize(bool refine) {
 			b = b.double_();
 		}
 		std::vector<multi_range> tmp;
-		std::vector<hpx::future<void>> old_children_futs;
+		std::vector<hpx::future<void>> void_futs;
 		std::vector < hpx::future < hpx::id_type >> new_children_futs;
 		for (int i = 0; i < children.size(); i++) {
 			auto &c = children[i];
@@ -203,7 +200,7 @@ double tree::hydro_initialize(bool refine) {
 			}
 			if (!found) {
 				old_children.push_back(c);
-				old_children_futs.push_back(c.clear_family());
+				void_futs.push_back(c.delist());
 				old_grandchildren.push_back(std::move(grandchildren[i]));
 			}
 		}
@@ -240,6 +237,7 @@ double tree::hydro_initialize(bool refine) {
 		for (int i = 0; i < new_boxes.size(); i++) {
 			new_children.push_back(tree_client(new_children_futs[i].get(), new_boxes[i]));
 		}
+		hpx::wait_all(void_futs.begin(), void_futs.end());
 		children = std::move(new_children);
 		std::vector<hpx::future<tree_client>> tfuts;
 		for (int i = unchanged_cnt; i < children.size(); i++) {
@@ -247,11 +245,13 @@ double tree::hydro_initialize(bool refine) {
 			tfuts.push_back(children[i].truncate(children[i].get_box()));
 		}
 		int j = 0;
+		void_futs.resize(0);
 		for (int i = unchanged_cnt; i < children.size(); i++) {
 			children[i] = tfuts[j].get();
+			void_futs.push_back(children[i].list());
 			j++;
 		}
-		hpx::wait_all(old_children_futs.begin(), old_children_futs.end());
+		hpx::wait_all(void_futs.begin(), void_futs.end());
 	}
 
 	return hydro.compute_flux();
@@ -381,10 +381,6 @@ tree::tree() :
 }
 
 tree::~tree() {
-	if (level >= 0) {
-//		printf("Removing entry %i\n", level);
-		levels_remove_entry(level, this);
-	}
 }
 
 tree::tree(int level_, multi_range box_) :
@@ -393,7 +389,6 @@ tree::tree(int level_, multi_range box_) :
 	t = 0.0;
 	level = level_;
 //	printf("Adding entry %i\n", level);
-	levels_add_entry(level, this);
 	box = box_;
 	dx = 1.0 / (1 << level) / opts.max_box;
 	hydro_step = 0;
@@ -408,15 +403,25 @@ void tree::set_family(tree_client p, tree_client s, std::vector<sibling> sibs) {
 	}
 }
 
-void tree::clear_family() {
+void tree::delist() {
+	levels_remove_entry(level, this);
 //	printf("Clearing family\n");
 	std::vector<hpx::future<void>> futs;
 	for (const auto &c : children) {
-		futs.push_back(c.clear_family());
+		futs.push_back(c.delist());
 	}
 	parent = tree_client();
 	self = tree_client();
 	siblings.resize(0);
+	hpx::wait_all(futs.begin(), futs.end());
+}
+
+void tree::list() {
+	std::vector<hpx::future<void>> futs;
+	for (const auto &c : children) {
+		futs.push_back(c.list());
+	}
+	levels_add_entry(level, this);
 	hpx::wait_all(futs.begin(), futs.end());
 }
 
@@ -513,6 +518,7 @@ void tree::hydro_substep(int rk, double dt) {
 double tree::initialize(int this_level) {
 	double amax = 0.0;
 	if (this_level == level) {
+		levels_add_entry(level,this);
 		hydro.resize(dx, box.pad(opts.hbw));
 		hydro.initialize();
 		amax = hydro.compute_flux();
