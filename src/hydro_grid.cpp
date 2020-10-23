@@ -13,8 +13,9 @@
 hydro_grid::hydro_grid() {
 }
 
-double hydro_grid::compute_flux() {
+double hydro_grid::compute_flux(int rk) {
 	double amax = 0.0;
+	const auto beta = rk == 0 ? 1.0 : 0.5;
 	std::vector<multi_array<double>> UR(opts.nhydro);
 	std::vector<multi_array<double>> UL(opts.nhydro);
 	const auto urlbox = box.pad(2 - opts.hbw);
@@ -43,7 +44,7 @@ double hydro_grid::compute_flux() {
 			}
 			amax = std::max(amax, hydro_flux(flux, ul, ur, dim));
 			for (int f = 0; f < opts.nhydro; f++) {
-				F[dim][f][j] = flux[f];
+				F[dim][f][j] = (1.0 - beta) * F[dim][f][j] + beta * flux[f];
 			}
 		}
 	}
@@ -62,13 +63,16 @@ void hydro_grid::substep_update(int rk, double dt) {
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		for (int f = 0; f < opts.nhydro; f++) {
 			auto &u = U[f][i];
+			u = U0[f][i];
 			for (int dim = 0; dim < NDIM; dim++) {
 				multi_index ip1 = i;
 				ip1[dim]++;
 				u -= (F[dim][f][ip1] - F[dim][f][i]) * lambda;
 			}
-			u += +onembeta * (U0[f][i] - u);
 		}
+	}
+	if (rk == opts.nrk - 1) {
+		reset_coarse_flux_registers();
 	}
 }
 
@@ -87,13 +91,39 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 	}
 	for (int dim = 0; dim < NDIM; dim++) {
 		F[dim].resize(opts.nhydro);
+		Fc[dim].resize(opts.nhydro);
 		for (int i = 0; i < opts.nhydro; i++) {
 			fbox[dim] = box.pad(-opts.hbw);
+			fcbox[dim] = fbox[dim].half();
 			fbox[dim].max[dim]++;
+			fcbox[dim].min[dim] = fbox[dim].min[dim] / 2;
+			fcbox[dim].max[dim] = (fbox[dim].max[dim] - 1) / 2 + 1;
 			F[dim][i].resize(fbox[dim]);
+			Fc[dim][i].resize(fcbox[dim]);
 		}
 	}
 	R.resize(box_.pad(opts.window));
+	reset_coarse_flux_registers();
+}
+
+void hydro_grid::reset_coarse_flux_registers() {
+	for (int dim = 0; dim < NDIM; dim++) {
+		for (int f = 0; f < opts.nhydro; f++) {
+			for (multi_iterator i(fcbox[dim]); !i.end(); i++) {
+				Fc[dim][f][i] = 0.0;
+			}
+		}
+	}
+}
+
+void hydro_grid::reset_flux_registers() {
+	for (int dim = 0; dim < NDIM; dim++) {
+		for (int f = 0; f < opts.nhydro; f++) {
+			for (multi_iterator i(fbox[dim]); !i.end(); i++) {
+				F[dim][f][i] = 0.0;
+			}
+		}
+	}
 }
 
 hydro_grid::~hydro_grid() {

@@ -24,15 +24,19 @@
 class hydro_grid {
 	multi_range box;
 	std::array<multi_range, NDIM> fbox;
+	std::array<multi_range, NDIM> fcbox;
 	std::vector<multi_array<double>> U0;
 	std::vector<multi_array<double>> U;
 	std::array<std::vector<multi_array<double>>, NDIM> F;
+	std::array<std::vector<multi_array<double>>, NDIM> Fc;
 	multi_array<std::uint8_t> R;
 	double dx;
+
 public:
 
 	hydro_grid();
 	~hydro_grid();
+
 
 	void resize(double dx, multi_range box_);
 
@@ -42,7 +46,9 @@ public:
 			assert(ibox == box.pad(-opts.hbw));
 		}
 	}
-	double compute_flux();
+	void reset_flux_registers();
+	void reset_coarse_flux_registers();
+	double compute_flux(int rk);
 	void initialize();
 	void compute_refinement_criteria();
 	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&,const std::vector<multi_range> &forced) const;

@@ -254,7 +254,7 @@ double tree::hydro_initialize(bool refine) {
 		hpx::wait_all(void_futs.begin(), void_futs.end());
 	}
 
-	return hydro.compute_flux();
+	return hydro.compute_flux(0);
 
 }
 
@@ -504,7 +504,7 @@ void tree::hydro_substep(int rk, double dt) {
 		}
 	}
 	if (rk > 0) {
-		hydro.compute_flux();
+		hydro.compute_flux(rk);
 	}
 	hydro.substep_update(rk, dt);
 	hydro_step++;
@@ -521,7 +521,9 @@ double tree::initialize(int this_level) {
 		levels_add_entry(level,this);
 		hydro.resize(dx, box.pad(opts.hbw));
 		hydro.initialize();
-		amax = hydro.compute_flux();
+		amax = hydro.compute_flux(0);
+		hydro.reset_flux_registers();
+		hydro.reset_coarse_flux_registers();
 	} else {
 		if (this_level == level + 1) {
 			hydro.compute_refinement_criteria();
