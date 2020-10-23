@@ -124,7 +124,7 @@ public:
 	multi_range get_box() const;
 	tree_client truncate(tree_client, multi_range box);
 	std::vector<multi_range> get_refinement_boundaries();
-	void get_hydro_boundaries(bool amr, int rk);
+	void get_hydro_boundaries(bool amr, double );
 	void sanity() const;
 
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);

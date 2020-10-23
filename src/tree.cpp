@@ -158,7 +158,7 @@ double tree::hydro_initialize(bool refine) {
 		hydro.unpack(tmp.first, cbox);
 	}
 	hydro_step++;
-	get_hydro_boundaries(true,0);
+	get_hydro_boundaries(true, t);
 	if (refine && level < opts.max_level) {
 		std::vector<std::vector<tree_client>> grandchildren;
 		std::vector<hpx::future<std::vector<tree_client>>> cfuts;
@@ -270,7 +270,7 @@ double tree::hydro_initialize(bool refine) {
 
 }
 
-void tree::get_hydro_boundaries(bool amr, int rk) {
+void tree::get_hydro_boundaries(bool amr, double this_time) {
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
 	std::vector<multi_range> sib_ranges;
@@ -321,7 +321,7 @@ void tree::get_hydro_boundaries(bool amr, int rk) {
 	}
 	if (parent != tree_client() && amr) {
 		assert(parent.get_box().double_().contains(box));
-		auto parent_fut = parent.get_hydro_prolong(parent_ranges, t);
+		auto parent_fut = parent.get_hydro_prolong(parent_ranges, this_time);
 		const auto datas = parent_fut.get();
 		for (int i = 0; i < datas.size(); i++) {
 			hydro.unpack(datas[i], parent_ranges[i]);
@@ -446,7 +446,6 @@ std::vector<multi_range> tree::get_amr_boxes() const {
 		for (int i = 0; i < bnd_ranges.size(); i++) {
 			std::vector<multi_range> tmp;
 			std::vector<multi_range> these_ranges(1, bnd_ranges[i]);
-			//		printf( "%i\n", siblings.size());
 			for (const auto &sib : siblings) {
 				tmp.resize(0);
 				for (int j = 0; j < these_ranges.size(); j++) {
@@ -461,9 +460,6 @@ std::vector<multi_range> tree::get_amr_boxes() const {
 			amr_ranges.insert(amr_ranges.end(), these_ranges.begin(), these_ranges.end());
 		}
 	}
-//	for( int i = 0; i < amr_ranges.size(); i++) {
-//		printf( "%s %s\n",  box.to_string().c_str(), amr_ranges[i].to_string().c_str());
-//	}
 	return amr_ranges;
 }
 
@@ -521,7 +517,7 @@ void tree::hydro_substep(int rk, double this_dt) {
 	hydro.substep_update(rk, dt);
 	hydro_step++;
 	if (rk != opts.nrk - 1) {
-		get_hydro_boundaries(true, rk + 1);
+		get_hydro_boundaries(true, t + opts.alpha[rk] * this_dt);
 	} else {
 		t0 = t;
 		t += dt;
@@ -542,7 +538,7 @@ double tree::initialize(int this_level) {
 			hydro.compute_refinement_criteria();
 			refine_step++;
 			get_refinement_boundaries();
-			auto boxes = hydro.refined_ranges(get_amr_boxes(), std::vector<multi_range>());
+			auto boxes = hydro.refined_ranges(std::vector<multi_range>(), std::vector<multi_range>());
 
 			std::vector<hpx::future<tree_client>> futs(boxes.size());
 			children.resize(boxes.size());
