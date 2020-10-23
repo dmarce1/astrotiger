@@ -134,7 +134,7 @@ void tree::sanity() const {
 #ifndef NDEBUG
 	const int max_x = (1 << level) * opts.max_box;
 	for (int dim = 0; dim < NDIM; dim++) {
-		assert(box.min[dim] >= 0 && box.max[dim] <= max_dx);
+		assert(box.min[dim] >= 0 && box.max[dim] <= max_x);
 	}
 #endif
 }
@@ -519,6 +519,7 @@ double tree::initialize(int this_level) {
 	} else {
 		if (this_level == level + 1) {
 			hydro.compute_refinement_criteria();
+			refine_step++;
 			get_refinement_boundaries();
 			auto boxes = hydro.refined_ranges(get_amr_boxes(), std::vector<multi_range>());
 
