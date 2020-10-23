@@ -20,6 +20,8 @@ using get_grandchild_boxes_action_type = tree::get_grandchild_boxes_action;
 using get_ptr_action_type = tree::get_ptr_action;
 using truncate_action_type = tree::truncate_action;
 using get_box_action_type = tree::get_box_action;
+using get_refinement_boundary_action_type = tree::get_refinement_boundary_action;
+HPX_REGISTER_ACTION (get_refinement_boundary_action_type);
 HPX_REGISTER_ACTION (get_box_action_type);
 HPX_REGISTER_ACTION (truncate_action_type);
 HPX_REGISTER_ACTION (get_ptr_action_type);
@@ -50,6 +52,13 @@ std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
 		hpx::this_thread::yield();
 	}
 	return hydro.pack(b);
+}
+
+std::vector<std::uint8_t> tree::get_refinement_boundary(multi_range b, int this_step) {
+	while (refine_step % 2 != refine_step % 2) {
+		hpx::this_thread::yield();
+	}
+	return hydro.pack_refinement(b);
 }
 
 std::vector<std::vector<double>> tree::get_hydro_prolong(std::vector<multi_range> ranges, double this_t) {
@@ -153,8 +162,9 @@ double tree::hydro_initialize(bool refine) {
 				grandchild_boxes.push_back(gc.get_box());
 			}
 		}
-//		printf("refine_step++\n");
+		hydro.compute_refinement_criteria();
 		refine_step++;
+
 		for (const auto &s : siblings) {
 			sfuts.push_back(s.client.get_grandchild_boxes(refine_step % 2));
 		}
@@ -176,14 +186,8 @@ double tree::hydro_initialize(bool refine) {
 			}
 			force_refine_boxes.insert(force_refine_boxes.begin(), tmp.begin(), tmp.end());
 		}
-//		if (level == 0) {
-//			for (auto &b : force_refine_boxes) {
-//				printf("%s\n", b.to_string().c_str());
-//			}
-//			abort();
-//		}
-		hydro.compute_refinement_criteria(force_refine_boxes);
-		auto new_boxes = hydro.refined_ranges(get_amr_boxes());
+		get_refinement_boundaries();
+		auto new_boxes = hydro.refined_ranges(get_amr_boxes(), force_refine_boxes);
 		std::vector<std::vector<tree_client>> old_grandchildren;
 		std::vector<tree_client> old_children;
 		std::vector<tree_client> new_children;
@@ -259,7 +263,6 @@ double tree::hydro_initialize(bool refine) {
 		hpx::wait_all(old_children_futs.begin(), old_children_futs.end());
 	}
 
-
 	return hydro.compute_flux();
 
 }
@@ -268,13 +271,7 @@ void tree::get_hydro_boundaries(bool amr) {
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
 	std::vector<multi_range> sib_ranges;
-//	int bnd_vol = 0;
-//	int pvol = 0;
-//	int svol = 0;
 	bnd_ranges = box.pad(opts.hbw).subtract(box);
-//	for (const auto &b : bnd_ranges) {
-//		bnd_vol += b.volume();
-//	}
 	for (const auto &sib : siblings) {
 		multi_range inter;
 		inter.set_null();
@@ -287,7 +284,6 @@ void tree::get_hydro_boundaries(bool amr) {
 		for (int i = 0; i < bnd_ranges.size(); i++) {
 			std::vector<multi_range> tmp;
 			std::vector<multi_range> these_ranges(1, bnd_ranges[i]);
-			//		printf( "Siblings %i\n", siblings.size());
 			for (const auto &sib : siblings) {
 				tmp.resize(0);
 				for (int j = 0; j < these_ranges.size(); j++) {
@@ -322,10 +318,6 @@ void tree::get_hydro_boundaries(bool amr) {
 	}
 	if (parent != tree_client() && amr) {
 		assert(parent.get_box().double_().contains(box));
-//		for (int i = 0; i < parent_ranges.size(); i++) {
-//			pvol += parent_ranges[i].volume();
-//			assert(parent.get_box().pad(opts.max_bw).double_().contains(parent_ranges[i]));
-//		}
 		auto parent_fut = parent.get_hydro_prolong(parent_ranges, t);
 		const auto datas = parent_fut.get();
 		for (int i = 0; i < datas.size(); i++) {
@@ -335,14 +327,51 @@ void tree::get_hydro_boundaries(bool amr) {
 	int j = 0;
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
-//			svol += sib_ranges[i].volume();
 			const auto data = sib_futs[j].get();
 			hydro.unpack(data, sib_ranges[i]);
 			j++;
 		}
 	}
-//	printf( "%i %i\n", bnd_vol, svol + pvol);
-//	assert(bnd_vol == svol + pvol);
+}
+
+void tree::get_refinement_boundaries() {
+	std::vector<multi_range> bnd_ranges;
+	std::vector<multi_range> sib_ranges;
+	bnd_ranges = box.pad(opts.window).subtract(box);
+	for (const auto &sib : siblings) {
+		multi_range inter;
+		inter.set_null();
+		for (int i = 0; i < bnd_ranges.size(); i++) {
+			inter = sib.box().intersection(bnd_ranges[i]);
+			sib_ranges.push_back(inter);
+		}
+	}
+	auto tmp = std::move(sib_ranges);
+	sib_ranges.resize(0);
+	for (const auto &s : siblings) {
+		multi_range this_range;
+		this_range.set_null();
+		for (const auto &range : tmp) {
+			const auto inter = range.intersection(s.box());
+			this_range = this_range.union_(inter);
+		}
+		sib_ranges.push_back(this_range);
+	}
+	std::vector<hpx::future<std::vector<std::uint8_t>>> sib_futs;
+	for (int i = 0; i < sib_ranges.size(); i++) {
+		if (!sib_ranges[i].empty()) {
+			auto shifted_box = sib_ranges[i].shift(-siblings[i].shift);
+			sib_futs.push_back(siblings[i].client.get_refinement_boundary(shifted_box, hydro_step));
+		}
+	}
+	int j = 0;
+	for (int i = 0; i < sib_ranges.size(); i++) {
+		if (!sib_ranges[i].empty()) {
+			const auto data = sib_futs[j].get();
+			hydro.unpack_refinement(data, sib_ranges[i]);
+			j++;
+		}
+	}
 }
 
 tree::tree() :
@@ -488,8 +517,9 @@ double tree::initialize(int this_level) {
 		amax = hydro.compute_flux();
 	} else {
 		if (this_level == level + 1) {
-			hydro.compute_refinement_criteria(std::vector<multi_range>());
-			auto boxes = hydro.refined_ranges(get_amr_boxes());
+			hydro.compute_refinement_criteria();
+			get_refinement_boundaries();
+			auto boxes = hydro.refined_ranges(get_amr_boxes(),std::vector<multi_range>());
 
 			std::vector<hpx::future<tree_client>> futs(boxes.size());
 			children.resize(boxes.size());

@@ -32,6 +32,11 @@ hpx::future<std::vector<double>> tree_client::get_hydro_boundary(multi_range b, 
 	return hpx::async<tree::get_hydro_boundary_action>(gid, b, step);
 }
 
+hpx::future<std::vector<std::uint8_t>> tree_client::get_refinement_boundary(multi_range b, int step) const {
+	assert(box == tree::get_box_action()(gid));
+	return hpx::async<tree::get_refinement_boundary_action>(gid, b, step);
+}
+
 hpx::future<std::vector<std::vector<double>>> tree_client::get_hydro_prolong(std::vector<multi_range> b, double t) const {
 	assert(box == tree::get_box_action()(gid));
 	return hpx::async<tree::get_hydro_prolong_action>(gid, std::move(b), t);

@@ -44,14 +44,16 @@ public:
 	}
 	double compute_flux();
 	void initialize();
-	void compute_refinement_criteria(const std::vector<multi_range> &forced);
-	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&) const;
+	void compute_refinement_criteria();
+	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&,const std::vector<multi_range> &forced);
 	double coord(index_type i) const;
 	std::vector<double> pack_field(int f, multi_range) const;
 	std::vector<double> pack(multi_range bbox) const;
+	std::vector<std::uint8_t> pack_refinement(multi_range bbox) const;
 	std::vector<double> pack_prolong(multi_range bbox, double w) const;
 	std::vector<double> pack_restrict(multi_range bbox) const;
 	void unpack(const std::vector<double>&, multi_range bbox);
+	void unpack_refinement(const std::vector<std::uint8_t>&, multi_range bbox);
 	void substep_update(int rk, double dt);
 
 	static std::vector<std::string> field_names();

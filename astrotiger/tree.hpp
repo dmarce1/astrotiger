@@ -122,6 +122,7 @@ public:
 	void clear_family();
 	void set_child_family();
 	std::vector<double> get_hydro_boundary(multi_range, int);
+	std::vector<std::uint8_t> get_refinement_boundary(multi_range, int);
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
 	std::vector<double> get_hydro_restrict();
 	void hydro_substep(int, double);
@@ -130,9 +131,10 @@ public:
 	std::vector<multi_range> get_grandchild_boxes(int) const;
 	multi_range get_box() const;
 	tree_client truncate(tree_client, multi_range box);
-
+	void get_refinement_boundaries();
 	void get_hydro_boundaries(bool amr);
 
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_box);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,truncate);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_ptr);
