@@ -158,7 +158,7 @@ double tree::hydro_initialize(bool refine) {
 		hydro.unpack(tmp.first, cbox);
 	}
 	hydro_step++;
-	get_hydro_boundaries(true);
+	get_hydro_boundaries(true,0);
 	if (refine && level < opts.max_level) {
 		std::vector<std::vector<tree_client>> grandchildren;
 		std::vector<hpx::future<std::vector<tree_client>>> cfuts;
@@ -270,7 +270,7 @@ double tree::hydro_initialize(bool refine) {
 
 }
 
-void tree::get_hydro_boundaries(bool amr) {
+void tree::get_hydro_boundaries(bool amr, int rk) {
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
 	std::vector<multi_range> sib_ranges;
@@ -521,7 +521,7 @@ void tree::hydro_substep(int rk, double this_dt) {
 	hydro.substep_update(rk, dt);
 	hydro_step++;
 	if (rk != opts.nrk - 1) {
-		get_hydro_boundaries(true);
+		get_hydro_boundaries(true, rk + 1);
 	} else {
 		t0 = t;
 		t += dt;

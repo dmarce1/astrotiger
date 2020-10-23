@@ -15,6 +15,7 @@ public:
 	int max_bw;
 	int window;
 	int max_level;
+	int order;
 	int nrk;
 	std::string problem;
 	double refine_slope;
@@ -22,9 +23,14 @@ public:
 	double cfl;
 	double tmax;
 	double efficiency;
+	std::vector<double> alpha;
+	std::vector<double> beta;
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
+		arc & alpha;
+		arc & beta;
+		arc & order;
 		arc & efficiency;
 		arc & min_box;
 		arc & tmax;

@@ -25,6 +25,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("config_file", po::value < std::string > (&config_file)->default_value(""), "configuration file") //
 	("problem", po::value < std::string > (&problem)->default_value("blast"), "Problem 1 - sod 2 - blast\n") //
 	("max_box", po::value<int>(&max_box)->default_value(32), "maximum (box volume)^(1/3)") //
+	("order", po::value<int>(&order)->default_value(2), "integration order") //
 	("window", po::value<int>(&window)->default_value(1), "refinement window size") //
 	("min_box", po::value<int>(&min_box)->default_value(8), "minimum (box volume)^(1/3)") //
 	("max_level", po::value<int>(&max_level)->default_value(3), "maximum refinement level") //
@@ -55,12 +56,23 @@ bool options::process_options(int argc, char *argv[]) {
 	po::notify(vm);
 
 	nhydro = 2 + NDIM;
-	hbw = 2;
+	hbw = order;
 	max_bw = std::max(hbw, window);
-	nrk = 2;
-
-	if (hbw == 2) {
+	nrk = order;
+	alpha.resize(nrk);
+	beta.resize(nrk);
+	if (order == 1) {
+		alpha[0] = beta[0] = 1.0;
+		opts.cfl = 0.9 / NDIM;
+	} else if (order == 2) {
 		opts.cfl = 0.9 * (2.0 / 3.0) / NDIM;
+		beta[0] = 1.0;
+		beta[1] = 0.5;
+		alpha[0] = 0.0;
+		alpha[1] = 1.0;
+	} else {
+		printf("Order %i not supported\n");
+		abort();
 	}
 
 	const auto loc = hpx::find_all_localities();

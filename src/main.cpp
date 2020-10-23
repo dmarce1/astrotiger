@@ -22,8 +22,8 @@ void master(int level, double tmax) {
 			levels_set_child_families(level - 1);
 		}
 		bool refine = (nstep == -1) && (super_step[level] % refine_freq == 0);
-		if( refine ) {
-			printf( "Refining on level %i\n", level);
+		if (refine) {
+			printf("Refining on level %i\n", level);
 		}
 		dt[level] = levels_hydro_initialize(level, refine);
 		if (dt[level] == 0.0) {
@@ -37,8 +37,8 @@ void master(int level, double tmax) {
 		dt[level] = (tmax - tm[level]) / nstep;
 		levels_hydro_substep(level, 0, dt[level]);
 //		printf("...\n");
-		if (opts.nrk > 1) {
-			levels_hydro_substep(level, 1, dt[level]);
+		for (int rk = 1; rk < opts.nrk; rk++) {
+			levels_hydro_substep(level, rk, dt[level]);
 		}
 		tm[level] += dt[level];
 		master(level + 1, tm[level]);
@@ -76,7 +76,7 @@ int hpx_main(int argc, char *argv[]) {
 			sibs.push_back(sib);
 		}
 	}
-	printf( "%i\n", sibs.size());
+	printf("%i\n", sibs.size());
 	dx.resize(opts.max_level + 1);
 	dt.resize(opts.max_level + 1);
 	tm.resize(opts.max_level + 1);
