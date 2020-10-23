@@ -62,6 +62,8 @@ public:
 		dx = std::move(other.dx);
 		t0 = std::move(other.t0);
 		t = std::move(other.t);
+		auto tmp = (int) other.refine_step;
+		refine_step = tmp;
 //		printf("Adding entry %i\n", level);
 	}
 	tree(const tree &other) :
@@ -78,6 +80,8 @@ public:
 		dx = other.dx;
 		t0 = other.t0;
 		t = other.t;
+		auto tmp = (int) other.refine_step;
+		refine_step = tmp;
 //		printf("Adding entry %i\n", level);
 	}
 	template<class A>
@@ -94,6 +98,9 @@ public:
 		arc & dx;
 		arc & t0;
 		arc & t;
+		int tmp = (int) refine_step;
+		arc & tmp;
+		refine_step = tmp;
 	}
 
 	tree();
@@ -108,9 +115,9 @@ public:
 	void list();
 	void set_child_family();
 	std::vector<double> get_hydro_boundary(multi_range, int);
-	std::pair<std::vector<std::uint8_t>,std::vector<multi_range>> get_refinement_boundary(multi_range, int);
+	std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> get_refinement_boundary(multi_range, int);
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
-	std::pair<std::vector<double>,std::vector<double>> get_hydro_restrict();
+	std::pair<std::vector<double>, std::vector<double>> get_hydro_restrict();
 	void hydro_substep(int, double);
 	double hydro_initialize(bool);
 	std::string output(DBfile *db) const;

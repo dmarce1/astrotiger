@@ -56,7 +56,8 @@ std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
 
 std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> tree::get_refinement_boundary(multi_range b, int this_step) {
 	std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> rc;
-	while (refine_step % 2 != this_step % 2) {
+	while (refine_step % 3 != this_step % 3) {
+	//	printf("%i %i\n", (int) refine_step, this_step);
 		hpx::this_thread::yield();
 	}
 	rc.first = hydro.pack_refinement(b);
@@ -118,6 +119,7 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 		tree new_tree(level, new_box);
 		new_tree.hydro.resize(new_tree.dx, new_box.pad(opts.hbw));
 		new_tree.t = new_tree.t0 = t;
+		new_tree.refine_step = 1;
 		new_tree.hydro.unpack(hydro.pack(new_box), new_box);
 		for (auto &c : children) {
 			if (!c.get_box().intersection(new_box.double_()).empty()) {
@@ -149,7 +151,7 @@ double tree::hydro_initialize(bool refine) {
 	}
 	for (int i = 0; i < children.size(); i++) {
 		const auto tmp = futs[i].get();
-		const auto cbox =  children[i].get_box().half();
+		const auto cbox = children[i].get_box().half();
 		if (dt != 0.0) {
 			hydro.unpack_coarse_flux(tmp.second, cbox, dt);
 		}
@@ -227,6 +229,7 @@ double tree::hydro_initialize(bool refine) {
 			auto np = std::make_shared<tree>(level + 1, b);
 			np->hydro.resize(np->dx, b.pad(opts.hbw));
 			np->t = np->t0 = t;
+			np->refine_step = 1;
 			np->hydro.unpack(hydro.pack_prolong(b, 1.0), b);
 			for (const auto &op : old_ptrs) {
 				const auto inter = np->box.intersection(op->box);
@@ -511,11 +514,8 @@ std::vector<tree_client> tree::get_children() const {
 void tree::hydro_substep(int rk, double this_dt) {
 	dt = this_dt;
 	if (rk == 0) {
-		if (refine_step % 2 == 1) {
-			refine_step++;
-		}
-	}
-	if (rk > 0) {
+		refine_step = 1;
+	} else if (rk > 0) {
 		hydro.compute_flux(rk);
 	}
 	hydro.substep_update(rk, dt);
