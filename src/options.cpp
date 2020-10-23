@@ -57,6 +57,10 @@ bool options::process_options(int argc, char *argv[]) {
 	nhydro = 2 + NDIM;
 	hbw = 2;
 	max_bw = 2;
+	if( window > hbw-1) {
+		printf( "window must be hbw-1 or less\n");
+		abort();
+	}
 	nrk = 2;
 
 	const auto loc = hpx::find_all_localities();

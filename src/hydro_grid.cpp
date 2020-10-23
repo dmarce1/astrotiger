@@ -100,7 +100,7 @@ hydro_grid::~hydro_grid() {
 }
 
 void hydro_grid::compute_refinement_criteria(const std::vector<multi_range> &forced) {
-	const auto ibox = box.pad(-opts.hbw);
+	const auto ibox = box.pad(-opts.hbw + opts.window);
 	for (multi_iterator i(box); !i.end(); i++) {
 		R[i] = false;
 	}

@@ -15,6 +15,7 @@ void master(int level, double tmax) {
 
 	double nstep = -1;
 	do {
+		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		if (level > 0 && nstep == -1) {
 			levels_set_child_families(level - 1);
 		}
@@ -29,9 +30,8 @@ void master(int level, double tmax) {
 		dt[level] = opts.cfl * dx[level] / dt[level];
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
 		dt[level] = (tmax - tm[level]) / nstep;
-		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		levels_hydro_substep(level, 0, dt[level]);
-		printf("...\n");
+//		printf("...\n");
 		if (opts.nrk > 1) {
 			levels_hydro_substep(level, 1, dt[level]);
 		}
@@ -70,6 +70,7 @@ int hpx_main(int argc, char *argv[]) {
 			sibs.push_back(sib);
 		}
 	}
+	printf( "%i\n", sibs.size());
 	dx.resize(opts.max_level + 1);
 	dt.resize(opts.max_level + 1);
 	tm.resize(opts.max_level + 1);

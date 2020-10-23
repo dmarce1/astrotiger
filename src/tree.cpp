@@ -135,7 +135,8 @@ double tree::hydro_initialize(bool refine) {
 	for (int i = 0; i < children.size(); i++) {
 		hydro.unpack(futs[i].get(), children[i].get_box().half());
 	}
-	hydro.sanity(box);
+	hydro_step++;
+	get_hydro_boundaries(true);
 	if (refine && level < opts.max_level) {
 		std::vector<std::vector<tree_client>> grandchildren;
 		std::vector<hpx::future<std::vector<tree_client>>> cfuts;
@@ -258,8 +259,6 @@ double tree::hydro_initialize(bool refine) {
 		hpx::wait_all(old_children_futs.begin(), old_children_futs.end());
 	}
 
-	hydro_step++;
-	get_hydro_boundaries(true);
 
 	return hydro.compute_flux();
 
@@ -269,20 +268,13 @@ void tree::get_hydro_boundaries(bool amr) {
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
 	std::vector<multi_range> sib_ranges;
-	if (children.size()) {
-		bnd_ranges = box.pad(opts.hbw).subtract(box);
-	} else {
-		for (int dim = 0; dim < NDIM; dim++) {
-			auto this_box = box;
-			this_box.max[dim] = this_box.min[dim];
-			this_box.min[dim] -= opts.hbw;
-			bnd_ranges.push_back(this_box);
-			this_box = box;
-			this_box.min[dim] = this_box.max[dim];
-			this_box.max[dim] += opts.hbw;
-			bnd_ranges.push_back(this_box);
-		}
-	}
+//	int bnd_vol = 0;
+//	int pvol = 0;
+//	int svol = 0;
+	bnd_ranges = box.pad(opts.hbw).subtract(box);
+//	for (const auto &b : bnd_ranges) {
+//		bnd_vol += b.volume();
+//	}
 	for (const auto &sib : siblings) {
 		multi_range inter;
 		inter.set_null();
@@ -330,9 +322,10 @@ void tree::get_hydro_boundaries(bool amr) {
 	}
 	if (parent != tree_client() && amr) {
 		assert(parent.get_box().double_().contains(box));
-		for (int i = 0; i < parent_ranges.size(); i++) {
-			assert(parent.get_box().pad(opts.max_bw).double_().contains(parent_ranges[i]));
-		}
+//		for (int i = 0; i < parent_ranges.size(); i++) {
+//			pvol += parent_ranges[i].volume();
+//			assert(parent.get_box().pad(opts.max_bw).double_().contains(parent_ranges[i]));
+//		}
 		auto parent_fut = parent.get_hydro_prolong(parent_ranges, t);
 		const auto datas = parent_fut.get();
 		for (int i = 0; i < datas.size(); i++) {
@@ -342,11 +335,14 @@ void tree::get_hydro_boundaries(bool amr) {
 	int j = 0;
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
+//			svol += sib_ranges[i].volume();
 			const auto data = sib_futs[j].get();
 			hydro.unpack(data, sib_ranges[i]);
 			j++;
 		}
 	}
+//	printf( "%i %i\n", bnd_vol, svol + pvol);
+//	assert(bnd_vol == svol + pvol);
 }
 
 tree::tree() :
