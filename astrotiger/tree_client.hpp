@@ -49,9 +49,8 @@ public:
 	hpx::future<std::vector<double>> get_hydro_boundary(multi_range b, int) const;
 	hpx::future<std::vector<std::vector<double>>> get_hydro_prolong(std::vector<multi_range> b, double t) const;
 	hpx::future<std::vector<double>> get_hydro_restrict() const;
-	hpx::future<std::vector<multi_range>> get_grandchild_boxes(int) const;
 	hpx::future<std::shared_ptr<tree>> get_ptr() const;
-	hpx::future<std::vector<std::uint8_t>> get_refinement_boundary(multi_range, int) const;
+	hpx::future<std::pair<std::vector<std::uint8_t>,std::vector<multi_range>>> get_refinement_boundary(multi_range, int) const;
 
 
 	template<class A>

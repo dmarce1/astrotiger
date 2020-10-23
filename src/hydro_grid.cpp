@@ -139,7 +139,7 @@ void hydro_grid::initialize() {
 			U[rho_i][i] = 1.0;
 			for (int dim = 0; dim < NDIM; dim++) {
 				U[sx_i + dim][i] = 0.0;
-				r += std::pow(coord(i[dim]) - (dim == 0 ? 0.65 : 0.6), 2);
+				r += std::pow(coord(i[dim]) - 0.5, 2);
 			}
 			r = std::sqrt(r);
 			if (r < 0.1) {
@@ -160,7 +160,7 @@ double hydro_grid::coord(index_type i) const {
 	return (i + 0.5) * dx;
 }
 
-std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_range> &amr_boxes, const std::vector<multi_range> &forced) {
+std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_range> &amr_boxes, const std::vector<multi_range> &forced) const {
 
 	const auto ibox = box.pad(-opts.hbw);
 	auto Rwin = R;
@@ -176,13 +176,12 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 		}
 		if (res) {
 			Rwin[i] = true;
-			auto window = range<index_type>(i).pad(opts.window).intersection(box.pad(-opts.hbw));
+			const auto window = range<index_type>(i).pad(opts.window).intersection(box.pad(-opts.hbw));
 			for (multi_iterator j(window); !j.end(); j++) {
 				Rwin[j] = true;
 			}
 		}
 	}
-	R = std::move(Rwin);
 
 	std::vector<multi_range> boxes;
 	std::vector<multi_range> tmp;
@@ -191,7 +190,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 	range.min = box.max;
 	range.max = box.min;
 	for (multi_iterator i(ibox); !i.end(); i++) {
-		if (R[i]) {
+		if (Rwin[i]) {
 			for (int dim = 0; dim < NDIM; dim++) {
 				range.min[dim] = std::min(range.min[dim], i[dim]);
 				range.max[dim] = std::max(range.max[dim], i[dim] + 1);
@@ -209,7 +208,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 				assert(b.volume());
 				int count = 0;
 				for (multi_iterator i(b); !i.end(); i++) {
-					if (R[i]) {
+					if (Rwin[i]) {
 						count++;
 					}
 				}
@@ -223,7 +222,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 					range.min = new_boxes.first.max;
 					range.max = new_boxes.first.min;
 					for (multi_iterator i(new_boxes.first); !i.end(); i++) {
-						if (R[i]) {
+						if (Rwin[i]) {
 							for (int dim = 0; dim < NDIM; dim++) {
 								range.min[dim] = std::min(range.min[dim], i[dim]);
 								range.max[dim] = std::max(range.max[dim], i[dim] + 1);
@@ -234,7 +233,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 					range.min = new_boxes.second.max;
 					range.max = new_boxes.second.min;
 					for (multi_iterator i(new_boxes.second); !i.end(); i++) {
-						if (R[i]) {
+						if (Rwin[i]) {
 							for (int dim = 0; dim < NDIM; dim++) {
 								range.min[dim] = std::min(range.min[dim], i[dim]);
 								range.max[dim] = std::max(range.max[dim], i[dim] + 1);
