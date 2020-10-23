@@ -59,6 +59,10 @@ bool options::process_options(int argc, char *argv[]) {
 	max_bw = std::max(hbw, window);
 	nrk = 2;
 
+	if (hbw == 2) {
+		opts.cfl = 0.9 * (2.0 / 3.0) / NDIM;
+	}
+
 	const auto loc = hpx::find_all_localities();
 	const auto sz = loc.size();
 	std::vector<hpx::future<void>> futs;

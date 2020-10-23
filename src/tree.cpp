@@ -57,7 +57,7 @@ std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
 std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> tree::get_refinement_boundary(multi_range b, int this_step) {
 	std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> rc;
 	while (refine_step % 3 != this_step % 3) {
-	//	printf("%i %i\n", (int) refine_step, this_step);
+		//	printf("%i %i\n", (int) refine_step, this_step);
 		hpx::this_thread::yield();
 	}
 	rc.first = hydro.pack_refinement(b);
@@ -515,13 +515,14 @@ void tree::hydro_substep(int rk, double this_dt) {
 	dt = this_dt;
 	if (rk == 0) {
 		refine_step = 1;
-	} else if (rk > 0) {
+	} else {
 		hydro.compute_flux(rk);
 	}
 	hydro.substep_update(rk, dt);
 	hydro_step++;
-	get_hydro_boundaries(true);
-	if (rk == opts.nrk - 1) {
+	if (rk != opts.nrk - 1) {
+		get_hydro_boundaries(true);
+	} else {
 		t0 = t;
 		t += dt;
 	}
