@@ -7,6 +7,7 @@ static tree_client root;
 std::vector<double> dx;
 std::vector<double> dt;
 std::vector<double> tm;
+std::vector<int> super_step;
 
 void master(int level, double tmax) {
 	if (level > opts.max_level) {
@@ -14,12 +15,16 @@ void master(int level, double tmax) {
 	}
 
 	double nstep = -1;
+	const int refine_freq = opts.window / opts.cfl;
 	do {
 		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		if (level > 0 && nstep == -1) {
 			levels_set_child_families(level - 1);
 		}
-		bool refine = nstep == -1;
+		bool refine = (nstep == -1) && (super_step[level] % refine_freq == 0);
+		if( refine ) {
+			printf( "Refining on level %i\n", level);
+		}
 		dt[level] = levels_hydro_initialize(level, refine);
 		if (dt[level] == 0.0) {
 			tm[level] = tm[level - 1];
@@ -38,6 +43,7 @@ void master(int level, double tmax) {
 		tm[level] += dt[level];
 		master(level + 1, tm[level]);
 	} while (nstep != 1.0);
+	super_step[level]++;
 
 }
 
@@ -74,7 +80,9 @@ int hpx_main(int argc, char *argv[]) {
 	dx.resize(opts.max_level + 1);
 	dt.resize(opts.max_level + 1);
 	tm.resize(opts.max_level + 1);
+	super_step.resize(opts.max_level + 1);
 	for (int l = 0; l <= opts.max_level; l++) {
+		super_step[l] = 0;
 		dx[l] = 1.0 / (opts.max_box * (1 << l));
 		tm[l] = 0.0;
 		auto fut = root.initialize(l);
