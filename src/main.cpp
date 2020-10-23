@@ -90,7 +90,7 @@ int hpx_main(int argc, char *argv[]) {
 	root.set_family(tree_client(), root, sibs).get();
 	output_silo("X.0.silo");
 	int i = 0;
-	const auto dt = 0.1;
+	const auto dt = 0.01;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

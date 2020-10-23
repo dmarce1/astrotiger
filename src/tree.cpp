@@ -158,20 +158,29 @@ double tree::hydro_initialize(bool refine) {
 			sfuts.push_back(s.client.get_grandchild_boxes(refine_step % 2));
 		}
 		force_refine_boxes = grandchild_boxes;
-//		printf("sibling grandchildren\n");
-		for (int i = 0; i < siblings.size(); i++) {
-			auto tmp = sfuts[i].get();
-			for (auto &b : tmp) {
-				b = b.shift(siblings[i].shift);
-			}
-			force_refine_boxes.insert(force_refine_boxes.begin(), tmp.begin(), tmp.end());
-		}
 		for (auto &b : force_refine_boxes) {
 			for (int dim = 0; dim < NDIM; dim++) {
 				b.min[dim] = b.min[dim] / 4;
 				b.max[dim] = (b.max[dim] + 3) / 4;
 			}
 		}
+		for (int i = 0; i < siblings.size(); i++) {
+			auto tmp = sfuts[i].get();
+			for (auto &b : tmp) {
+				for (int dim = 0; dim < NDIM; dim++) {
+					b.min[dim] = b.min[dim] / 4;
+					b.max[dim] = (b.max[dim] + 3) / 4;
+				}
+				b = b.shift(siblings[i].shift);
+			}
+			force_refine_boxes.insert(force_refine_boxes.begin(), tmp.begin(), tmp.end());
+		}
+//		if (level == 0) {
+//			for (auto &b : force_refine_boxes) {
+//				printf("%s\n", b.to_string().c_str());
+//			}
+//			abort();
+//		}
 		hydro.compute_refinement_criteria(force_refine_boxes);
 		auto new_boxes = hydro.refined_ranges(get_amr_boxes());
 		std::vector<std::vector<tree_client>> old_grandchildren;
