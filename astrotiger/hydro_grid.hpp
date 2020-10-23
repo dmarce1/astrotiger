@@ -58,6 +58,8 @@ public:
 	std::vector<std::uint8_t> pack_refinement(multi_range bbox) const;
 	std::vector<double> pack_prolong(multi_range bbox, double w) const;
 	std::vector<double> pack_restrict(multi_range bbox) const;
+	std::vector<double> pack_coarse_flux();
+	void unpack_coarse_flux(const std::vector<double>&, const multi_range& bbox, double dt);
 	void unpack(const std::vector<double>&, multi_range bbox);
 	void unpack_refinement(const std::vector<std::uint8_t>&, multi_range bbox);
 	void substep_update(int rk, double dt);

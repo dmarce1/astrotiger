@@ -48,7 +48,7 @@ hpx::future<std::vector<std::vector<double>>> tree_client::get_hydro_prolong(std
 	return hpx::async<tree::get_hydro_prolong_action>(gid, std::move(b), t);
 }
 
-hpx::future<std::vector<double>> tree_client::get_hydro_restrict() const {
+hpx::future<std::pair<std::vector<double>,std::vector<double>>> tree_client::get_hydro_restrict() const {
 	assert(gid!=hpx::invalid_id);
 	return hpx::async<tree::get_hydro_restrict_action>(gid);
 }

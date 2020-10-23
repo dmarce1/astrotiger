@@ -20,7 +20,7 @@ void master(int level, double tmax) {
 			levels_set_child_families(level - 1);
 		}
 		bool refine = nstep == -1;
-		dt[level] = levels_hydro_initialize(level, true);
+		dt[level] = levels_hydro_initialize(level, refine);
 		if (dt[level] == 0.0) {
 			tm[level] = tm[level - 1];
 			master(level + 1, tm[level]);

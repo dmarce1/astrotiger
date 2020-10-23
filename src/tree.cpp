@@ -80,8 +80,12 @@ std::vector<std::vector<double>> tree::get_hydro_prolong(std::vector<multi_range
 	return p;
 }
 
-std::vector<double> tree::get_hydro_restrict() {
-	return hydro.pack_restrict(box.half());
+std::pair<std::vector<double>, std::vector<double>> tree::get_hydro_restrict() {
+	std::pair<std::vector<double>, std::vector<double>> rc;
+	const auto bbox = box.half();
+	rc.first = hydro.pack_restrict(bbox);
+	rc.second = hydro.pack_coarse_flux();
+	return rc;
 }
 
 std::shared_ptr<tree> tree::get_ptr() {
@@ -139,12 +143,17 @@ void tree::sanity() const {
 double tree::hydro_initialize(bool refine) {
 	sanity();
 	std::vector<multi_range> force_refine_boxes;
-	std::vector<hpx::future<std::vector<double>>> futs;
+	std::vector<hpx::future<std::pair<std::vector<double>, std::vector<double>>>> futs;
 	for (int i = 0; i < children.size(); i++) {
 		futs.push_back(children[i].get_hydro_restrict());
 	}
 	for (int i = 0; i < children.size(); i++) {
-		hydro.unpack(futs[i].get(), children[i].get_box().half());
+		const auto tmp = futs[i].get();
+		const auto cbox =  children[i].get_box().half();
+		if (dt != 0.0) {
+			hydro.unpack_coarse_flux(tmp.second, cbox, dt);
+		}
+		hydro.unpack(tmp.first, cbox);
 	}
 	hydro_step++;
 	get_hydro_boundaries(true);
@@ -378,6 +387,7 @@ std::vector<multi_range> tree::get_refinement_boundaries() {
 tree::tree() :
 		hydro_step(0), refine_step(0) {
 	level = -1;
+	dt = 0.0;
 }
 
 tree::~tree() {
@@ -385,6 +395,7 @@ tree::~tree() {
 
 tree::tree(int level_, multi_range box_) :
 		hydro_step(0), refine_step(0) {
+	dt = 0.0;
 	t0 = 0.0;
 	t = 0.0;
 	level = level_;
@@ -497,7 +508,8 @@ std::vector<tree_client> tree::get_children() const {
 	return children;
 }
 
-void tree::hydro_substep(int rk, double dt) {
+void tree::hydro_substep(int rk, double this_dt) {
+	dt = this_dt;
 	if (rk == 0) {
 		if (refine_step % 2 == 1) {
 			refine_step++;
@@ -518,7 +530,7 @@ void tree::hydro_substep(int rk, double dt) {
 double tree::initialize(int this_level) {
 	double amax = 0.0;
 	if (this_level == level) {
-		levels_add_entry(level,this);
+		levels_add_entry(level, this);
 		hydro.resize(dx, box.pad(opts.hbw));
 		hydro.initialize();
 		amax = hydro.compute_flux(0);

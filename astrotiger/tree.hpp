@@ -43,12 +43,14 @@ class tree: public hpx::components::managed_component_base<tree> {
 	double dx;
 	double t0;
 	double t;
+	double dt;
 public:
 
 	static hpx::future<tree_client> allocate(int, multi_range box);
 
 	tree(tree &&other) :
 			hydro_step(0), refine_step(0) {
+		dt = std::move(dt);
 		box = std::move(other.box);
 		hydro = std::move(other.hydro);
 		parent = std::move(other.parent);
@@ -64,6 +66,7 @@ public:
 	}
 	tree(const tree &other) :
 			hydro_step(0), refine_step(0) {
+		dt = other.dt;
 		box = other.box;
 		hydro = other.hydro;
 		parent = other.parent;
@@ -79,6 +82,7 @@ public:
 	}
 	template<class A>
 	void serialize(A &&arc, unsigned) {
+		arc & dt;
 		arc & box;
 		arc & hydro;
 		arc & parent;
@@ -106,7 +110,7 @@ public:
 	std::vector<double> get_hydro_boundary(multi_range, int);
 	std::pair<std::vector<std::uint8_t>,std::vector<multi_range>> get_refinement_boundary(multi_range, int);
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
-	std::vector<double> get_hydro_restrict();
+	std::pair<std::vector<double>,std::vector<double>> get_hydro_restrict();
 	void hydro_substep(int, double);
 	double hydro_initialize(bool);
 	std::string output(DBfile *db) const;
