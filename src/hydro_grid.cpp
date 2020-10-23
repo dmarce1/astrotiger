@@ -144,12 +144,19 @@ void hydro_grid::compute_refinement_criteria() {
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		double max_grad_rho = 0.0;
 		double max_grad_egas = 0.0;
+		double max_grad_mom = 0.0;
 		for (int dim = 0; dim < NDIM; dim++) {
 			max_grad_rho = std::max(max_grad_rho, std::abs(U[rho_i].smooth_gradient(dim, i)));
 			max_grad_egas = std::max(max_grad_egas, std::abs(U[egas_i].smooth_gradient(dim, i)));
+			for (int dim2 = 0; dim2 < NDIM; dim2++) {
+				max_grad_mom = std::max(max_grad_mom, std::abs(U[sx_i + dim2].smooth_gradient(dim, i)));
+			}
 		}
 		bool res = max_grad_rho / U[rho_i][i] > opts.refine_slope;
 		res = res || max_grad_egas / U[egas_i][i] > opts.refine_slope;
+//		printf( "%e\n", U[rho_i][i] * U[egas_i][i]);
+		assert(U[rho_i][i] * U[egas_i][i] > 0.0);
+		res = res || max_grad_mom / std::sqrt(U[rho_i][i] * U[egas_i][i]);
 		R[i] = res;
 	}
 }
