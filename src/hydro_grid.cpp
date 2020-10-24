@@ -142,24 +142,25 @@ void hydro_grid::compute_refinement_criteria() {
 		R[i] = false;
 	}
 	multi_range dirs(multi_range(index_type(0)).pad(1));
+	int dirmax = (std::pow(3, NDIM) - 1) / 2;
+	int cnt = 0;
 	for (multi_iterator i(dirs); !i.end(); i++) {
-		bool cont = false;
+		if (cnt >= dirmax) {
+			break;
+		}
+		cnt++;
 		bool all_zero = true;
 		const auto j = i.index();
-		for (int dim = 0; dim < NDIM - 1; dim++) {
+		for (int dim = 0; dim < NDIM; dim++) {
 			all_zero = all_zero && (j[dim] == 0);
-			if (j[dim] < j[dim + 1]) {
-				cont = true;
-				break;
-			}
 		}
-		if (cont || all_zero) {
+		if (all_zero) {
 			continue;
 		}
 		for (multi_iterator k(box.pad(-opts.hbw)); !k.end(); k++) {
 			if (!R[k]) {
 				for (int f = 0; f < opts.nhydro; f++) {
-					const auto up = U[f][k.index()+ j];
+					const auto up = U[f][k.index() + j];
 					const auto u0 = U[f][k];
 					const auto um = U[f][k.index() - j];
 					const auto num = std::abs(up + um - 2.0 * u0);

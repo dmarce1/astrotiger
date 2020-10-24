@@ -12,6 +12,7 @@
 #include <cassert>
 #include <cstdint>
 #include <vector>
+#include <cmath>
 
 using index_type = std::int64_t;
 

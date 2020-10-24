@@ -3,6 +3,8 @@
 #include <astrotiger/defs.hpp>
 #include <astrotiger/vect.hpp>
 
+#include <vector>
+#include <string>
 #include <utility>
 
 template<class T>
