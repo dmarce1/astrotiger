@@ -50,7 +50,7 @@ public:
 
 	tree(tree &&other) :
 			hydro_step(0), refine_step(0) {
-		dt = std::move(dt);
+		dt = std::move(other.dt);
 		box = std::move(other.box);
 		hydro = std::move(other.hydro);
 		parent = std::move(other.parent);

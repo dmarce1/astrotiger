@@ -141,6 +141,38 @@ void hydro_grid::compute_refinement_criteria() {
 	for (multi_iterator i(ibox); !i.end(); i++) {
 		R[i] = false;
 	}
+	multi_range dirs(multi_range(index_type(0)).pad(1));
+	for (multi_iterator i(dirs); !i.end(); i++) {
+		bool cont = false;
+		bool all_zero = true;
+		const auto j = i.index();
+		for (int dim = 0; dim < NDIM - 1; dim++) {
+			all_zero = all_zero && (j[dim] == 0);
+			if (j[dim] < j[dim + 1]) {
+				cont = true;
+				break;
+			}
+		}
+		if (cont || all_zero) {
+			continue;
+		}
+		for (multi_iterator k(box.pad(-opts.hbw)); !k.end(); k++) {
+			if (!R[k]) {
+				for (int f = 0; f < opts.nhydro; f++) {
+					const auto up = U[f][k.index()+ j];
+					const auto u0 = U[f][k];
+					const auto um = U[f][k.index() - j];
+					const auto num = std::abs(up + um - 2.0 * u0);
+					const auto den = std::abs(up - u0) + std::abs(u0 - um) + 0.01 * (std::abs(up) + std::abs(um) + 2.0 * std::abs(u0));
+					if (den > 0.0) {
+						if (num / den > opts.refine_slope) {
+							R[k] = true;
+						}
+					}
+				}
+			}
+		}
+	}
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		double max_grad_rho = 0.0;
 		double max_grad_egas = 0.0;
@@ -178,7 +210,7 @@ void hydro_grid::initialize() {
 				r += std::pow(coord(i[dim]) - 0.5, 2);
 			}
 			r = std::sqrt(r);
-			if (r < 0.1) {
+			if (r < 3.0 * dx) {
 				U[egas_i][i] = 1.0;
 			} else {
 				U[egas_i][i] = 1.0e-3;
@@ -318,7 +350,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 		for (const auto &amr : amr_boxes) {
 			tmp.resize(0);
 			for (const auto &b : boxes) {
-				const auto amrbox = amr.pad(opts.window);
+				const auto amrbox = amr.pad(1);
 				if (!amrbox.intersection(b).empty()) {
 					auto tmp2 = b.subtract(amrbox);
 					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
