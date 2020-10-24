@@ -39,6 +39,7 @@ class tree: public hpx::components::managed_component_base<tree> {
 	int level;
 	std::atomic<int> hydro_step;
 	std::atomic<int> refine_step;
+	std::atomic<int> energy_step;
 	std::vector<multi_range> grandchild_boxes;
 	double dx;
 	double t0;
@@ -49,7 +50,7 @@ public:
 	static hpx::future<tree_client> allocate(int, multi_range box);
 
 	tree(tree &&other) :
-			hydro_step(0), refine_step(0) {
+			hydro_step(0), refine_step(0), energy_step(0) {
 		dt = std::move(other.dt);
 		box = std::move(other.box);
 		hydro = std::move(other.hydro);
@@ -115,8 +116,10 @@ public:
 	void list();
 	void set_child_family();
 	std::vector<double> get_hydro_boundary(multi_range, int);
+	std::vector<double> get_energy_boundary(multi_range, int);
 	std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> get_refinement_boundary(multi_range, int);
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
+	std::vector<std::vector<double>> get_energy_prolong(std::vector<multi_range>, double);
 	std::pair<std::vector<double>, std::vector<double>> get_hydro_restrict();
 	void hydro_substep(int, double);
 	double hydro_initialize(bool);
@@ -124,14 +127,17 @@ public:
 	multi_range get_box() const;
 	tree_client truncate(tree_client, multi_range box);
 	std::vector<multi_range> get_refinement_boundaries();
-	void get_hydro_boundaries(bool amr, double );
+	void get_hydro_boundaries(double);
+	void get_energy_boundaries(double);
 	void sanity() const;
 
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_box);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,truncate);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_ptr);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_energy_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_boundary);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_energy_prolong);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_prolong);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_restrict);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_children);

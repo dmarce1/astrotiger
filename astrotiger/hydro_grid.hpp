@@ -17,9 +17,10 @@
 
 #define rho_i 0
 #define egas_i 1
-#define sx_i 2
-#define sy_i 3
-#define sz_i 4
+#define tau_i 2
+#define sx_i 3
+#define sy_i 4
+#define sz_i 5
 
 class hydro_grid {
 	multi_range box;
@@ -57,12 +58,15 @@ public:
 	std::vector<double> pack(multi_range bbox) const;
 	std::vector<std::uint8_t> pack_refinement(multi_range bbox) const;
 	std::vector<double> pack_prolong(multi_range bbox, double w) const;
+	std::vector<double> pack_field_prolong(int f, multi_range bbox, double w) const;
 	std::vector<double> pack_restrict(multi_range bbox) const;
 	std::vector<double> pack_coarse_flux();
 	void unpack_coarse_flux(const std::vector<double>&, const multi_range& bbox, double dt);
 	void unpack(const std::vector<double>&, multi_range bbox);
+	void unpack_field(int f, const std::vector<double>&, multi_range bbox);
 	void unpack_refinement(const std::vector<std::uint8_t>&, multi_range bbox);
 	void substep_update(int rk, double dt);
+	void update_energy();
 
 	static std::vector<std::string> field_names();
 

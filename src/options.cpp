@@ -31,9 +31,9 @@ bool options::process_options(int argc, char *argv[]) {
 	("max_level", po::value<int>(&max_level)->default_value(3), "maximum refinement level") //
 	("tmax", po::value<double>(&tmax)->default_value(0.25), "maximum simulation time") //
 	("cfl", po::value<double>(&cfl)->default_value(0.2), "cfl factor") //
-	("efficiency", po::value<double>(&efficiency)->default_value(0.5), "refinement efficiency") //
+	("efficiency", po::value<double>(&efficiency)->default_value(0.7), "refinement efficiency") //
 	("gamma", po::value<double>(&gamma)->default_value(5.0 / 3.0), "fluid gamma") //
-	("refine_slope", po::value<double>(&refine_slope)->default_value(0.1), "refinement slope criteria") //
+	("refine_slope", po::value<double>(&refine_slope)->default_value(0.025), "refinement slope criteria") //
 	("ngroup", po::value<int>(&ngroup)->default_value(1), "number of frequency groups") //
 			;
 
@@ -55,7 +55,7 @@ bool options::process_options(int argc, char *argv[]) {
 	}
 	po::notify(vm);
 
-	nhydro = 2 + NDIM;
+	nhydro = 3 + NDIM;
 	hbw = order;
 	max_bw = std::max(hbw, window);
 	nrk = order;
