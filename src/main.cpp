@@ -17,11 +17,14 @@ statistics solve_gravity() {
 	for (int l = 0; l <= opts.max_level; l++) {
 		int pass = 0;
 		double r;
-		do {
+		printf( "Solving gravity\n");
+		for (int i = 0; i < 10; i++) {
+			//	do {
 			r = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get().resid;
 			printf("%e %e\n", mtot, r);
 			pass++;
-		} while (r > toler);
+			//	} while (r > toler);
+		}
 		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get().resid;
 		printf("%e\n", r);
 //		r = root.gravity_solve(0, l, std::vector<double>(), 0.0).get().resid;
@@ -120,6 +123,7 @@ int hpx_main(int argc, char *argv[]) {
 		}
 	}
 	root.set_family(tree_client(), root, sibs).get();
+	master(0, 1.0e-100);
 	solve_gravity();
 	output_silo("X.0.silo");
 //	int i = 0;
@@ -127,7 +131,7 @@ int hpx_main(int argc, char *argv[]) {
 //	levels_show();
 //	for (double t = 0.0; t < opts.tmax; t += dt) {
 //		i++;
-//		master(0, std::min(t + dt, opts.tmax));
+	//		master(0, std::min(t + dt, opts.tmax));
 //		std::string fname = "X." + std::to_string(i) + ".silo";
 //		output_silo(fname);
 //	}

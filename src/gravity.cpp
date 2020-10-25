@@ -18,15 +18,27 @@ void gravity::initialize_fine(const multi_array<double> &rho, double mtot) {
 		active[i] = true;
 	}
 	const auto rho0 = mtot;
-	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
+	for (multi_iterator i(box); !i.end(); i++) {
 		R[i] = 4.0 * M_PI * opts.G * (rho[i] - rho0);
 	}
-	X = phi;
 }
 
 void gravity::initialize_coarse(double w) {
-	for (multi_iterator i(box); !i.end(); i++) {
-		phi[i] = (1.0 - w) * phi0[i] + w * phi1[i];
+	if (!has_phi1) {
+		for (multi_iterator i(box); !i.end(); i++) {
+			phi[i] = 0.0;
+		}
+	} else {
+		if (!has_phi0) {
+			for (multi_iterator i(box); !i.end(); i++) {
+				phi[i] = phi1[i];
+//				printf( "--- %e\n", phi[i]);
+			}
+		} else {
+			for (multi_iterator i(box); !i.end(); i++) {
+				phi[i] = (1.0 - w) * phi0[i] + w * phi1[i];
+			}
+		}
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
 		X[i] = 0.0;
@@ -78,12 +90,15 @@ void gravity::unpack(const std::vector<double> &data, const multi_range &bbox) {
 }
 
 void gravity::finish_fine() {
+	has_phi0 = has_phi1;
+	has_phi1 = true;
 	phi = X;
 	phi0 = phi1;
 	phi1 = phi;
 }
 
 std::vector<double> gravity::pack_prolong_amr(const multi_range &bbox) const {
+//	printf( "PRO: %s\n", bbox.to_string().c_str());
 	std::vector<double> data;
 	auto pro = phi.prolong(bbox, true);
 	for (multi_iterator i(bbox); !i.end(); i++) {
@@ -144,12 +159,13 @@ gravity_return gravity::get_restrict() {
 		}
 		resid[i] -= (2.0 * NDIM) * x[j] / (dx * dx);
 		resid[i] -= R[i];
+//		phi[i] = resid[i];
 		rmax = std::max(rmax, std::abs(resid[i] * (dx * dx)));
 	}
 	const auto resid_c = resid.restrict_(rbox);
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		if (active_c[i]) {
-			rc.R.push_back(resid[i]);
+			rc.R.push_back(resid_c[i]);
 		}
 	}
 	rc.resid = rmax;
@@ -166,11 +182,11 @@ void gravity::apply_restrict(const gravity_return &data) {
 	}
 	k = 0;
 	for (multi_iterator i(data.box); !i.end(); i++) {
-		assert(k < data.R.size());
 		if (active[i]) {
+			assert(k < data.R.size());
 			R[i] = data.R[k];
+			k++;
 		}
-		k++;
 	}
 }
 
@@ -188,7 +204,7 @@ void gravity::apply_prolong(const std::vector<double> &data) {
 		dX[i] = data[k];
 		k++;
 	}
-	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
+	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 		X[i] += dX[i.index() / 2];
 	}
 }

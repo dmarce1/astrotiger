@@ -46,6 +46,7 @@ class tree: public hpx::components::managed_component_base<tree> {
 	std::atomic<int> energy_step;
 	std::atomic<int> gravity_step;
 	std::vector<multi_range> grandchild_boxes;
+	mutex_type mtx;
 	double dx;
 	double t0;
 	double t;
@@ -59,6 +60,7 @@ public:
 		dt = std::move(other.dt);
 		box = std::move(other.box);
 		hydro = std::move(other.hydro);
+		grav = std::move(other.grav);
 		parent = std::move(other.parent);
 		self = std::move(other.self);
 		children = std::move(other.children);
@@ -77,6 +79,7 @@ public:
 		dt = other.dt;
 		box = other.box;
 		hydro = other.hydro;
+		grav = other.grav;
 		parent = other.parent;
 		self = other.self;
 		children = other.children;
@@ -95,6 +98,7 @@ public:
 		arc & dt;
 		arc & box;
 		arc & hydro;
+		arc & grav;
 		arc & parent;
 		arc & self;
 		arc & children;

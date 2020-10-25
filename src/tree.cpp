@@ -45,18 +45,17 @@ HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
 
-
 statistics tree::get_statistics() const {
 	std::vector<multi_range> cranges;
 	std::vector<hpx::future<statistics>> futs;
-	for( const auto& c : children) {
+	for (const auto &c : children) {
 		futs.push_back(c.get_statistics());
 		cranges.push_back(c.get_box().half());
 	}
 	auto stats = hydro.get_statistics(cranges);
-	for( auto& f : futs) {
-		for( int field = 0; field < opts.nhydro; field++) {
-			auto tmp = f.get();
+	for (auto &f : futs) {
+		auto tmp = f.get();
+		for (int field = 0; field < opts.nhydro; field++) {
 			stats.u[field] += tmp.u[field];
 		}
 	}
@@ -82,10 +81,14 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	}
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < opts.nmulti; i++) {
+			std::unique_lock<mutex_type> lock(mtx);
 			grav.relax(false);
+			lock.unlock();
 			gravity_step++;
 			get_gravity_boundaries();
 		}
+	} else {
+		gravity_step += opts.nmulti;
 	}
 	gravity_return rc;
 	double max_resid = 0.0;
@@ -114,11 +117,14 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			max_resid = std::max(max_resid, tmp.resid);
 		}
 		for (int i = 0; i < opts.nmulti; i++) {
+			std::unique_lock<mutex_type> lock(mtx);
 			grav.relax(pass == 0);
+			lock.unlock();
 			gravity_step++;
 			get_gravity_boundaries();
 		}
 	} else if (pass == GRAVITY_FINAL_PASS) {
+		gravity_step += opts.nmulti;
 		grav.finish_fine();
 		hydro.set_phi(grav.get_phi());
 	}
@@ -153,11 +159,16 @@ std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
 	return hydro.pack(b);
 }
 
-std::vector<double> tree::get_gravity_boundary(multi_range b, int this_step) {
-	while (gravity_step % (opts.nmulti) != this_step % (opts.nmulti)) {
+std::vector<double> tree::get_gravity_boundary(multi_range bbox, int this_step) {
+	const auto a = gravity_step % (2 * opts.nmulti);
+	const auto b = this_step % (2 * opts.nmulti);
+	while (!((a - b >= 0 && a - b <= 2) || (a < 2 && a + 2 * opts.nmulti - b >= 0 && a + 2 * opts.nmulti - b <= 2))) {
+		//	printf( "%i %i\n", a, b);
 		hpx::this_thread::yield();
 	}
-	return grav.pack(b);
+//	printf( "In %i %i\n", a, b);
+	std::lock_guard<mutex_type> lock(mtx);
+	return grav.pack(bbox);
 }
 
 std::vector<double> tree::get_energy_boundary(multi_range b, int this_step) {

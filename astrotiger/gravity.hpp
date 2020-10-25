@@ -27,9 +27,28 @@ class gravity {
 	multi_array<double> R;
 	multi_array<std::uint8_t> active;
 	double dx;
+	bool has_phi0;
+	bool has_phi1;
 	multi_range box;
 
 public:
+
+	gravity() {
+		has_phi0 = false;
+		has_phi1 = false;
+	}
+
+	template<class A>
+	void serialize(A&& arc, unsigned ) {
+		arc & has_phi0;
+		arc & has_phi1;
+		arc & phi0;
+		arc & phi1;
+		arc & phi;
+		arc & X;
+		arc & R;
+		arc & active;
+	}
 
 	void resize(double, const multi_range&);
 	void set_avg_zero();
