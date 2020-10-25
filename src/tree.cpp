@@ -76,7 +76,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 				grav.apply_prolong(coarse);
 			}
 		}
-	} else {
+	} else if( pass == 0 ){
 		grav.initialize_coarse(t);
 	}
 	if (pass > 0 || level == fine_level) {
@@ -85,7 +85,11 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			grav.relax(false);
 			lock.unlock();
 			gravity_step++;
+			hpx::this_thread::yield();
 			get_gravity_boundaries();
+		}
+		if( level < fine_level ) {
+			grav.print();
 		}
 	} else {
 		gravity_step += opts.nmulti;
@@ -118,8 +122,9 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 		for (int i = 0; i < opts.nmulti; i++) {
 			std::unique_lock<mutex_type> lock(mtx);
-			grav.relax(pass == 0);
+			grav.relax(pass == 0 && i == 0);
 			lock.unlock();
+			hpx::this_thread::yield();
 			gravity_step++;
 			get_gravity_boundaries();
 		}
@@ -160,13 +165,6 @@ std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
 }
 
 std::vector<double> tree::get_gravity_boundary(multi_range bbox, int this_step) {
-	const auto a = gravity_step % (2 * opts.nmulti);
-	const auto b = this_step % (2 * opts.nmulti);
-	while (!((a - b >= 0 && a - b <= 2) || (a < 2 && a + 2 * opts.nmulti - b >= 0 && a + 2 * opts.nmulti - b <= 2))) {
-		//	printf( "%i %i\n", a, b);
-		hpx::this_thread::yield();
-	}
-//	printf( "In %i %i\n", a, b);
 	std::lock_guard<mutex_type> lock(mtx);
 	return grav.pack(bbox);
 }

@@ -33,6 +33,11 @@ class gravity {
 
 public:
 
+	void print() const {
+//		for( int i = 0; i < box.volume(); i++) {
+//			printf( "%e %e %i\n", X.data()[i], R.data()[i], active.data()[i]);
+//		}
+	}
 	gravity() {
 		has_phi0 = false;
 		has_phi1 = false;
