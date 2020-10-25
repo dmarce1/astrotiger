@@ -12,8 +12,12 @@ hpx::future<void> tree_client::delist() const {
 	return hpx::async<tree::delist_action>(gid);
 }
 
-hpx::future<gravity_return> tree_client::gravity_solve(int pass, int level, const std::vector<double> coarse, double t) const {
-	return hpx::async<tree::gravity_solve_action>(gid, pass, level, coarse, t);
+hpx::future<gravity_return> tree_client::gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m) const {
+	return hpx::async<tree::gravity_solve_action>(gid, pass, level, coarse, t, m);
+}
+
+hpx::future<statistics> tree_client::get_statistics() const {
+	return hpx::async<tree::get_statistics_action>(gid);
 }
 
 hpx::future<void> tree_client::list() const {

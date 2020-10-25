@@ -22,6 +22,15 @@
 #define sy_i 4
 #define sz_i 5
 
+struct statistics {
+	std::vector<double> u;
+
+	template<class A>
+	void serialize(A &&arc, unsigned) {
+		arc & u;
+	}
+};
+
 class hydro_grid {
 	multi_range box;
 	std::array<multi_range, NDIM> fbox;
@@ -31,6 +40,7 @@ class hydro_grid {
 	std::array<std::vector<multi_array<double>>, NDIM> F;
 	std::array<std::vector<multi_array<double>>, NDIM> Fc;
 	multi_array<std::uint8_t> R;
+	multi_array<double> phi;
 	double dx;
 
 public:
@@ -38,14 +48,16 @@ public:
 	hydro_grid();
 	~hydro_grid();
 
-
 	void resize(double dx, multi_range box_);
 
-	void sanity(const multi_range& ibox) const {
+	void sanity(const multi_range &ibox) const {
 		if (U0.size()) {
 			assert(box == U0[0].box);
 			assert(ibox == box.pad(-opts.hbw));
 		}
+	}
+	void set_phi(multi_array<double> &&phi_) {
+		phi = std::move(phi_);
 	}
 	const multi_array<double>& get_density() const {
 		return U[rho_i];
@@ -55,8 +67,9 @@ public:
 	double compute_flux(int rk);
 	void initialize();
 	void compute_refinement_criteria();
-	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&,const std::vector<multi_range> &forced) const;
+	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&, const std::vector<multi_range> &forced) const;
 	double coord(index_type i) const;
+	std::vector<std::vector<double>> pack_output() const;
 	std::vector<double> pack_field(int f, multi_range) const;
 	std::vector<double> pack(multi_range bbox) const;
 	std::vector<std::uint8_t> pack_refinement(multi_range bbox) const;
@@ -64,12 +77,13 @@ public:
 	std::vector<double> pack_field_prolong(int f, multi_range bbox, double w) const;
 	std::vector<double> pack_restrict(multi_range bbox) const;
 	std::vector<double> pack_coarse_flux();
-	void unpack_coarse_flux(const std::vector<double>&, const multi_range& bbox, double dt);
+	void unpack_coarse_flux(const std::vector<double>&, const multi_range &bbox, double dt);
 	void unpack(const std::vector<double>&, multi_range bbox);
 	void unpack_field(int f, const std::vector<double>&, multi_range bbox);
 	void unpack_refinement(const std::vector<std::uint8_t>&, multi_range bbox);
 	void substep_update(int rk, double dt);
 	void update_energy();
+	statistics get_statistics(const std::vector<multi_range>&) const;
 
 	static std::vector<std::string> field_names();
 

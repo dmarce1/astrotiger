@@ -120,6 +120,7 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 	int j = 0;
 	U0.resize(opts.nhydro);
 	U.resize(opts.nhydro);
+	phi.resize(box_.pad(1));
 	for (int i = 0; i < opts.nhydro; i++) {
 		U0[i].resize(box);
 		U[i].resize(box);
@@ -217,6 +218,11 @@ void hydro_grid::compute_refinement_criteria() {
 
 void hydro_grid::initialize() {
 	for (multi_iterator i(box); !i.end(); i++) {
+		double r = 0.0;
+		for (int dim = 0; dim < NDIM; dim++) {
+			r += std::pow(coord(i[dim]) - 0.5, 2);
+		}
+		r = std::sqrt(r);
 		for (int dim = 0; dim < NDIM; dim++) {
 			U[sx_i + dim][i] = 0.0;
 		}
@@ -240,12 +246,7 @@ void hydro_grid::initialize() {
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 			U[egas_i][i] -= ek;
 		} else if (opts.problem == "blast") {
-			double r = 0.0;
 			U[rho_i][i] = 1.0;
-			for (int dim = 0; dim < NDIM; dim++) {
-				r += std::pow(coord(i[dim]) - 0.5, 2);
-			}
-			r = std::sqrt(r);
 			if (r < 3.0 * dx) {
 				U[egas_i][i] = 1.0;
 			} else {
@@ -274,6 +275,16 @@ void hydro_grid::initialize() {
 			}
 			U[egas_i][i] = ein + ek;
 			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
+		} else if (opts.problem == "sphere") {
+			for (int f = 0; f < opts.nhydro; f++) {
+				U[f][i] = 0.0;
+			}
+			if (r < 0.1) {
+				U[rho_i][i] = 1.0;
+			} else {
+				U[rho_i][i] = 1.0e-20;
+			}
+			U[egas_i][i] = 1e-20;
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());
 			abort();
@@ -441,16 +452,29 @@ std::vector<std::uint8_t> hydro_grid::pack_refinement(multi_range bbox) const {
 
 std::vector<double> hydro_grid::pack_field(int f, multi_range bbox) const {
 	std::vector<double> data;
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		data.push_back(U[f][i]);
+	}
+	return data;
+}
+
+std::vector<std::vector<double>> hydro_grid::pack_output() const {
+	std::vector<std::vector<double>> data;
+	auto bbox = box.pad(-opts.hbw);
+	data.resize(opts.nhydro + 1);
 	if ( NDIM > 1) {
 		std::swap(bbox.min[0], bbox.min[NDIM - 1]);
 		std::swap(bbox.max[0], bbox.max[NDIM - 1]);
 	}
-	for (multi_iterator i(bbox); !i.end(); i++) {
-		multi_index j = i.index();
-		if ( NDIM > 1) {
-			std::swap(j[0], j[NDIM - 1]);
+	for (int f = 0; f <= opts.nhydro; f++) {
+		const auto &u = f == opts.nhydro ? phi : U[f];
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			multi_index j = i.index();
+			if ( NDIM > 1) {
+				std::swap(j[0], j[NDIM - 1]);
+			}
+			data[f].push_back(u[j]);
 		}
-		data.push_back(U[f][j]);
 	}
 	return data;
 }
@@ -458,10 +482,10 @@ std::vector<double> hydro_grid::pack_field(int f, multi_range bbox) const {
 std::vector<double> hydro_grid::pack_prolong(multi_range bbox, double w) const {
 	std::vector<double> data;
 	for (int f = 0; f < opts.nhydro; f++) {
-			auto pro0 = U0[f].prolong(bbox);
-			auto pro1 = U[f].prolong(bbox);
-			for (multi_iterator i(bbox); !i.end(); i++) {
-				data.push_back((1.0 - w) * pro0[i] + w * pro1[i]);
+		auto pro0 = U0[f].prolong(bbox);
+		auto pro1 = U[f].prolong(bbox);
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			data.push_back((1.0 - w) * pro0[i] + w * pro1[i]);
 		}
 	}
 	return data;
@@ -562,6 +586,27 @@ void hydro_grid::unpack_field(int f, const std::vector<double> &data, multi_rang
 	}
 }
 
+statistics hydro_grid::get_statistics(const std::vector<multi_range>& child_ranges) const {
+	statistics stats;
+	stats.u.resize(opts.nhydro,0.0);
+	for( multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+		bool refined = false;
+		for( const auto& c : child_ranges) {
+			if( c.contains(i)) {
+				refined = true;
+				break;
+			}
+		}
+		if(!refined) {
+			for( int f = 0; f < opts.nhydro; f++) {
+				stats.u[f] += std::pow(dx,2) * U[f][i];
+			}
+		}
+	}
+	return stats;
+}
+
+
 std::vector<std::string> hydro_grid::field_names() {
 	std::vector<std::string> names;
 	names.push_back("D");
@@ -570,6 +615,7 @@ std::vector<std::string> hydro_grid::field_names() {
 	for (int dim = 0; dim < NDIM; dim++) {
 		names.push_back(std::string("S") + char('x' + dim));
 	}
+	names.push_back("phi");
 	return names;
 }
 

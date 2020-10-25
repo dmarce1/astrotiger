@@ -13,12 +13,13 @@ void gravity::resize(double dx_, const multi_range &box_) {
 
 }
 
-void gravity::initialize_fine(const multi_array<double> &rho) {
+void gravity::initialize_fine(const multi_array<double> &rho, double mtot) {
 	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
 		active[i] = true;
 	}
+	const auto rho0 = mtot;
 	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
-		R[i] = 4.0 * M_PI * opts.G * rho[i];
+		R[i] = 4.0 * M_PI * opts.G * (rho[i] - rho0);
 	}
 	X = phi;
 }
@@ -46,11 +47,6 @@ void gravity::set_avg_zero() {
 	}
 }
 
-void gravity::store() {
-	phi0 = phi1;
-	phi1 = phi;
-}
-
 std::vector<double> gravity::pack(const multi_range &bbox) const {
 	assert(box.contains(bbox));
 	std::vector<double> data;
@@ -59,6 +55,16 @@ std::vector<double> gravity::pack(const multi_range &bbox) const {
 		data.push_back(X[i]);
 	}
 	return data;
+}
+
+multi_array<double> gravity::get_phi() const {
+	multi_array<double> rphi;
+	auto bbox = box.pad(-opts.gbw + 1);
+	rphi.resize(bbox);
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		rphi[i] = phi[i];
+	}
+	return rphi;
 }
 
 void gravity::unpack(const std::vector<double> &data, const multi_range &bbox) {
@@ -71,14 +77,15 @@ void gravity::unpack(const std::vector<double> &data, const multi_range &bbox) {
 	}
 }
 
-
 void gravity::finish_fine() {
 	phi = X;
+	phi0 = phi1;
+	phi1 = phi;
 }
 
 std::vector<double> gravity::pack_prolong_amr(const multi_range &bbox) const {
 	std::vector<double> data;
-	auto pro = phi.prolong(bbox,true);
+	auto pro = phi.prolong(bbox, true);
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		data.push_back(pro[i]);
 	}
@@ -92,28 +99,27 @@ void gravity::relax(bool init_zero) {
 			X[i] = 0.0;
 		}
 	}
-	for (int iter = 0; iter < opts.gbw; iter++) {
-		const auto ibox = box.pad(-iter - 1);
-		X0 = X;
-		auto *x0 = X0.data();
-		auto *x1 = X.data();
-		const auto s = X.get_strides();
-		for (multi_iterator i(ibox); !i.end(); i++) {
-			if (active[i]) {
-				const auto j = X.index(i);
-				for (int dim = 0; dim < NDIM; dim++) {
-					x1[j] += (0.5 / NDIM) * (x0[j + s[dim]] + x0[j - s[dim]]);
-				}
-				x1[j] -= (0.5 / NDIM) * (R[j] * dx * dx);
+	const auto ibox = box.pad(-opts.gbw);
+	X0 = X;
+	auto *x0 = X0.data();
+	auto *x1 = X.data();
+	const auto s = X.get_strides();
+	for (multi_iterator i(ibox); !i.end(); i++) {
+		if (active[i]) {
+			const auto j = X.index(i);
+			x1[j] = 0.0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				x1[j] += (0.5 / NDIM) * (x0[j + s[dim]] + x0[j - s[dim]]);
 			}
+			x1[j] -= (0.5 / NDIM) * (R[i] * dx * dx);
 		}
 	}
 }
 
-gravity_return gravity::get_restrict() const {
+gravity_return gravity::get_restrict() {
 	gravity_return rc;
 	multi_array<std::uint8_t> active_c;
-	auto rbox = box.pad(-(opts.gbw % 2)).half();
+	auto rbox = box.pad(-opts.gbw).half();
 	active_c.resize(rbox);
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		const auto cbox = multi_range(i.index()).double_();
@@ -131,14 +137,14 @@ gravity_return gravity::get_restrict() const {
 	const auto *x = X.data();
 	const auto s = X.get_strides();
 	double rmax = 0.0;
-	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
+	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 		const auto j = X.index(i);
 		for (int dim = 0; dim < NDIM; dim++) {
-			resid[j] += (x[j + s[dim]] + x[j - s[dim]] / (dx * dx));
+			resid[i] += (x[j + s[dim]] + x[j - s[dim]]) / (dx * dx);
 		}
-		resid[j] -= (2.0 * NDIM) * x[j] / (dx * dx);
-		resid[j] -= R[j];
-		rmax = std::max(rmax, resid[j]);
+		resid[i] -= (2.0 * NDIM) * x[j] / (dx * dx);
+		resid[i] -= R[i];
+		rmax = std::max(rmax, std::abs(resid[i] * (dx * dx)));
 	}
 	const auto resid_c = resid.restrict_(rbox);
 	for (multi_iterator i(rbox); !i.end(); i++) {
@@ -146,6 +152,7 @@ gravity_return gravity::get_restrict() const {
 			rc.R.push_back(resid[i]);
 		}
 	}
+	rc.resid = rmax;
 	rc.box = rbox;
 	return rc;
 }
@@ -173,7 +180,7 @@ std::vector<double> gravity::get_prolong(const multi_range &bbox) const {
 
 void gravity::apply_prolong(const std::vector<double> &data) {
 	multi_array<double> dX;
-	const auto pbox = box.pad(-opts.gbw).half().pad(opts.gbw / 2 + (opts.gbw % 2));
+	const auto pbox = box.pad(-opts.gbw).half();
 	dX.resize(pbox);
 	int k = 0;
 	for (multi_iterator i(pbox); !i.end(); i++) {

@@ -29,7 +29,7 @@ void output_silo(const std::string &filename) {
 	SILO_CHECK(DBPutMultimesh(db, "main_mesh", mesh_names.size(), mesh_names.data(), mesh_types.data(), options));
 	const auto field_names = hydro_grid::field_names();
 	std::vector<int> var_types(mesh_names.size(), DB_QUADVAR);
-	for (int f = 0; f < opts.nhydro; f++) {
+	for (int f = 0; f < field_names.size(); f++) {
 		std::vector<char*> var_names(mesh_names.size());
 		for (int i = 0; i < mesh_names.size(); i++) {
 			std::string varname = field_names[f] + std::string("_") + mesh_names[i];

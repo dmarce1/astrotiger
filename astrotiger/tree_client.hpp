@@ -10,6 +10,7 @@
 
 #include <astrotiger/hpx.hpp>
 #include <astrotiger/multi_array.hpp>
+#include <astrotiger/hydro_grid.hpp>
 
 class tree;
 class sibling;
@@ -56,7 +57,8 @@ public:
 	hpx::future<std::pair<std::vector<double>,std::vector<double>>> get_hydro_restrict() const;
 	hpx::future<std::shared_ptr<tree>> get_ptr() const;
 	hpx::future<std::pair<std::vector<std::uint8_t>,std::vector<multi_range>>> get_refinement_boundary(multi_range, int) const;
-	hpx::future<gravity_return> gravity_solve(int pass, int level, const std::vector<double> coarse, double t) const;
+	hpx::future<gravity_return> gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m) const;
+	hpx::future<statistics> get_statistics() const;
 
 
 	template<class A>

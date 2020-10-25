@@ -9,6 +9,29 @@ std::vector<double> dt;
 std::vector<double> tm;
 std::vector<int> super_step;
 
+statistics solve_gravity() {
+	const double toler = 1.0e-10;
+	statistics stats;
+	stats = root.get_statistics().get();
+	const auto mtot = stats.u[rho_i];
+	for (int l = 0; l <= opts.max_level; l++) {
+		int pass = 0;
+		double r;
+		do {
+			r = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get().resid;
+			printf("%e %e\n", mtot, r);
+			pass++;
+		} while (r > toler);
+		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get().resid;
+		printf("%e\n", r);
+//		r = root.gravity_solve(0, l, std::vector<double>(), 0.0).get().resid;
+//		printf( "%e\n", r);
+//		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0).get().resid;
+//		printf( "%e\n", r);
+	}
+	return stats;
+}
+
 void master(int level, double tmax) {
 	if (level > opts.max_level) {
 		return;
@@ -97,18 +120,19 @@ int hpx_main(int argc, char *argv[]) {
 		}
 	}
 	root.set_family(tree_client(), root, sibs).get();
+	solve_gravity();
 	output_silo("X.0.silo");
-	int i = 0;
-	const auto dt = 0.01;
-	levels_show();
-	for (double t = 0.0; t < opts.tmax; t += dt) {
-		i++;
-		master(0, std::min(t + dt, opts.tmax));
-		std::string fname = "X." + std::to_string(i) + ".silo";
-		output_silo(fname);
-	}
-	std::string fname = "X." + std::to_string(i) + ".silo";
-	output_silo(fname);
+//	int i = 0;
+//	const auto dt = 0.01;
+//	levels_show();
+//	for (double t = 0.0; t < opts.tmax; t += dt) {
+//		i++;
+//		master(0, std::min(t + dt, opts.tmax));
+//		std::string fname = "X." + std::to_string(i) + ".silo";
+//		output_silo(fname);
+//	}
+//	std::string fname = "X." + std::to_string(i) + ".silo";
+//	output_silo(fname);
 	return hpx::finalize();
 }
 

@@ -34,16 +34,17 @@ public:
 	void resize(double, const multi_range&);
 	void set_avg_zero();
 	void store();
-	void initialize_fine(const multi_array<double>&);
+	void initialize_fine(const multi_array<double>&, double mtot);
 	void initialize_coarse(double w);
 	void finish_fine();
 
+	multi_array<double> get_phi() const;
 	std::vector<double> pack(const multi_range&) const;
 	void unpack(const std::vector<double>&, const multi_range &bbox);
 	std::vector<double> pack_prolong_amr(const multi_range&) const;
 
 	void relax(bool init_zero);
-	gravity_return get_restrict() const;
+	gravity_return get_restrict() ;
 	void apply_restrict(const gravity_return&);
 	std::vector<double> get_prolong(const multi_range&) const;
 	void apply_prolong(const std::vector<double>&);

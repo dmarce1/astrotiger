@@ -26,6 +26,8 @@ using get_energy_prolong_action_type = tree::get_energy_prolong_action;
 using gravity_solve_action_type = tree::gravity_solve_action;
 using get_hydro_boundary_action_type = tree::get_hydro_boundary_action;
 using get_gravity_boundary_action_type = tree::get_gravity_boundary_action;
+using get_statistics_action_type = tree::get_statistics_action;
+HPX_REGISTER_ACTION (get_statistics_action_type);
 HPX_REGISTER_ACTION (get_gravity_boundary_action_type);
 HPX_REGISTER_ACTION (get_hydro_boundary_action_type);
 HPX_REGISTER_ACTION (gravity_solve_action_type);
@@ -43,16 +45,40 @@ HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
 
-gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse, double t) {
-	if (pass == 0) {
-		if (level == fine_level) {
-			grav.unpack(coarse, box.pad(opts.gbw));
-			grav.initialize_fine(hydro.get_density());
+
+statistics tree::get_statistics() const {
+	std::vector<multi_range> cranges;
+	std::vector<hpx::future<statistics>> futs;
+	for( const auto& c : children) {
+		futs.push_back(c.get_statistics());
+		cranges.push_back(c.get_box().half());
+	}
+	auto stats = hydro.get_statistics(cranges);
+	for( auto& f : futs) {
+		for( int field = 0; field < opts.nhydro; field++) {
+			auto tmp = f.get();
+			stats.u[field] += tmp.u[field];
+		}
+	}
+	return stats;
+}
+
+gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse, double this_t, double mtot) {
+	if (level == fine_level) {
+		if (pass == 0) {
+			if (level != 0) {
+				grav.unpack(coarse, box.pad(opts.gbw));
+			} else {
+				grav.initialize_coarse(t);
+			}
+			grav.initialize_fine(hydro.get_density(), mtot);
 		} else {
-			grav.initialize_coarse(t);
+			if (level != 0) {
+				grav.apply_prolong(coarse);
+			}
 		}
 	} else {
-		grav.apply_prolong(coarse);
+		grav.initialize_coarse(t);
 	}
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < opts.nmulti; i++) {
@@ -64,15 +90,23 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	gravity_return rc;
 	double max_resid = 0.0;
 	if (level < fine_level) {
+		double w;
+		if (t0 != t) {
+			w = (this_t - t0) / (t - t0);
+			assert(this_t >= t0);
+			assert(this_t <= t);
+		} else {
+			w = 1.0;
+		}
 		std::vector<hpx::future<gravity_return>> futs;
 		for (const auto &c : children) {
 			std::vector<double> coarse;
 			if (pass == 0) {
 				coarse = grav.pack_prolong_amr(c.get_box().pad(opts.gbw));
 			} else {
-				coarse = grav.get_prolong(c.get_box().half().pad(opts.gbw / 2 + (opts.gbw % 2)));
+				coarse = grav.get_prolong(c.get_box().half());
 			}
-			futs.push_back(c.gravity_solve(pass, fine_level, std::move(coarse), t));
+			futs.push_back(c.gravity_solve(pass, fine_level, std::move(coarse), w, mtot));
 		}
 		for (auto &f : futs) {
 			auto tmp = f.get();
@@ -84,13 +118,18 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			gravity_step++;
 			get_gravity_boundaries();
 		}
-	} else {
+	} else if (pass == GRAVITY_FINAL_PASS) {
 		grav.finish_fine();
+		hydro.set_phi(grav.get_phi());
+	}
+	if (level == 0 && fine_level == 0) {
+		grav.set_avg_zero();
 	}
 	rc = grav.get_restrict();
 	if (level < fine_level) {
 		rc.resid = max_resid;
 	}
+	return rc;
 
 }
 
@@ -433,7 +472,7 @@ void tree::get_hydro_boundaries(double this_time) {
 void tree::get_gravity_boundaries() {
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> sib_ranges;
-	bnd_ranges = box.pad(opts.gbw).subtract(box.pad(opts.gbw - 1));
+	bnd_ranges = box.pad(opts.gbw).subtract(box);
 	for (const auto &sib : siblings) {
 		multi_range inter;
 		inter.set_null();
@@ -786,9 +825,7 @@ std::string tree::output(DBfile *db) const {
 			coords[dim][i - box.min[dim]/* + opts.hbw*/] = hydro.coord(i) - 0.5 * dx;
 		}
 	}
-	for (int f = 0; f < opts.nhydro; f++) {
-		vars[f] = hydro.pack_field(f, box/*.pad(opts.hbw)*/);
-	}
+	vars = hydro.pack_output();
 	std::string mesh_name;
 	for (int dim = 0; dim < NDIM; dim++) {
 		mesh_name += std::to_string(level) + std::string("_") + std::string(coordnames[dim]) + "_";
@@ -800,11 +837,11 @@ std::string tree::output(DBfile *db) const {
 	SILO_CHECK(DBPutQuadmesh(db, mesh_name.c_str(), coordnames, coords.data(), dims2.data(), NDIM, DB_DOUBLE, DB_COLLINEAR, options));
 
 	auto var_names = hydro_grid::field_names();
-	for (int f = 0; f < opts.nhydro; f++) {
+	for (int f = 0; f < vars.size(); f++) {
 		var_names[f] += "_" + mesh_name;
 	}
 
-	for (int f = 0; f < opts.nhydro; f++) {
+	for (int f = 0; f < vars.size(); f++) {
 		SILO_CHECK(DBPutQuadvar1(db, var_names[f].c_str(), mesh_name.c_str(), vars[f].data(), dims1.data(), NDIM, NULL, 0, DB_DOUBLE, DB_ZONECENT,options));
 	}
 

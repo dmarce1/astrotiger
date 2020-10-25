@@ -17,6 +17,8 @@
 
 #include <silo.h>
 
+#define GRAVITY_FINAL_PASS 1000000
+
 struct sibling {
 	tree_client client;
 	vect<int> shift;
@@ -135,9 +137,10 @@ public:
 	void get_hydro_boundaries(double);
 	void get_energy_boundaries(double);
 	void sanity() const;
-	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t);
+	statistics get_statistics() const;
+	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
 
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,gravity_solve);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_statistics);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_box);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,truncate);
@@ -153,6 +156,7 @@ public:
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,list);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,delist);
 
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,gravity_solve);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,initialize);
 
 };
