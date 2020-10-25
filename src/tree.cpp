@@ -25,10 +25,10 @@ using get_energy_boundary_action_type = tree::get_energy_boundary_action;
 using get_energy_prolong_action_type = tree::get_energy_prolong_action;
 using gravity_solve_action_type = tree::gravity_solve_action;
 using get_hydro_boundary_action_type = tree::get_hydro_boundary_action;
-using get_gravity_boundary_action_type = tree::get_gravity_boundary_action;
+using set_gravity_boundary_action_type = tree::set_gravity_boundary_action;
 using get_statistics_action_type = tree::get_statistics_action;
 HPX_REGISTER_ACTION (get_statistics_action_type);
-HPX_REGISTER_ACTION (get_gravity_boundary_action_type);
+HPX_REGISTER_ACTION (set_gravity_boundary_action_type);
 HPX_REGISTER_ACTION (get_hydro_boundary_action_type);
 HPX_REGISTER_ACTION (gravity_solve_action_type);
 HPX_REGISTER_ACTION (get_energy_prolong_action_type);
@@ -76,7 +76,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 				grav.apply_prolong(coarse);
 			}
 		}
-	} else if( pass == 0 ){
+	} else if (pass == 0) {
 		grav.initialize_coarse(t);
 	}
 	if (pass > 0 || level == fine_level) {
@@ -88,7 +88,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			hpx::this_thread::yield();
 			get_gravity_boundaries();
 		}
-		if( level < fine_level ) {
+		if (level < fine_level) {
 			grav.print();
 		}
 	} else {
@@ -164,9 +164,16 @@ std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
 	return hydro.pack(b);
 }
 
-std::vector<double> tree::get_gravity_boundary(multi_range bbox, int this_step) {
-	std::lock_guard<mutex_type> lock(mtx);
-	return grav.pack(bbox);
+void tree::set_gravity_boundary(std::vector<double> &&data, const multi_range& bbox) {
+	bool found = false;
+	for (int i = 0; i < siblings.size(); i++) {
+		if (siblings[i].box() == bbox) {
+			assert(!found);
+			siblings[i].client.put(std::move(data));
+			found = true;
+		}
+	}
+	assert(found);
 }
 
 std::vector<double> tree::get_energy_boundary(multi_range b, int this_step) {
@@ -479,6 +486,13 @@ void tree::get_hydro_boundaries(double this_time) {
 }
 
 void tree::get_gravity_boundaries() {
+	for (const auto &sib : siblings) {
+		const auto inter = sib.box().pad(opts.gbw).intersection(box);
+		if (inter.volume()) {
+			sib.client.set_gravity_boundary(grav.pack(inter), box.shift(-sib.shift));
+		}
+	}
+
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> sib_ranges;
 	bnd_ranges = box.pad(opts.gbw).subtract(box);
@@ -505,7 +519,7 @@ void tree::get_gravity_boundaries() {
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
 			auto shifted_box = sib_ranges[i].shift(-siblings[i].shift);
-			sib_futs.push_back(siblings[i].client.get_gravity_boundary(shifted_box, gravity_step));
+			sib_futs.push_back(siblings[i].client.get());
 		}
 	}
 	int j = 0;

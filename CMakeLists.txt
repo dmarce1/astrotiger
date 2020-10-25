@@ -40,6 +40,7 @@ set(astrotiger_source_files
 
 
 set(astrotiger_header_files
+ 	astrotiger/channel.hpp	
  	astrotiger/defs.hpp	
  	astrotiger/geometry.hpp	
  	astrotiger/gravity.hpp	

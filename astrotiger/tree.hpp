@@ -125,7 +125,7 @@ public:
 	void list();
 	void set_child_family();
 	std::vector<double> get_hydro_boundary(multi_range, int);
-	std::vector<double> get_gravity_boundary(multi_range, int);
+	void set_gravity_boundary(std::vector<double>&&, const multi_range&);
 	std::vector<double> get_energy_boundary(multi_range, int);
 	std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> get_refinement_boundary(multi_range, int);
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
@@ -150,7 +150,7 @@ public:
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,truncate);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_ptr);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_energy_boundary);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_gravity_boundary);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_gravity_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_energy_prolong);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_prolong);
