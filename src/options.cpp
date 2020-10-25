@@ -24,6 +24,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("help", "produce help message") //
 	("config_file", po::value < std::string > (&config_file)->default_value(""), "configuration file") //
 	("problem", po::value < std::string > (&problem)->default_value("blast"), "Problem 1 - sod 2 - blast\n") //
+	("nmulti", po::value<int>(&nmulti)->default_value(4), "multigrid solver iterations)") //
 	("max_box", po::value<int>(&max_box)->default_value(32), "maximum (box volume)^(1/3)") //
 	("order", po::value<int>(&order)->default_value(2), "integration order") //
 	("window", po::value<int>(&window)->default_value(1), "refinement window size") //
@@ -57,7 +58,9 @@ bool options::process_options(int argc, char *argv[]) {
 
 	nhydro = 3 + NDIM;
 	hbw = order;
+	gbw = 2;
 	max_bw = std::max(hbw, window);
+	max_bw = std::max(max_bw, gbw);
 	nrk = order;
 	alpha.resize(nrk);
 	beta.resize(nrk);
@@ -74,6 +77,7 @@ bool options::process_options(int argc, char *argv[]) {
 		printf("Order %i not supported\n");
 		abort();
 	}
+	G = 1;
 
 	const auto loc = hpx::find_all_localities();
 	const auto sz = loc.size();

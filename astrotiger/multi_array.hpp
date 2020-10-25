@@ -58,15 +58,7 @@ class multi_array {
 	multi_index dims;
 	multi_index stride;
 	std::size_t size;
-	std::vector<T> data;
-	inline index_type index(const multi_index &I) const {
-		index_type i = I[0] - box.min[0];
-		for (int dim = 1; dim < NDIM; dim++) {
-			i = i * dims[dim] + (I[dim] - box.min[dim]);
-		}
-		assert(i >= 0 && i < data.size());
-		return i;
-	}
+	std::vector<T> a;
 public:
 	multi_range box;
 	inline multi_array() {
@@ -76,6 +68,14 @@ public:
 	}
 	inline multi_array(const multi_range &box_) {
 		resize(box_);
+	}
+	inline index_type index(const multi_index &I) const {
+		index_type i = I[0] - box.min[0];
+		for (int dim = 1; dim < NDIM; dim++) {
+			i = i * dims[dim] + (I[dim] - box.min[dim]);
+		}
+		assert(i >= 0 && i < a.size());
+		return i;
 	}
 	multi_array& operator=(const multi_array&) = default;
 	multi_array& operator=(multi_array&&) = default;
@@ -92,40 +92,44 @@ public:
 		for (int dim = NDIM - 1; dim > 0; dim--) {
 			stride[dim - 1] = dims[dim] * stride[dim];
 		}
-		data.resize(size);
+		a.resize(size);
+	}
+	inline multi_index get_strides() const {
+		return stride;
 	}
 	inline T operator[](const multi_index &I) const {
-		return data[index(I)];
+		return a[index(I)];
 	}
 	inline T& operator[](const multi_index &I) {
-		return data[index(I)];
+		return a[index(I)];
 	}
 	T smooth_gradient(int dim, const multi_index &I) const {
 		const auto i = index(I);
 		const auto ip = i + stride[dim];
 		const auto im = i - stride[dim];
-		assert(ip < data.size());
+		assert(ip < a.size());
 		assert(ip >= 0);
-		assert(im < data.size());
+		assert(im < a.size());
 		assert(im >= 0);
-		assert(i < data.size());
+		assert(i < a.size());
 		assert(i >= 0);
-		return 0.5 *( data[ip] - data[im]);
+		return 0.5 * (a[ip] - a[im]);
 	}
 	T minmod_gradient(int dim, const multi_index &I) const {
 		const auto i = index(I);
 		const auto ip = i + stride[dim];
 		const auto im = i - stride[dim];
-		assert(ip < data.size());
+		assert(ip < a.size());
 		assert(ip >= 0);
-		assert(im < data.size());
+		assert(im < a.size());
 		assert(im >= 0);
-		assert(i < data.size());
+		assert(i < a.size());
 		assert(i >= 0);
-		const auto a = data[ip] - data[i];
-		const auto b = data[i] - data[im];
-		return (std::copysign(0.5, a) + std::copysign(0.5, b)) * std::min(std::abs(a), std::abs(b));
+		const auto c = a[ip] - a[i];
+		const auto b = a[i] - a[im];
+		return (std::copysign(0.5, c) + std::copysign(0.5, b)) * std::min(std::abs(c), std::abs(b));
 	}
+
 	multi_array restrict_(const multi_range &res_box) const {
 		multi_array res(res_box);
 		for (multi_iterator i(res_box); !i.end(); i++) {
@@ -138,7 +142,13 @@ public:
 		}
 		return res;
 	}
-	multi_array prolong(const multi_range &pro_box) const {
+	const T* data() const {
+		return a.data();
+	}
+	T* data() {
+		return a.data();
+	}
+	multi_array prolong(const multi_range &pro_box, bool smooth = false) const {
 		multi_range grad_box;
 		for (int dim = 0; dim < NDIM; dim++) {
 			grad_box.min[dim] = (pro_box.min[dim] - std::abs(pro_box.min[dim] % 2)) / 2;
@@ -148,7 +158,11 @@ public:
 		for (int dim = 0; dim < NDIM; dim++) {
 			grad[dim].resize(grad_box);
 			for (multi_iterator i(grad_box); !i.end(); i++) {
-				grad[dim][i] = minmod_gradient(dim, i);
+				if (smooth) {
+					grad[dim][i] = smooth_gradient(dim, i);
+				} else {
+					grad[dim][i] = minmod_gradient(dim, i);
+				}
 			}
 		}
 		multi_array pro(pro_box);
@@ -174,7 +188,7 @@ public:
 		arc & box;
 		arc & dims;
 		arc & size;
-		arc & data;
+		arc & a;
 	}
 };
 

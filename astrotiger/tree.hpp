@@ -13,6 +13,7 @@
 #include <astrotiger/range.hpp>
 #include <astrotiger/tree_client.hpp>
 #include <astrotiger/hydro_grid.hpp>
+#include <astrotiger/gravity.hpp>
 
 #include <silo.h>
 
@@ -32,6 +33,7 @@ struct sibling {
 class tree: public hpx::components::managed_component_base<tree> {
 	multi_range box;
 	hydro_grid hydro;
+	gravity grav;
 	tree_client parent;
 	tree_client self;
 	std::vector<tree_client> children;
@@ -40,6 +42,7 @@ class tree: public hpx::components::managed_component_base<tree> {
 	std::atomic<int> hydro_step;
 	std::atomic<int> refine_step;
 	std::atomic<int> energy_step;
+	std::atomic<int> gravity_step;
 	std::vector<multi_range> grandchild_boxes;
 	double dx;
 	double t0;
@@ -50,7 +53,7 @@ public:
 	static hpx::future<tree_client> allocate(int, multi_range box);
 
 	tree(tree &&other) :
-			hydro_step(0), refine_step(0), energy_step(0) {
+			hydro_step(0), refine_step(0), energy_step(0), gravity_step(0) {
 		dt = std::move(other.dt);
 		box = std::move(other.box);
 		hydro = std::move(other.hydro);
@@ -116,6 +119,7 @@ public:
 	void list();
 	void set_child_family();
 	std::vector<double> get_hydro_boundary(multi_range, int);
+	std::vector<double> get_gravity_boundary(multi_range, int);
 	std::vector<double> get_energy_boundary(multi_range, int);
 	std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> get_refinement_boundary(multi_range, int);
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
@@ -127,15 +131,19 @@ public:
 	multi_range get_box() const;
 	tree_client truncate(tree_client, multi_range box);
 	std::vector<multi_range> get_refinement_boundaries();
+	void get_gravity_boundaries();
 	void get_hydro_boundaries(double);
 	void get_energy_boundaries(double);
 	void sanity() const;
+	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t);
 
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,gravity_solve);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_box);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,truncate);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_ptr);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_energy_boundary);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_gravity_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_energy_prolong);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_prolong);

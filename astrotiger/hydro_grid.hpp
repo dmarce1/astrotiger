@@ -47,6 +47,9 @@ public:
 			assert(ibox == box.pad(-opts.hbw));
 		}
 	}
+	const multi_array<double>& get_density() const {
+		return U[rho_i];
+	}
 	void reset_flux_registers();
 	void reset_coarse_flux_registers();
 	double compute_flux(int rk);

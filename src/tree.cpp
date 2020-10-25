@@ -23,6 +23,12 @@ using get_refinement_boundary_action_type = tree::get_refinement_boundary_action
 using list_action_type = tree::list_action;
 using get_energy_boundary_action_type = tree::get_energy_boundary_action;
 using get_energy_prolong_action_type = tree::get_energy_prolong_action;
+using gravity_solve_action_type = tree::gravity_solve_action;
+using get_hydro_boundary_action_type = tree::get_hydro_boundary_action;
+using get_gravity_boundary_action_type = tree::get_gravity_boundary_action;
+HPX_REGISTER_ACTION (get_gravity_boundary_action_type);
+HPX_REGISTER_ACTION (get_hydro_boundary_action_type);
+HPX_REGISTER_ACTION (gravity_solve_action_type);
 HPX_REGISTER_ACTION (get_energy_prolong_action_type);
 HPX_REGISTER_ACTION (get_energy_boundary_action_type);
 HPX_REGISTER_ACTION (list_action_type);
@@ -30,13 +36,63 @@ HPX_REGISTER_ACTION (get_refinement_boundary_action_type);
 HPX_REGISTER_ACTION (get_box_action_type);
 HPX_REGISTER_ACTION (truncate_action_type);
 HPX_REGISTER_ACTION (get_ptr_action_type);
-HPX_REGISTER_ACTION (get_hydro_boundary_action_type);
 HPX_REGISTER_ACTION (get_hydro_prolong_action_type);
 HPX_REGISTER_ACTION (get_hydro_restrict_action_type);
 HPX_REGISTER_ACTION (set_family_action_type);
 HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
+
+gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse, double t) {
+	if (pass == 0) {
+		if (level == fine_level) {
+			grav.unpack(coarse, box.pad(opts.gbw));
+			grav.initialize_fine(hydro.get_density());
+		} else {
+			grav.initialize_coarse(t);
+		}
+	} else {
+		grav.apply_prolong(coarse);
+	}
+	if (pass > 0 || level == fine_level) {
+		for (int i = 0; i < opts.nmulti; i++) {
+			grav.relax(false);
+			gravity_step++;
+			get_gravity_boundaries();
+		}
+	}
+	gravity_return rc;
+	double max_resid = 0.0;
+	if (level < fine_level) {
+		std::vector<hpx::future<gravity_return>> futs;
+		for (const auto &c : children) {
+			std::vector<double> coarse;
+			if (pass == 0) {
+				coarse = grav.pack_prolong_amr(c.get_box().pad(opts.gbw));
+			} else {
+				coarse = grav.get_prolong(c.get_box().half().pad(opts.gbw / 2 + (opts.gbw % 2)));
+			}
+			futs.push_back(c.gravity_solve(pass, fine_level, std::move(coarse), t));
+		}
+		for (auto &f : futs) {
+			auto tmp = f.get();
+			grav.apply_restrict(tmp);
+			max_resid = std::max(max_resid, tmp.resid);
+		}
+		for (int i = 0; i < opts.nmulti; i++) {
+			grav.relax(pass == 0);
+			gravity_step++;
+			get_gravity_boundaries();
+		}
+	} else {
+		grav.finish_fine();
+	}
+	rc = grav.get_restrict();
+	if (level < fine_level) {
+		rc.resid = max_resid;
+	}
+
+}
 
 hpx::future<tree_client> tree::allocate(int level, multi_range box) {
 	auto fut1 = hpx::new_<tree>(hpx::find_here(), level, box);
@@ -56,6 +112,13 @@ std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
 		hpx::this_thread::yield();
 	}
 	return hydro.pack(b);
+}
+
+std::vector<double> tree::get_gravity_boundary(multi_range b, int this_step) {
+	while (gravity_step % (opts.nmulti) != this_step % (opts.nmulti)) {
+		hpx::this_thread::yield();
+	}
+	return grav.pack(b);
 }
 
 std::vector<double> tree::get_energy_boundary(multi_range b, int this_step) {
@@ -145,6 +208,7 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 	} else {
 		tree new_tree(level, new_box);
 		new_tree.hydro.resize(new_tree.dx, new_box.pad(opts.hbw));
+		new_tree.grav.resize(new_tree.dx, new_box);
 		new_tree.t = new_tree.t0 = t;
 		new_tree.refine_step = 1;
 		new_tree.hydro.unpack(hydro.pack(new_box), new_box);
@@ -256,6 +320,7 @@ double tree::hydro_initialize(bool refine) {
 			const auto &b = new_boxes[i];
 			auto np = std::make_shared<tree>(level + 1, b);
 			np->hydro.resize(np->dx, b.pad(opts.hbw));
+			np->grav.resize(np->dx, b);
 			np->t = np->t0 = t;
 			np->refine_step = 1;
 			np->hydro.unpack(hydro.pack_prolong(b, 1.0), b);
@@ -360,6 +425,46 @@ void tree::get_hydro_boundaries(double this_time) {
 		if (!sib_ranges[i].empty()) {
 			const auto data = sib_futs[j].get();
 			hydro.unpack(data, sib_ranges[i]);
+			j++;
+		}
+	}
+}
+
+void tree::get_gravity_boundaries() {
+	std::vector<multi_range> bnd_ranges;
+	std::vector<multi_range> sib_ranges;
+	bnd_ranges = box.pad(opts.gbw).subtract(box.pad(opts.gbw - 1));
+	for (const auto &sib : siblings) {
+		multi_range inter;
+		inter.set_null();
+		for (int i = 0; i < bnd_ranges.size(); i++) {
+			inter = sib.box().intersection(bnd_ranges[i]);
+			sib_ranges.push_back(inter);
+		}
+	}
+	auto tmp = std::move(sib_ranges);
+	sib_ranges.resize(0);
+	for (const auto &s : siblings) {
+		multi_range this_range;
+		this_range.set_null();
+		for (const auto &range : tmp) {
+			const auto inter = range.intersection(s.box());
+			this_range = this_range.union_(inter);
+		}
+		sib_ranges.push_back(this_range);
+	}
+	std::vector<hpx::future<std::vector<double>>> sib_futs;
+	for (int i = 0; i < sib_ranges.size(); i++) {
+		if (!sib_ranges[i].empty()) {
+			auto shifted_box = sib_ranges[i].shift(-siblings[i].shift);
+			sib_futs.push_back(siblings[i].client.get_gravity_boundary(shifted_box, gravity_step));
+		}
+	}
+	int j = 0;
+	for (int i = 0; i < sib_ranges.size(); i++) {
+		if (!sib_ranges[i].empty()) {
+			const auto data = sib_futs[j].get();
+			grav.unpack(data, sib_ranges[i]);
 			j++;
 		}
 	}
@@ -483,7 +588,7 @@ std::vector<multi_range> tree::get_refinement_boundaries() {
 }
 
 tree::tree() :
-		hydro_step(0), refine_step(0), energy_step(0) {
+		hydro_step(0), refine_step(0), energy_step(0), gravity_step(0) {
 	level = -1;
 	dt = 0.0;
 }
@@ -492,7 +597,7 @@ tree::~tree() {
 }
 
 tree::tree(int level_, multi_range box_) :
-		hydro_step(0), refine_step(0), energy_step(0) {
+		hydro_step(0), refine_step(0), energy_step(0), gravity_step(0) {
 	dt = 0.0;
 	t0 = 0.0;
 	t = 0.0;
@@ -627,6 +732,7 @@ double tree::initialize(int this_level) {
 	if (this_level == level) {
 		levels_add_entry(level, this);
 		hydro.resize(dx, box.pad(opts.hbw));
+		grav.resize(dx, box);
 		hydro.initialize();
 		amax = hydro.compute_flux(0);
 		hydro.reset_flux_registers();

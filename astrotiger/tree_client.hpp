@@ -13,6 +13,7 @@
 
 class tree;
 class sibling;
+class gravity_return;
 
 class tree_client {
 	hpx::id_type gid;
@@ -47,6 +48,7 @@ public:
 	hpx::future<void> set_family(tree_client p, tree_client, std::vector<sibling> c) const;
 	hpx::future<double> initialize(int) const;
 	hpx::future<std::vector<tree_client>> get_children() const;
+	hpx::future<std::vector<double>> get_gravity_boundary(multi_range b, int) const;
 	hpx::future<std::vector<double>> get_hydro_boundary(multi_range b, int) const;
 	hpx::future<std::vector<double>> get_energy_boundary(multi_range b, int) const;
 	hpx::future<std::vector<std::vector<double>>> get_hydro_prolong(std::vector<multi_range> b, double t) const;
@@ -54,6 +56,7 @@ public:
 	hpx::future<std::pair<std::vector<double>,std::vector<double>>> get_hydro_restrict() const;
 	hpx::future<std::shared_ptr<tree>> get_ptr() const;
 	hpx::future<std::pair<std::vector<std::uint8_t>,std::vector<multi_range>>> get_refinement_boundary(multi_range, int) const;
+	hpx::future<gravity_return> gravity_solve(int pass, int level, const std::vector<double> coarse, double t) const;
 
 
 	template<class A>

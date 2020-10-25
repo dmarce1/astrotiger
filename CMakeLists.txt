@@ -27,6 +27,7 @@ set(CMAKE_CXX_FLAGS "-isystem /home/dmarce1/local/boost/include -DBOOST_ALL_NO_L
 
 set(astrotiger_source_files
 	src/geometry.cpp
+	src/gravity.cpp
 	src/hpx.cpp
 	src/hydro_grid.cpp
 	src/main.cpp
@@ -41,6 +42,7 @@ set(astrotiger_source_files
 set(astrotiger_header_files
  	astrotiger/defs.hpp	
  	astrotiger/geometry.hpp	
+ 	astrotiger/gravity.hpp	
  	astrotiger/hpx.hpp	
  	astrotiger/hydro_flux.hpp	
  	astrotiger/hydro_grid.hpp	

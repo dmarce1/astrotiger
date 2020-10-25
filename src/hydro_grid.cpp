@@ -458,17 +458,10 @@ std::vector<double> hydro_grid::pack_field(int f, multi_range bbox) const {
 std::vector<double> hydro_grid::pack_prolong(multi_range bbox, double w) const {
 	std::vector<double> data;
 	for (int f = 0; f < opts.nhydro; f++) {
-		if (w == 0.0 || w == 1.0) {
-			auto pro = w == 0.0 ? U0[f].prolong(bbox) : U[f].prolong(bbox);
-			for (multi_iterator i(bbox); !i.end(); i++) {
-				data.push_back(pro[i]);
-			}
-		} else {
 			auto pro0 = U0[f].prolong(bbox);
 			auto pro1 = U[f].prolong(bbox);
 			for (multi_iterator i(bbox); !i.end(); i++) {
 				data.push_back((1.0 - w) * pro0[i] + w * pro1[i]);
-			}
 		}
 	}
 	return data;
