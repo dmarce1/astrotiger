@@ -155,10 +155,10 @@ gravity_return gravity::get_restrict() {
 	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 		const auto j = X.index(i);
 		for (int dim = 0; dim < NDIM; dim++) {
-			resid[i] += (x[j + s[dim]] + x[j - s[dim]]) / (dx * dx);
+			resid[i] -= (x[j + s[dim]] + x[j - s[dim]]) / (dx * dx);
 		}
-		resid[i] -= (2.0 * NDIM) * x[j] / (dx * dx);
-		resid[i] -= R[i];
+		resid[i] += (2.0 * NDIM) * x[j] / (dx * dx);
+		resid[i] += R[i];
 //		phi[i] = resid[i];
 		rmax = std::max(rmax, std::abs(resid[i] * (dx * dx)));
 	}
