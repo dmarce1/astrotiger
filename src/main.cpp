@@ -23,7 +23,7 @@ statistics solve_gravity() {
 			r = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get().resid;
 			printf("%i %e\n", pass, r);
 			pass++;
-			if( pass > 100 ) {
+			if (pass > 1000) {
 				break;
 			}
 		} while (r > toler);
@@ -98,11 +98,19 @@ int hpx_main(int argc, char *argv[]) {
 			zero = zero && (i[dim] == 0);
 		}
 		if (!zero) {
-			const auto shift = i.index() * opts.max_box;
-			sibling sib;
-			sib.client = root;
-			sib.shift = shift;
-			sibs.push_back(sib);
+			bool use_periodic = true;
+			for (int dim = 0; dim < NDIM; dim++) {
+				if ((i.index()[dim] == -1 && opts.bnd[2 * dim] != PERIODIC) || (i.index()[dim] == +1 && opts.bnd[2 * dim + 1] != PERIODIC)) {
+					use_periodic = false;
+				}
+			}
+			if (use_periodic) {
+				const auto shift = i.index() * opts.max_box;
+				sibling sib;
+				sib.client = root;
+				sib.shift = shift;
+				sibs.push_back(sib);
+			}
 		}
 	}
 	printf("%i\n", sibs.size());
@@ -126,20 +134,21 @@ int hpx_main(int argc, char *argv[]) {
 		}
 	}
 	root.set_family(tree_client(), root, sibs).get();
-	master(0, 1.0e-100);
-	solve_gravity();
+	root.restrict_all().get();
+//	master(0, 1.0e-100);
+//	solve_gravity();
 	output_silo("X.0.silo");
-//	int i = 0;
-//	const auto dt = 0.01;
-//	levels_show();
-//	for (double t = 0.0; t < opts.tmax; t += dt) {
-//		i++;
-//		master(0, std::min(t + dt, opts.tmax));
-//		std::string fname = "X." + std::to_string(i) + ".silo";
-//		output_silo(fname);
-//	}
-//	std::string fname = "X." + std::to_string(i) + ".silo";
-//	output_silo(fname);
+	int i = 0;
+	const auto dt = 0.01;
+	levels_show();
+	for (double t = 0.0; t < opts.tmax; t += dt) {
+		i++;
+		master(0, std::min(t + dt, opts.tmax));
+		std::string fname = "X." + std::to_string(i) + ".silo";
+		output_silo(fname);
+	}
+	std::string fname = "X." + std::to_string(i) + ".silo";
+	output_silo(fname);
 	return hpx::finalize();
 }
 

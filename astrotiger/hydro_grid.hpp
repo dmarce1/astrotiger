@@ -62,6 +62,7 @@ public:
 	const multi_array<double>& get_density() const {
 		return U[rho_i];
 	}
+	void enforce_physical_bc(int);
 	void reset_flux_registers();
 	void reset_coarse_flux_registers();
 	double compute_flux(int rk);

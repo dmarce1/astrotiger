@@ -23,6 +23,13 @@ bool options::process_options(int argc, char *argv[]) {
 	command_opts.add_options() //
 	("help", "produce help message") //
 	("config_file", po::value < std::string > (&config_file)->default_value(""), "configuration file") //
+	("xmbnd", po::value < std::string > (&xmbnd)->default_value("periodic"), "") //
+	("xpbnd", po::value < std::string > (&xpbnd)->default_value("periodic"), "") //
+	("ymbnd", po::value < std::string > (&ymbnd)->default_value("periodic"), "") //
+	("ypbnd", po::value < std::string > (&ypbnd)->default_value("periodic"), "") //
+	("zmbnd", po::value < std::string > (&zmbnd)->default_value("periodic"), "") //
+	("zpbnd", po::value < std::string > (&zpbnd)->default_value("periodic"), "") //
+	("config_file", po::value < std::string > (&config_file)->default_value(""), "configuration file") //
 	("problem", po::value < std::string > (&problem)->default_value("blast"), "Problem 1 - sod 2 - blast\n") //
 	("nmulti", po::value<int>(&nmulti)->default_value(4), "multigrid solver iterations)") //
 	("max_box", po::value<int>(&max_box)->default_value(32), "maximum (box volume)^(1/3)") //
@@ -56,6 +63,29 @@ bool options::process_options(int argc, char *argv[]) {
 	}
 	po::notify(vm);
 
+	const auto str_to_bc_type = [](const std::string str) {
+		if (str == "periodic") {
+			return PERIODIC;
+		} else if (str == "reflecting") {
+			return REFLECTING;
+		} else if (str == "outflow") {
+			return OUTFLOW;
+		} else {
+			printf( "Unknow boundary condition %s\n", str);
+		}
+	};
+
+	bnd[0] = str_to_bc_type(xpbnd);
+	bnd[1] = str_to_bc_type(xmbnd);
+	if ( NDIM > 1) {
+		bnd[2] = str_to_bc_type(ypbnd);
+		bnd[3] = str_to_bc_type(ymbnd);
+		if ( NDIM > 2) {
+			bnd[4] = str_to_bc_type(zpbnd);
+			bnd[5] = str_to_bc_type(zmbnd);
+		}
+	}
+
 	nhydro = 3 + NDIM;
 	hbw = order;
 	gbw = 2;
@@ -66,7 +96,7 @@ bool options::process_options(int argc, char *argv[]) {
 	beta.resize(nrk);
 	if (order == 1) {
 		alpha[0] = beta[0] = 1.0;
-		opts.cfl = 0.9 / NDIM;
+		opts.cfl = 0.01 / NDIM;
 	} else if (order == 2) {
 		opts.cfl = 0.9 * (2.0 / 3.0) / NDIM;
 		beta[0] = 1.0;

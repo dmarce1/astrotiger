@@ -188,15 +188,19 @@ void hydro_grid::compute_refinement_criteria() {
 		}
 		for (multi_iterator k(box.pad(-opts.hbw)); !k.end(); k++) {
 			if (!R[k]) {
+
 				for (int f = 0; f < opts.nhydro; f++) {
-					const auto up = U[f][k.index() + j];
-					const auto u0 = U[f][k];
-					const auto um = U[f][k.index() - j];
-					const auto num = std::abs(up + um - 2.0 * u0);
-					const auto den = std::abs(up - u0) + std::abs(u0 - um) + 0.01 * (std::abs(up) + std::abs(um) + 2.0 * std::abs(u0));
-					if (den > 0.0) {
-						if (num / den > opts.refine_slope) {
-							R[k] = true;
+					if (f == rho_i || f == egas_i) {
+						const auto up = U[f][k.index() + j];
+						const auto u0 = U[f][k];
+						const auto um = U[f][k.index() - j];
+						const auto num = std::abs(up + um - 2.0 * u0);
+						const auto den = std::abs(up - u0) + std::abs(u0 - um) + 0.5 * (std::abs(up) + std::abs(um) + 2.0 * std::abs(u0));
+						if (den > 0.0) {
+//						printf( "%e\n", num/ den);
+							if (num / den > opts.refine_slope) {
+								R[k] = true;
+							}
 						}
 					}
 				}
@@ -271,14 +275,56 @@ void hydro_grid::initialize() {
 			if (r < 0.1) {
 				U[rho_i][i] = 1.0;
 			} else {
-				U[rho_i][i] = 1.0e-20;
+				U[rho_i][i] = 1.0e-5;
 			}
-			U[egas_i][i] = 1e-20;
+			U[egas_i][i] = 1e-5;
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());
 			abort();
 		}
 
+	}
+
+}
+
+void hydro_grid::enforce_physical_bc(int dir) {
+	const auto ibox = box.pad(-opts.hbw);
+	multi_range bbox = box;
+	const int dim = dir / 2;
+	if (dir % 2 == 0) {
+		bbox.min[dim] = ibox.min[dim] - opts.hbw;
+	} else if (dir % 2 == 1) {
+		bbox.max[dim] = ibox.max[dim] + opts.hbw;
+	}
+
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		int xi;
+		if (dir % 2 == 0 && !opts.bnd[dir] == PERIODIC) {
+			if (opts.bnd[dir] == OUTFLOW) {
+				xi = ibox.min[dim];
+			} else if (opts.bnd[dir] == REFLECTING) {
+				xi = -i.index()[dim] + opts.hbw + 1;
+			}
+		} else {
+			if (opts.bnd[dir] == OUTFLOW) {
+				xi = ibox.max[dim] - 1;
+			} else if (opts.bnd[dir] == REFLECTING) {
+				xi = -i.index()[dim] + 2 * ibox.max[dim] + 2 * opts.hbw - 1;
+			}
+		}
+		if (opts.bnd[dir] != PERIODIC) {
+			auto j = i.index();
+			j[dim] = xi;
+			for (int f = 0; f < opts.nhydro; f++) {
+				U[f][i] = U[f][j];
+			}
+			const int si = sx_i + dim;
+			if (opts.bnd[dir] == OUTFLOW) {
+				U[si][i] = 0.0;
+			} else if (opts.bnd[dir] == REFLECTING) {
+				U[si][i] = -U[si][i];
+			}
+		}
 	}
 
 }
@@ -575,26 +621,25 @@ void hydro_grid::unpack_field(int f, const std::vector<double> &data, multi_rang
 	}
 }
 
-statistics hydro_grid::get_statistics(const std::vector<multi_range>& child_ranges) const {
+statistics hydro_grid::get_statistics(const std::vector<multi_range> &child_ranges) const {
 	statistics stats;
-	stats.u.resize(opts.nhydro,0.0);
-	for( multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+	stats.u.resize(opts.nhydro, 0.0);
+	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		bool refined = false;
-		for( const auto& c : child_ranges) {
-			if( c.contains(i)) {
+		for (const auto &c : child_ranges) {
+			if (c.contains(i)) {
 				refined = true;
 				break;
 			}
 		}
-		if(!refined) {
-			for( int f = 0; f < opts.nhydro; f++) {
-				stats.u[f] += std::pow(dx,2) * U[f][i];
+		if (!refined) {
+			for (int f = 0; f < opts.nhydro; f++) {
+				stats.u[f] += std::pow(dx, 2) * U[f][i];
 			}
 		}
 	}
 	return stats;
 }
-
 
 std::vector<std::string> hydro_grid::field_names() {
 	std::vector<std::string> names;

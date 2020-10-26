@@ -27,6 +27,8 @@ using gravity_solve_action_type = tree::gravity_solve_action;
 using get_hydro_boundary_action_type = tree::get_hydro_boundary_action;
 using set_gravity_boundary_action_type = tree::set_gravity_boundary_action;
 using get_statistics_action_type = tree::get_statistics_action;
+using restrict_all_action_type = tree::restrict_all_action;
+HPX_REGISTER_ACTION (restrict_all_action_type);
 HPX_REGISTER_ACTION (get_statistics_action_type);
 HPX_REGISTER_ACTION (set_gravity_boundary_action_type);
 HPX_REGISTER_ACTION (get_hydro_boundary_action_type);
@@ -83,6 +85,9 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			grav.apply_prolong(coarse);
 		}
 	}
+//	if( pass == 0 ) {
+//		grav.zero();
+//	}
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < opts.nmulti; i++) {
 			get_gravity_boundaries();
@@ -278,11 +283,24 @@ void tree::sanity() const {
 #endif
 }
 
+std::vector<double> tree::restrict_all() {
+	std::vector<hpx::future<std::vector<double>>> futs;
+	for (int i = 0; i < children.size(); i++) {
+		futs.push_back(children[i].restrict_all());
+	}
+	for (int i = 0; i < children.size(); i++) {
+		const auto tmp = futs[i].get();
+		const auto cbox = children[i].get_box().half();
+		hydro.unpack(tmp, cbox);
+	}
+	return hydro.pack_restrict(box.half());
+}
+
 double tree::hydro_initialize(bool refine) {
 	sanity();
 	std::vector<multi_range> force_refine_boxes;
-	std::vector<hpx::future<std::pair<std::vector<double>, std::vector<double>>>> futs;
 	energy_step++;
+	std::vector<hpx::future<std::pair<std::vector<double>, std::vector<double>>>> futs;
 	for (int i = 0; i < children.size(); i++) {
 		futs.push_back(children[i].get_hydro_restrict());
 	}
@@ -473,6 +491,17 @@ void tree::get_hydro_boundaries(double this_time) {
 			j++;
 		}
 	}
+	for (int dir = 0; dir < NDIM; dir++) {
+		if (dir % 2 == 0) {
+			if (box.min[dir/2] == 0) {
+				hydro.enforce_physical_bc(dir);
+			}
+		} else {
+			if (box.max[dir/2] == opts.max_box * (1 << level)) {
+				hydro.enforce_physical_bc(dir);
+			}
+		}
+	}
 }
 
 void tree::get_gravity_boundaries() {
@@ -523,6 +552,7 @@ void tree::get_gravity_boundaries() {
 }
 
 void tree::get_energy_boundaries(double this_time) {
+	return;
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
 	std::vector<multi_range> sib_ranges;

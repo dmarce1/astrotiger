@@ -90,6 +90,7 @@ public:
 	hpx::future<std::pair<std::vector<std::uint8_t>, std::vector<multi_range>>> get_refinement_boundary(multi_range, int) const;
 	hpx::future<gravity_return> gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m) const;
 	hpx::future<statistics> get_statistics() const;
+	hpx::future<std::vector<double>> restrict_all() const;
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

@@ -102,11 +102,7 @@ std::vector<double> gravity::pack_prolong_amr(const multi_range &bbox) const {
 	std::vector<double> data;
 	auto pro = phi.prolong(bbox, true);
 	for (multi_iterator i(bbox); !i.end(); i++) {
-		if (bbox.pad(-opts.gbw).contains(i.index())) {
-			data.push_back(pro[i]);
-		} else {
-			data.push_back(0.0);
-		}
+		data.push_back(pro[i]);
 	}
 	return data;
 }
@@ -204,7 +200,11 @@ std::vector<double> gravity::get_prolong(const multi_range &bbox) const {
 	std::vector<double> data;
 	auto prox = X.prolong(bbox, true);
 	for (multi_iterator i(bbox); !i.end(); i++) {
-		data.push_back(prox[i]);
+		if (active[i.index() / 2]) {
+			data.push_back(prox[i]);
+		} else {
+			data.push_back(0.0);
+		}
 	}
 	return data;
 }

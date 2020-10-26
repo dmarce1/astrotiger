@@ -1,6 +1,7 @@
 #pragma once
 
 #include <astrotiger/multi_array.hpp>
+#include <astrotiger/options.hpp>
 
 #include <array>
 
@@ -61,6 +62,12 @@ public:
 	void initialize_fine(const multi_array<double>&, double mtot);
 	void initialize_coarse(double w);
 	void finish_fine();
+
+	void zero() {
+		for( multi_iterator i(box.pad(-opts.gbw));!i.end(); i++) {
+			X[i] = 0.0;
+		}
+	}
 
 	multi_array<double> get_phi() const;
 	std::vector<double> pack(const multi_range&) const;

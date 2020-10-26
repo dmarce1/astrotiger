@@ -74,7 +74,7 @@ public:
 //		printf("Adding entry %i\n", level);
 	}
 	tree(const tree &other) :
-			hydro_step(0), refine_step(0) {
+			hydro_step(0), refine_step(0), energy_step(0) {
 		dt = other.dt;
 		box = other.box;
 		hydro = other.hydro;
@@ -90,6 +90,8 @@ public:
 		t = other.t;
 		auto tmp = (int) other.refine_step;
 		refine_step = tmp;
+		tmp = (int) other.energy_step;
+		energy_step = tmp;
 //		printf("Adding entry %i\n", level);
 	}
 	template<class A>
@@ -110,6 +112,9 @@ public:
 		int tmp = (int) refine_step;
 		arc & tmp;
 		refine_step = tmp;
+		tmp = (int) energy_step;
+		arc & tmp;
+		energy_step = tmp;
 	}
 
 	tree();
@@ -141,8 +146,10 @@ public:
 	void get_energy_boundaries(double);
 	void sanity() const;
 	statistics get_statistics() const;
+	std::vector<double> restrict_all();
 	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
 
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,restrict_all);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_statistics);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_box);

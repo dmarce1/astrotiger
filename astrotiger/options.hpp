@@ -3,6 +3,12 @@
 
 #include <string>
 #include <vector>
+#include <array>
+
+using bc_type = int;
+#define REFLECTING 0
+#define PERIODIC 1
+#define OUTFLOW 2
 
 class options {
 public:
@@ -26,11 +32,26 @@ public:
 	double G;
 	double tmax;
 	double efficiency;
+	std::string xpbnd;
+	std::string ypbnd;
+	std::string zpbnd;
+	std::string xmbnd;
+	std::string ymbnd;
+	std::string zmbnd;
+	std::array<bc_type, 2 * NDIM> bnd;
+
 	std::vector<double> alpha;
 	std::vector<double> beta;
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
+		arc & bnd;
+		arc & xpbnd;
+		arc & ypbnd;
+		arc & zpbnd;
+		arc & xmbnd;
+		arc & ymbnd;
+		arc & zmbnd;
 		arc & nmulti;
 		arc & gbw;
 		arc & G;
