@@ -44,7 +44,6 @@ class tree: public hpx::components::managed_component_base<tree> {
 	std::atomic<int> hydro_step;
 	std::atomic<int> refine_step;
 	std::atomic<int> energy_step;
-	std::atomic<int> gravity_step;
 	std::vector<multi_range> grandchild_boxes;
 	mutex_type mtx;
 	double dx;
@@ -56,7 +55,7 @@ public:
 	static hpx::future<tree_client> allocate(int, multi_range box);
 
 	tree(tree &&other) :
-			hydro_step(0), refine_step(0), energy_step(0), gravity_step(0) {
+			hydro_step(0), refine_step(0), energy_step(0) {
 		dt = std::move(other.dt);
 		box = std::move(other.box);
 		hydro = std::move(other.hydro);

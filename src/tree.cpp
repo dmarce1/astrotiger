@@ -78,21 +78,16 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 	} else if (pass == 0) {
 		grav.initialize_coarse(t);
+	} else {
+		if (level != 0) {
+			grav.apply_prolong(coarse);
+		}
 	}
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < opts.nmulti; i++) {
-			std::unique_lock<mutex_type> lock(mtx);
-			grav.relax(false);
-			lock.unlock();
-			gravity_step++;
-			hpx::this_thread::yield();
 			get_gravity_boundaries();
+			grav.relax(false);
 		}
-		if (level < fine_level) {
-			grav.print();
-		}
-	} else {
-		gravity_step += opts.nmulti;
 	}
 	gravity_return rc;
 	double max_resid = 0.0;
@@ -111,7 +106,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			if (pass == 0) {
 				coarse = grav.pack_prolong_amr(c.get_box().pad(opts.gbw));
 			} else {
-				coarse = grav.get_prolong(c.get_box().half());
+				coarse = grav.get_prolong(c.get_box());
 			}
 			futs.push_back(c.gravity_solve(pass, fine_level, std::move(coarse), w, mtot));
 		}
@@ -121,15 +116,10 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			max_resid = std::max(max_resid, tmp.resid);
 		}
 		for (int i = 0; i < opts.nmulti; i++) {
-			std::unique_lock<mutex_type> lock(mtx);
-			grav.relax(pass == 0 && i == 0);
-			lock.unlock();
-			hpx::this_thread::yield();
-			gravity_step++;
 			get_gravity_boundaries();
+			grav.relax(pass == 0 && i == 0);
 		}
 	} else if (pass == GRAVITY_FINAL_PASS) {
-		gravity_step += opts.nmulti;
 		grav.finish_fine();
 		hydro.set_phi(grav.get_phi());
 	}
@@ -164,7 +154,7 @@ std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
 	return hydro.pack(b);
 }
 
-void tree::set_gravity_boundary(std::vector<double> &&data, const multi_range& bbox) {
+void tree::set_gravity_boundary(std::vector<double> &&data, const multi_range &bbox) {
 	bool found = false;
 	for (int i = 0; i < siblings.size(); i++) {
 		if (siblings[i].box() == bbox) {
@@ -650,7 +640,7 @@ std::vector<multi_range> tree::get_refinement_boundaries() {
 }
 
 tree::tree() :
-		hydro_step(0), refine_step(0), energy_step(0), gravity_step(0) {
+		hydro_step(0), refine_step(0), energy_step(0) {
 	level = -1;
 	dt = 0.0;
 }
@@ -659,7 +649,7 @@ tree::~tree() {
 }
 
 tree::tree(int level_, multi_range box_) :
-		hydro_step(0), refine_step(0), energy_step(0), gravity_step(0) {
+		hydro_step(0), refine_step(0), energy_step(0) {
 	dt = 0.0;
 	t0 = 0.0;
 	t = 0.0;

@@ -203,17 +203,6 @@ void hydro_grid::compute_refinement_criteria() {
 			}
 		}
 	}
-	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
-		double max_grad_rho = 0.0;
-		double max_grad_egas = 0.0;
-		for (int dim = 0; dim < NDIM; dim++) {
-			max_grad_rho = std::max(max_grad_rho, std::abs(U[rho_i].smooth_gradient(dim, i)));
-			max_grad_egas = std::max(max_grad_egas, std::abs(U[egas_i].smooth_gradient(dim, i)));
-		}
-		bool res = max_grad_rho / U[rho_i][i] > opts.refine_slope;
-		res = res || max_grad_egas / U[egas_i][i] > opts.refine_slope;
-		R[i] = res;
-	}
 }
 
 void hydro_grid::initialize() {

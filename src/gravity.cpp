@@ -102,7 +102,11 @@ std::vector<double> gravity::pack_prolong_amr(const multi_range &bbox) const {
 	std::vector<double> data;
 	auto pro = phi.prolong(bbox, true);
 	for (multi_iterator i(bbox); !i.end(); i++) {
-		data.push_back(pro[i]);
+		if (bbox.pad(-opts.gbw).contains(i.index())) {
+			data.push_back(pro[i]);
+		} else {
+			data.push_back(0.0);
+		}
 	}
 	return data;
 }
@@ -138,9 +142,11 @@ gravity_return gravity::get_restrict() {
 	active_c.resize(rbox);
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		const auto cbox = multi_range(i.index()).double_();
+		bool all_active = true;
 		for (multi_iterator ci(cbox); !ci.end(); ci++) {
-			active_c[i] = active_c[i] || active[ci];
+			all_active = all_active && active[ci];
 		}
+		active_c[i] = all_active;
 	}
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		rc.active.push_back(active_c[i]);
@@ -180,32 +186,36 @@ void gravity::apply_restrict(const gravity_return &data) {
 		active[i] = data.active[k];
 		k++;
 	}
+	assert(k == data.active.size());
 	k = 0;
 	for (multi_iterator i(data.box); !i.end(); i++) {
 		if (active[i]) {
 			assert(k < data.R.size());
 			R[i] = data.R[k];
 			k++;
+		} else {
+			R[i] = 0.0;
 		}
 	}
+	assert(k == data.R.size());
 }
 
 std::vector<double> gravity::get_prolong(const multi_range &bbox) const {
-	return pack(bbox);
+	std::vector<double> data;
+	auto prox = X.prolong(bbox, true);
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		data.push_back(prox[i]);
+	}
+	return data;
 }
 
 void gravity::apply_prolong(const std::vector<double> &data) {
-	multi_array<double> dX;
-	const auto pbox = box.pad(-opts.gbw).half();
-	dX.resize(pbox);
 	int k = 0;
-	for (multi_iterator i(pbox); !i.end(); i++) {
+	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 		assert(k < data.size());
-		dX[i] = data[k];
+		X[i] += data[k];
 		k++;
 	}
-	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
-		X[i] += dX[i.index() / 2];
-	}
+	assert(k == data.size());
 }
 
