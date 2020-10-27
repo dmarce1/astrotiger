@@ -31,6 +31,8 @@ bool options::process_options(int argc, char *argv[]) {
 	("zpbnd", po::value < std::string > (&zpbnd)->default_value("periodic"), "") //
 	("config_file", po::value < std::string > (&config_file)->default_value(""), "configuration file") //
 	("problem", po::value < std::string > (&problem)->default_value("blast"), "Problem 1 - sod 2 - blast\n") //
+	("hydro", po::value<bool>(&hydro)->default_value(true), "use hydro") //
+	("gravity", po::value<bool>(&gravity)->default_value(false), "use gravity") //
 	("nmulti", po::value<int>(&nmulti)->default_value(4), "multigrid solver iterations)") //
 	("max_box", po::value<int>(&max_box)->default_value(32), "maximum (box volume)^(1/3)") //
 	("order", po::value<int>(&order)->default_value(2), "integration order") //
@@ -71,10 +73,16 @@ bool options::process_options(int argc, char *argv[]) {
 		} else if (str == "outflow") {
 			return OUTFLOW;
 		} else {
-			printf( "Unknow boundary condition %s\n", str);
+			printf("Unknow boundary condition %s\n", str);
 		}
 	};
-
+	if (problem == "rt" && NDIM > 1) {
+		bnd[2] = bnd[3] = REFLECTING;
+		gamma = 7.0 / 5.0;
+		gravity = true;
+	} else if (problem == "sod") {
+		gamma = 7.0 / 5.0;
+	}
 	bnd[0] = str_to_bc_type(xpbnd);
 	bnd[1] = str_to_bc_type(xmbnd);
 	if ( NDIM > 1) {

@@ -40,18 +40,13 @@ hpx::future<std::vector<tree_client>> tree_client::get_children() const {
 	return hpx::async<tree::get_children_action>(gid);
 }
 
-hpx::future<std::vector<double>> tree_client::get_hydro_boundary(multi_range b, int step) const {
-	assert(gid != hpx::invalid_id);
-	return hpx::async<tree::get_hydro_boundary_action>(gid, b, step);
-}
-
 hpx::future<std::vector<double>> tree_client::restrict_all() const {
 	return hpx::async<tree::restrict_all_action>(gid);
 }
 
-hpx::future<void> tree_client::set_gravity_boundary(std::vector<double>&& data, const multi_range& id) const {
+hpx::future<void> tree_client::set_boundary(std::vector<double>&& data, const multi_range& id) const {
 	assert(gid != hpx::invalid_id);
-	return hpx::async<tree::set_gravity_boundary_action>(gid, std::move(data), id);
+	return hpx::async<tree::set_boundary_action>(gid, std::move(data), id);
 }
 
 hpx::future<std::vector<double>> tree_client::get_energy_boundary(multi_range b, int step) const {

@@ -10,10 +10,20 @@
 #include <astrotiger/multi_array.hpp>
 #include <vector>
 
+double rand1() {
+	return (rand() + 0.5) / RAND_MAX;
+}
+
 hydro_grid::hydro_grid() {
 }
 
 double hydro_grid::compute_flux(int rk) {
+	if (rk == 0) {
+		for (int f = 0; f < opts.nhydro; f++) {
+			U0[f] = U[f];
+		}
+		reset_flux_registers();
+	}
 	double amax = 0.0;
 	std::vector<multi_array<double>> VR(opts.nhydro);
 	std::vector<multi_array<double>> VL(opts.nhydro);
@@ -74,6 +84,15 @@ double hydro_grid::compute_flux(int rk) {
 				F[dim][f][j] = (1.0 - opts.beta[rk]) * F[dim][f][j] + opts.beta[rk] * flux[f];
 			}
 		}
+		for (multi_iterator j(box.pad(-opts.hbw)); !j.end(); j++) {
+			if (opts.gravity) {
+				auto jp = j.index();
+				auto jm = j.index();
+				jp[dim]++;
+				jm[dim]--;
+				S[sx_i + dim][j] = (1.0 - opts.beta[rk]) * S[sx_i + dim][j] + opts.beta[rk] * 0.5 * U[rho_i][j] * (-phi[jp] + phi[jm]) / dx;
+			}
+		}
 	}
 	return amax;
 }
@@ -81,12 +100,6 @@ double hydro_grid::compute_flux(int rk) {
 void hydro_grid::substep_update(int rk, double dt) {
 	const double onembeta = 1.0 - opts.beta[rk];
 	const double lambda = dt / dx;
-	if (rk == 0) {
-		for (int f = 0; f < opts.nhydro; f++) {
-			U0[f] = U[f];
-		}
-		reset_flux_registers();
-	}
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		for (int f = 0; f < opts.nhydro; f++) {
 			auto &u = U[f][i];
@@ -95,16 +108,19 @@ void hydro_grid::substep_update(int rk, double dt) {
 				multi_index ip1 = i;
 				ip1[dim]++;
 				u -= (F[dim][f][ip1] - F[dim][f][i]) * lambda;
+				u += S[f][i] * dt;
 			}
 		}
 	}
-	const auto factor = dt / (1 << (NDIM - 1));
-	for (int dim = 0; dim < NDIM; dim++) {
-		for (int f = 0; f < opts.nhydro; f++) {
-			for (multi_iterator i(fbox[dim]); !i.end(); i++) {
-				if (i.index()[dim] % 2 == 0) {
-					const auto j = i.index() / 2;
-					Fc[dim][f][j] += F[dim][f][i] * factor;
+	if (rk == opts.nrk - 1) {
+		const auto factor = dt / (1 << (NDIM - 1));
+		for (int dim = 0; dim < NDIM; dim++) {
+			for (int f = 0; f < opts.nhydro; f++) {
+				for (multi_iterator i(fbox[dim]); !i.end(); i++) {
+					if (i.index()[dim] % 2 == 0) {
+						const auto j = i.index() / 2;
+						Fc[dim][f][j] += F[dim][f][i] * factor;
+					}
 				}
 			}
 		}
@@ -120,10 +136,12 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 	int j = 0;
 	U0.resize(opts.nhydro);
 	U.resize(opts.nhydro);
+	S.resize(opts.nhydro);
 	phi.resize(box_.pad(1));
-	for (int i = 0; i < opts.nhydro; i++) {
-		U0[i].resize(box);
-		U[i].resize(box);
+	for (int f = 0; f < opts.nhydro; f++) {
+		U0[f].resize(box);
+		U[f].resize(box);
+		S[f].resize(box.pad(-opts.hbw));
 	}
 	for (int dim = 0; dim < NDIM; dim++) {
 		F[dim].resize(opts.nhydro);
@@ -140,6 +158,17 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 	}
 	R.resize(box_.pad(opts.window));
 	reset_coarse_flux_registers();
+	if (opts.problem == "rt") {
+		for (multi_iterator i(box); !i.end(); i++) {
+			auto y = coord(i.index()[1]);
+			if (y < 0.0) {
+				y = -y;
+			} else if (y > 1.0) {
+				y = 2.0 - y;
+			}
+			phi[i] = y;
+		}
+	}
 }
 
 void hydro_grid::reset_coarse_flux_registers() {
@@ -158,6 +187,11 @@ void hydro_grid::reset_flux_registers() {
 			for (multi_iterator i(fbox[dim]); !i.end(); i++) {
 				F[dim][f][i] = 0.0;
 			}
+		}
+	}
+	for (int f = 0; f < opts.nhydro; f++) {
+		for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+			S[f][i] = 0.0;
 		}
 	}
 }
@@ -180,27 +214,41 @@ void hydro_grid::compute_refinement_criteria() {
 		cnt++;
 		bool all_zero = true;
 		const auto j = i.index();
+		int n_one = 0;
 		for (int dim = 0; dim < NDIM; dim++) {
-			all_zero = all_zero && (j[dim] == 0);
+			if (j[dim] != 0) {
+				n_one++;
+			}
 		}
-		if (all_zero) {
+		if (n_one == 0) {
 			continue;
 		}
 		for (multi_iterator k(box.pad(-opts.hbw)); !k.end(); k++) {
 			if (!R[k]) {
-
+				constexpr double eps = 0.1;
 				for (int f = 0; f < opts.nhydro; f++) {
-					if (f == rho_i || f == egas_i) {
-						const auto up = U[f][k.index() + j];
-						const auto u0 = U[f][k];
-						const auto um = U[f][k.index() - j];
-						const auto num = std::abs(up + um - 2.0 * u0);
-						const auto den = std::abs(up - u0) + std::abs(u0 - um) + 0.5 * (std::abs(up) + std::abs(um) + 2.0 * std::abs(u0));
-						if (den > 0.0) {
-//						printf( "%e\n", num/ den);
-							if (num / den > opts.refine_slope) {
-								R[k] = true;
-							}
+					const auto up = U[f][k.index() + j];
+					const auto u0 = U[f][k];
+					const auto um = U[f][k.index() - j];
+					double c0;
+					if (f < sx_i || f >= sx_i + NDIM) {
+						c0 = eps * (std::abs(up) + std::abs(um) + 2.0 * std::abs(u0));
+					} else {
+						double vp = 0.0;
+						double v0 = 0.0;
+						double vm = 0.0;
+						for (int dim = 0; dim < NDIM; dim++) {
+							vm += std::max(0.0, U[egas_i][k.index() - j] / U[rho_i][k.index() - 1]);
+							v0 += std::max(0.0, U[egas_i][k] / U[rho_i][k]);
+							vp += std::max(0.0, U[egas_i][k.index() + j] / U[rho_i][k.index() + 1]);
+						}
+						c0 = eps * (std::sqrt(vp) + std::sqrt(vm) + 2.0 * std::sqrt(v0));
+					}
+					const auto num = std::abs(up + um - 2.0 * u0) / std::sqrt(n_one);
+					const auto den = std::abs(up - u0) + std::abs(u0 - um) + c0;
+					if (den > 0.0) {
+						if (num / den > opts.refine_slope) {
+							R[k] = true;
 						}
 					}
 				}
@@ -221,7 +269,7 @@ void hydro_grid::initialize() {
 		}
 		if (opts.problem == "sod") {
 			double xsum = 0.0;
-			for (int dim = 0; dim < NDIM; dim++) {
+			for (int dim = 0; dim < 1; dim++) {
 				xsum += coord(i[dim]) - 0.5;
 			}
 			U[sx_i][i] = 0.0;
@@ -248,13 +296,13 @@ void hydro_grid::initialize() {
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		} else if (opts.problem == "kh") {
 			const int dim = NDIM - 1;
-			const double rnd = 2.0 * (double) (rand() + 0.5) / RAND_MAX - 1.0;
+			const double rnd = 2.0 * rand1() - 1.0;
 			if (std::abs(coord(i.index()[dim]) - 0.5) > 0.25) {
 				U[rho_i][i] = 1.0;
-				U[sx_i][i] = +0.5 + rnd * 0.001;
+				U[sx_i][i] = +0.5 + rnd * 0.0001;
 			} else {
 				U[sx_i][i] = -0.5;
-				U[rho_i][i] = 2.0 + 2.0 * rnd * 0.001;
+				U[rho_i][i] = 2.0 + 2.0 * rnd * 0.0001;
 			}
 			for (int dim = 1; dim < NDIM; dim++) {
 				const double rnd = 2.0 * (double) (rand() + 0.5) / RAND_MAX - 1.0;
@@ -278,13 +326,24 @@ void hydro_grid::initialize() {
 				U[rho_i][i] = 1.0e-5;
 			}
 			U[egas_i][i] = 1e-5;
+		} else if (opts.problem == "rt") {
+			const auto y = coord(i[1]);
+			double p;
+			if (y > 0.5) {
+				U[rho_i][i] = 2.0 * (1.0 + rand1() * 0.001);
+			} else {
+				U[rho_i][i] = 1.0 * (1.0 + rand1() * 0.001);
+			}
+			p = std::max(1.0 - y, 1.0e-3) * U[rho_i][i];
+			const auto ein = p / (opts.gamma - 1.0);
+			U[egas_i][i] = ein;
+			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());
 			abort();
 		}
 
 	}
-
 }
 
 void hydro_grid::enforce_physical_bc(int dir) {
@@ -293,8 +352,10 @@ void hydro_grid::enforce_physical_bc(int dir) {
 	const int dim = dir / 2;
 	if (dir % 2 == 0) {
 		bbox.min[dim] = ibox.min[dim] - opts.hbw;
+		bbox.max[dim] = ibox.min[dim];
 	} else if (dir % 2 == 1) {
 		bbox.max[dim] = ibox.max[dim] + opts.hbw;
+		bbox.min[dim] = ibox.max[dim];
 	}
 
 	for (multi_iterator i(bbox); !i.end(); i++) {
@@ -309,7 +370,7 @@ void hydro_grid::enforce_physical_bc(int dir) {
 			if (opts.bnd[dir] == OUTFLOW) {
 				xi = ibox.max[dim] - 1;
 			} else if (opts.bnd[dir] == REFLECTING) {
-				xi = -i.index()[dim] + 2 * ibox.max[dim] + 2 * opts.hbw - 1;
+				xi = -i.index()[dim] + 2 * ibox.max[dim] - 2 * opts.hbw - 1;
 			}
 		}
 		if (opts.bnd[dir] != PERIODIC) {

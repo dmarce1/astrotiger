@@ -37,6 +37,7 @@ class hydro_grid {
 	std::array<multi_range, NDIM> fcbox;
 	std::vector<multi_array<double>> U0;
 	std::vector<multi_array<double>> U;
+	std::vector<multi_array<double>> S;
 	std::array<std::vector<multi_array<double>>, NDIM> F;
 	std::array<std::vector<multi_array<double>>, NDIM> Fc;
 	multi_array<std::uint8_t> R;

@@ -9,7 +9,6 @@
 
 HPX_REGISTER_COMPONENT(hpx::components::managed_component<tree>, tree);
 
-using get_hydro_boundary_action_type = tree::get_hydro_boundary_action;
 using get_hydro_prolong_action_type = tree::get_hydro_prolong_action;
 using get_hydro_restrict_action_type = tree::get_hydro_restrict_action;
 using set_family_action_type = tree::set_family_action;
@@ -24,14 +23,12 @@ using list_action_type = tree::list_action;
 using get_energy_boundary_action_type = tree::get_energy_boundary_action;
 using get_energy_prolong_action_type = tree::get_energy_prolong_action;
 using gravity_solve_action_type = tree::gravity_solve_action;
-using get_hydro_boundary_action_type = tree::get_hydro_boundary_action;
-using set_gravity_boundary_action_type = tree::set_gravity_boundary_action;
+using set_boundary_action_type = tree::set_boundary_action;
 using get_statistics_action_type = tree::get_statistics_action;
 using restrict_all_action_type = tree::restrict_all_action;
 HPX_REGISTER_ACTION (restrict_all_action_type);
 HPX_REGISTER_ACTION (get_statistics_action_type);
-HPX_REGISTER_ACTION (set_gravity_boundary_action_type);
-HPX_REGISTER_ACTION (get_hydro_boundary_action_type);
+HPX_REGISTER_ACTION (set_boundary_action_type);
 HPX_REGISTER_ACTION (gravity_solve_action_type);
 HPX_REGISTER_ACTION (get_energy_prolong_action_type);
 HPX_REGISTER_ACTION (get_energy_boundary_action_type);
@@ -152,14 +149,7 @@ multi_range tree::get_box() const {
 	return box;
 }
 
-std::vector<double> tree::get_hydro_boundary(multi_range b, int this_step) {
-	while (hydro_step % (opts.nrk + 1) != this_step % (opts.nrk + 1)) {
-		hpx::this_thread::yield();
-	}
-	return hydro.pack(b);
-}
-
-void tree::set_gravity_boundary(std::vector<double> &&data, const multi_range &bbox) {
+void tree::set_boundary(std::vector<double> &&data, const multi_range &bbox) {
 	bool found = false;
 	for (int i = 0; i < siblings.size(); i++) {
 		if (siblings[i].box() == bbox) {
@@ -312,7 +302,6 @@ double tree::hydro_initialize(bool refine) {
 		}
 		hydro.unpack(tmp.first, cbox);
 	}
-	hydro_step++;
 	get_hydro_boundaries(t);
 	if (refine && level < opts.max_level) {
 		std::vector<std::vector<tree_client>> grandchildren;
@@ -427,6 +416,13 @@ double tree::hydro_initialize(bool refine) {
 }
 
 void tree::get_hydro_boundaries(double this_time) {
+	for (const auto &sib : siblings) {
+		const auto inter = sib.box().pad(opts.hbw).intersection(box);
+		if (inter.volume()) {
+			sib.client.set_boundary(hydro.pack(inter), box.shift(-sib.shift));
+		}
+	}
+
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
 	std::vector<multi_range> sib_ranges;
@@ -472,7 +468,7 @@ void tree::get_hydro_boundaries(double this_time) {
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
 			auto shifted_box = sib_ranges[i].shift(-siblings[i].shift);
-			sib_futs.push_back(siblings[i].client.get_hydro_boundary(shifted_box, hydro_step));
+			sib_futs.push_back(siblings[i].client.get());
 		}
 	}
 	if (parent != tree_client()) {
@@ -493,11 +489,11 @@ void tree::get_hydro_boundaries(double this_time) {
 	}
 	for (int dir = 0; dir < NDIM; dir++) {
 		if (dir % 2 == 0) {
-			if (box.min[dir/2] == 0) {
+			if (box.min[dir / 2] == 0) {
 				hydro.enforce_physical_bc(dir);
 			}
 		} else {
-			if (box.max[dir/2] == opts.max_box * (1 << level)) {
+			if (box.max[dir / 2] == opts.max_box * (1 << level)) {
 				hydro.enforce_physical_bc(dir);
 			}
 		}
@@ -508,7 +504,7 @@ void tree::get_gravity_boundaries() {
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.gbw).intersection(box);
 		if (inter.volume()) {
-			sib.client.set_gravity_boundary(grav.pack(inter), box.shift(-sib.shift));
+			sib.client.set_boundary(grav.pack(inter), box.shift(-sib.shift));
 		}
 	}
 
@@ -670,7 +666,7 @@ std::vector<multi_range> tree::get_refinement_boundaries() {
 }
 
 tree::tree() :
-		hydro_step(0), refine_step(0), energy_step(0) {
+		refine_step(0), energy_step(0) {
 	level = -1;
 	dt = 0.0;
 }
@@ -679,7 +675,7 @@ tree::~tree() {
 }
 
 tree::tree(int level_, multi_range box_) :
-		hydro_step(0), refine_step(0), energy_step(0) {
+		refine_step(0), energy_step(0) {
 	dt = 0.0;
 	t0 = 0.0;
 	t = 0.0;
@@ -687,7 +683,6 @@ tree::tree(int level_, multi_range box_) :
 //	printf("Adding entry %i\n", level);
 	box = box_;
 	dx = 1.0 / (1 << level) / opts.max_box;
-	hydro_step = 0;
 }
 
 void tree::set_family(tree_client p, tree_client s, std::vector<sibling> sibs) {
@@ -797,7 +792,6 @@ void tree::hydro_substep(int rk, double this_dt) {
 		hydro.compute_flux(rk);
 	}
 	hydro.substep_update(rk, dt);
-	hydro_step++;
 	if (rk != opts.nrk - 1) {
 		get_hydro_boundaries(t + opts.alpha[rk] * this_dt);
 	} else {
@@ -816,9 +810,9 @@ double tree::initialize(int this_level) {
 		hydro.resize(dx, box.pad(opts.hbw));
 		grav.resize(dx, box);
 		hydro.initialize();
-		amax = hydro.compute_flux(0);
 		hydro.reset_flux_registers();
 		hydro.reset_coarse_flux_registers();
+		amax = hydro.compute_flux(0);
 	} else {
 		if (this_level == level + 1) {
 			hydro.compute_refinement_criteria();

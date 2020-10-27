@@ -41,7 +41,6 @@ class tree: public hpx::components::managed_component_base<tree> {
 	std::vector<tree_client> children;
 	std::vector<sibling> siblings;
 	int level;
-	std::atomic<int> hydro_step;
 	std::atomic<int> refine_step;
 	std::atomic<int> energy_step;
 	std::vector<multi_range> grandchild_boxes;
@@ -55,7 +54,7 @@ public:
 	static hpx::future<tree_client> allocate(int, multi_range box);
 
 	tree(tree &&other) :
-			hydro_step(0), refine_step(0), energy_step(0) {
+			refine_step(0), energy_step(0) {
 		dt = std::move(other.dt);
 		box = std::move(other.box);
 		hydro = std::move(other.hydro);
@@ -74,7 +73,7 @@ public:
 //		printf("Adding entry %i\n", level);
 	}
 	tree(const tree &other) :
-			hydro_step(0), refine_step(0), energy_step(0) {
+			refine_step(0), energy_step(0) {
 		dt = other.dt;
 		box = other.box;
 		hydro = other.hydro;
@@ -128,8 +127,7 @@ public:
 	void delist();
 	void list();
 	void set_child_family();
-	std::vector<double> get_hydro_boundary(multi_range, int);
-	void set_gravity_boundary(std::vector<double>&&, const multi_range&);
+	void set_boundary(std::vector<double>&&, const multi_range&);
 	std::vector<double> get_energy_boundary(multi_range, int);
 	std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> get_refinement_boundary(multi_range, int);
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
@@ -156,8 +154,7 @@ public:
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,truncate);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_ptr);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_energy_boundary);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_gravity_boundary);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_boundary);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_energy_prolong);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_prolong);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_hydro_restrict);
@@ -165,7 +162,6 @@ public:
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_family);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,list);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,delist);
-
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,gravity_solve);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,initialize);
 
