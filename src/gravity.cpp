@@ -13,7 +13,28 @@ void gravity::resize(double dx_, const multi_range &box_) {
 	active.resize(box);
 	amr.resize(box);
 	phi_c.resize(cbox);
+	refined.resize(box);
+	for (int dim = 0; dim < NDIM; dim++) {
+		fbox[dim] = box_;
+		fbox[dim].max[dim]++;
+		flux[dim].resize(fbox[dim]);
+	}
 
+}
+
+void gravity::compute_flux() {
+
+}
+
+void gravity::set_refined(const std::vector<multi_range> &boxes) {
+	for (multi_iterator i(box); !i.end(); i++) {
+		refined[i] = false;
+	}
+	for (multi_iterator i(box); !i.end(); i++) {
+		for (const auto &b : boxes) {
+			refined[i] = refined[i] || b.contains(i);
+		}
+	}
 }
 
 void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::vector<double> &data) {

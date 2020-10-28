@@ -147,6 +147,7 @@ public:
 	std::vector<double> restrict_all();
 	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
 
+
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,restrict_all);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_statistics);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);

@@ -30,6 +30,9 @@ class gravity {
 	multi_array<double> R;
 	multi_array<std::uint8_t> active;
 	multi_array<std::uint8_t> amr;
+	multi_array<std::uint8_t> refined;
+	std::array<multi_array<double>,NDIM> flux;
+	std::array<multi_range,NDIM> fbox;
 	multi_array<double> phi_c;
 	double dx;
 	bool has_phi0;
@@ -49,7 +52,9 @@ public:
 	}
 
 	template<class A>
-	void serialize(A&& arc, unsigned ) {
+	void serialize(A &&arc, unsigned) {
+		arc & fbox;
+		arc & flux;
 		arc & has_phi0;
 		arc & has_phi1;
 		arc & phi0;
@@ -60,17 +65,20 @@ public:
 		arc & active;
 		arc & phi_c;
 		arc & amr;
+		arc & refined;
 	}
 
+	void compute_flux();
+	void set_refined(const std::vector<multi_range>&);
 	void resize(double, const multi_range&);
 	void set_avg_zero();
 	void store();
 	void initialize_fine(const multi_array<double>&, double mtot);
 	void initialize_coarse(double w);
 	void finish_fine();
-	void set_amr_zones(const std::vector<multi_range>&,const std::vector<double>&);
+	void set_amr_zones(const std::vector<multi_range>&, const std::vector<double>&);
 	void zero() {
-		for( multi_iterator i(box.pad(-opts.gbw));!i.end(); i++) {
+		for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 			X[i] = 0.0;
 		}
 	}
@@ -81,7 +89,7 @@ public:
 	void unpack(const std::vector<double>&, const multi_range &bbox);
 
 	void relax(bool init_zero);
-	gravity_return get_restrict(double) ;
+	gravity_return get_restrict(double);
 	void compute_amr_bounds(bool first_pass);
 	void apply_restrict(const gravity_return&);
 	std::vector<double> get_prolong(const multi_range&) const;
