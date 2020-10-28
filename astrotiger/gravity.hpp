@@ -5,6 +5,8 @@
 
 #include <array>
 
+#define PACK_PHI 1
+#define PACK_X 2
 
 struct gravity_return {
 	double resid;
@@ -27,6 +29,8 @@ class gravity {
 	multi_array<double> X;
 	multi_array<double> R;
 	multi_array<std::uint8_t> active;
+	multi_array<std::uint8_t> amr;
+	multi_array<double> phi_c;
 	double dx;
 	bool has_phi0;
 	bool has_phi1;
@@ -54,6 +58,8 @@ public:
 		arc & X;
 		arc & R;
 		arc & active;
+		arc & phi_c;
+		arc & amr;
 	}
 
 	void resize(double, const multi_range&);
@@ -62,7 +68,7 @@ public:
 	void initialize_fine(const multi_array<double>&, double mtot);
 	void initialize_coarse(double w);
 	void finish_fine();
-
+	void set_amr_zones(const std::vector<multi_range>&,const std::vector<double>&);
 	void zero() {
 		for( multi_iterator i(box.pad(-opts.gbw));!i.end(); i++) {
 			X[i] = 0.0;
@@ -70,12 +76,12 @@ public:
 	}
 
 	multi_array<double> get_phi() const;
-	std::vector<double> pack(const multi_range&) const;
+	std::vector<double> pack(const multi_range&, int type) const;
 	void unpack(const std::vector<double>&, const multi_range &bbox);
-	std::vector<double> pack_prolong_amr(const multi_range&) const;
 
 	void relax(bool init_zero);
 	gravity_return get_restrict() ;
+	void compute_amr_bounds(bool first_pass);
 	void apply_restrict(const gravity_return&);
 	std::vector<double> get_prolong(const multi_range&) const;
 	void apply_prolong(const std::vector<double>&);

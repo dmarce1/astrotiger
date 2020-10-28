@@ -65,11 +65,12 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	if (level == fine_level) {
 		if (pass == 0) {
 			if (level != 0) {
-				grav.unpack(coarse, box.pad(opts.gbw));
+				grav.initialize_fine(hydro.get_density(), mtot);
+				grav.set_amr_zones(get_amr_boxes(), coarse);
 			} else {
 				grav.initialize_coarse(t);
+				grav.initialize_fine(hydro.get_density(), mtot);
 			}
-			grav.initialize_fine(hydro.get_density(), mtot);
 		} else {
 			if (level != 0) {
 				grav.apply_prolong(coarse);
@@ -82,12 +83,12 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			grav.apply_prolong(coarse);
 		}
 	}
-//	if( pass == 0 ) {
-//		grav.zero();
-//	}
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < opts.nmulti; i++) {
 			get_gravity_boundaries();
+			if( level == fine_level ) {
+				grav.compute_amr_bounds(false);
+			}
 			grav.relax(false);
 		}
 	}
@@ -106,7 +107,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		for (const auto &c : children) {
 			std::vector<double> coarse;
 			if (pass == 0) {
-				coarse = grav.pack_prolong_amr(c.get_box().pad(opts.gbw));
+				coarse = grav.pack(c.get_box().half().pad(opts.gbw), PACK_PHI);
 			} else {
 				coarse = grav.get_prolong(c.get_box());
 			}
@@ -119,6 +120,9 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 		for (int i = 0; i < opts.nmulti; i++) {
 			get_gravity_boundaries();
+			if( level == fine_level ) {
+				grav.compute_amr_bounds(false);
+			}
 			grav.relax(pass == 0 && i == 0);
 		}
 	} else if (pass == GRAVITY_FINAL_PASS) {
@@ -504,7 +508,7 @@ void tree::get_gravity_boundaries() {
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.gbw).intersection(box);
 		if (inter.volume()) {
-			sib.client.set_boundary(grav.pack(inter), box.shift(-sib.shift));
+			sib.client.set_boundary(grav.pack(inter, PACK_X), box.shift(-sib.shift));
 		}
 	}
 

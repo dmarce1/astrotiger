@@ -3,6 +3,7 @@
 
 void gravity::resize(double dx_, const multi_range &box_) {
 	dx = dx_;
+	const auto cbox = box_.half().pad(opts.gbw);
 	box = box_.pad(opts.gbw);
 	phi0.resize(box);
 	phi1.resize(box);
@@ -10,7 +11,74 @@ void gravity::resize(double dx_, const multi_range &box_) {
 	X.resize(box);
 	R.resize(box);
 	active.resize(box);
+	amr.resize(box);
+	phi_c.resize(cbox);
 
+}
+
+void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::vector<double> &data) {
+	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw);
+	int k = 0;
+	for (multi_iterator i(cbox); !i.end(); i++) {
+		assert(k < data.size());
+		phi_c[i] = data[k];
+		k++;
+	}
+	for (multi_iterator i(box); !i.end(); i++) {
+		amr[i] = false;
+		for (const auto &b : boxes) {
+			amr[i] = b.contains(i);
+			if (amr[i]) {
+				break;
+			}
+		}
+	}
+	compute_amr_bounds(true);
+}
+void gravity::compute_amr_bounds(bool plus_interior) {
+	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw);
+	const auto to_dir = [](multi_index i) {
+		vect<index_type> j(0);
+		for (int dim = 0; dim < NDIM; dim++) {
+			if (i[dim] % 2 == 0) {
+				j[dim]--;
+			} else {
+				j[dim]++;
+			}
+		}
+		return j;
+	};
+	const auto ibox = box.pad(-opts.gbw);
+	if (plus_interior) {
+		for (multi_iterator I(ibox); !I.end(); I++) {
+			const auto i = I.index();
+			const auto ibox = box.pad(-opts.gbw);
+			const auto d = to_dir(i);
+			const auto ic = i / 2;
+			const auto icp = ic + d;
+			const auto icm = ic - d;
+			X[i] = (-(3.0 / 32.0) * phi_c[icm] + (15.0 / 16.0) * phi_c[ic] + (5.0 / 32.0) * phi_c[icp]);
+		}
+	}
+	for (multi_iterator I(box); !I.end(); I++) {
+		const auto i = I.index();
+		if (ibox.contains(i)) {
+			continue;
+		}
+		if (amr[i]) {
+			const auto d = to_dir(i);
+			const auto ip = i + d;
+			const auto im = i - d;
+			const auto ic = i / 2;
+			const auto icp = ic + d;
+			const auto icm = ic - d;
+			if (!amr[ip]) {
+				X[i] = (-(1.0 / 14.0) * phi_c[icm] + (5.0 / 6.0) * phi_c[ic] + (5.0 / 21.0) * X[ip]);
+			} else {
+				X[i] = (-(3.0 / 32.0) * phi_c[icm] + (15.0 / 16.0) * phi_c[ic] + (5.0 / 32.0) * phi_c[icp]);
+			}
+		}
+	}
 }
 
 void gravity::initialize_fine(const multi_array<double> &rho, double mtot) {
@@ -21,6 +89,7 @@ void gravity::initialize_fine(const multi_array<double> &rho, double mtot) {
 	for (multi_iterator i(box); !i.end(); i++) {
 		R[i] = 4.0 * M_PI * opts.G * (rho[i] - rho0);
 	}
+//	X = phi;
 }
 
 void gravity::initialize_coarse(double w) {
@@ -59,12 +128,13 @@ void gravity::set_avg_zero() {
 	}
 }
 
-std::vector<double> gravity::pack(const multi_range &bbox) const {
+std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 	assert(box.contains(bbox));
 	std::vector<double> data;
 	data.reserve(bbox.volume());
+	const auto &Y = type == PACK_PHI ? phi : X;
 	for (multi_iterator i(bbox); !i.end(); i++) {
-		data.push_back(X[i]);
+		data.push_back(Y[i]);
 	}
 	return data;
 }
@@ -95,16 +165,6 @@ void gravity::finish_fine() {
 	phi = X;
 	phi0 = phi1;
 	phi1 = phi;
-}
-
-std::vector<double> gravity::pack_prolong_amr(const multi_range &bbox) const {
-//	printf( "PRO: %s\n", bbox.to_string().c_str());
-	std::vector<double> data;
-	auto pro = phi.prolong(bbox, true);
-	for (multi_iterator i(bbox); !i.end(); i++) {
-		data.push_back(pro[i]);
-	}
-	return data;
 }
 
 void gravity::relax(bool init_zero) {
@@ -138,11 +198,11 @@ gravity_return gravity::get_restrict() {
 	active_c.resize(rbox);
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		const auto cbox = multi_range(i.index()).double_();
-		bool all_active = true;
+		bool this_active = true;
 		for (multi_iterator ci(cbox); !ci.end(); ci++) {
-			all_active = all_active && active[ci];
+			this_active = this_active && active[ci];
 		}
-		active_c[i] = all_active;
+		active_c[i] = this_active;
 	}
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		rc.active.push_back(active_c[i]);

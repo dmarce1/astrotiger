@@ -136,19 +136,19 @@ int hpx_main(int argc, char *argv[]) {
 	root.set_family(tree_client(), root, sibs).get();
 	root.restrict_all().get();
 //	master(0, 1.0e-100);
-//	solve_gravity();
+	solve_gravity();
 	output_silo("X.0.silo");
-	int i = 0;
-	const auto dt = 0.01;
-	levels_show();
-	for (double t = 0.0; t < opts.tmax; t += dt) {
-		i++;
-		master(0, std::min(t + dt, opts.tmax));
-		std::string fname = "X." + std::to_string(i) + ".silo";
-		output_silo(fname);
-	}
-	std::string fname = "X." + std::to_string(i) + ".silo";
-	output_silo(fname);
+//	int i = 0;
+//	const auto dt = 0.01;
+//	levels_show();
+//	for (double t = 0.0; t < opts.tmax; t += dt) {
+//		i++;
+//		master(0, std::min(t + dt, opts.tmax));
+//		std::string fname = "X." + std::to_string(i) + ".silo";
+//		output_silo(fname);
+//	}
+//	std::string fname = "X." + std::to_string(i) + ".silo";
+//	output_silo(fname);
 	return hpx::finalize();
 }
 
