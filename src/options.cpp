@@ -76,13 +76,6 @@ bool options::process_options(int argc, char *argv[]) {
 			printf("Unknow boundary condition %s\n", str);
 		}
 	};
-	if (problem == "rt" && NDIM > 1) {
-		bnd[2] = bnd[3] = REFLECTING;
-		gamma = 7.0 / 5.0;
-		gravity = true;
-	} else if (problem == "sod") {
-		gamma = 7.0 / 5.0;
-	}
 	bnd[0] = str_to_bc_type(xpbnd);
 	bnd[1] = str_to_bc_type(xmbnd);
 	if ( NDIM > 1) {
@@ -92,6 +85,13 @@ bool options::process_options(int argc, char *argv[]) {
 			bnd[4] = str_to_bc_type(zpbnd);
 			bnd[5] = str_to_bc_type(zmbnd);
 		}
+	}
+	if (problem == "rt" && NDIM > 1) {
+		bnd[2] = bnd[3] = REFLECTING;
+		gamma = 7.0 / 5.0;
+		gravity = true;
+	} else if (problem == "sod") {
+		gamma = 7.0 / 5.0;
 	}
 
 	nhydro = 3 + NDIM;

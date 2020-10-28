@@ -108,6 +108,9 @@ void hydro_grid::substep_update(int rk, double dt) {
 				multi_index ip1 = i;
 				ip1[dim]++;
 				u -= (F[dim][f][ip1] - F[dim][f][i]) * lambda;
+//				if( f == sy_i && dim==1) {
+//					printf( "%e %i %i\n", (F[dim][f][ip1] - F[dim][f][i])/dx/U[rho_i][i], i.index()[0], i.index()[1]);
+//				}
 				u += S[f][i] * dt;
 			}
 		}
@@ -166,7 +169,7 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 			} else if (y > 1.0) {
 				y = 2.0 - y;
 			}
-			phi[i] = y;
+			phi[i] = 0.1 * y;
 		}
 	}
 }
@@ -251,6 +254,7 @@ void hydro_grid::compute_refinement_criteria() {
 							R[k] = true;
 						}
 					}
+//					R[k] = true;
 				}
 			}
 		}
@@ -330,13 +334,20 @@ void hydro_grid::initialize() {
 			const auto y = coord(i[1]);
 			double p;
 			if (y > 0.5) {
-				U[rho_i][i] = 2.0 * (1.0 + rand1() * 0.001);
+				U[rho_i][i] = 2.0 * (1.0 + rand1() * 0.000);
 			} else {
-				U[rho_i][i] = 1.0 * (1.0 + rand1() * 0.001);
+				U[rho_i][i] = 1.0 * (1.0 + rand1() * 0.000);
 			}
-			p = std::max(1.0 - y, 1.0e-3) * U[rho_i][i];
+			if (std::abs(y - 0.5) < 0.25) {
+				U[sy_i][i] = rand1() * 0.005 * (1.0 + std::cos(4.0 * M_PI * (y - 0.5))) * U[rho_i][i];
+			}
+			p = std::max(2.5 - 0.1 * y * U[rho_i][i], 1.0e-3);
 			const auto ein = p / (opts.gamma - 1.0);
-			U[egas_i][i] = ein;
+			double ek = 0.0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				ek += 0.5 * std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
+			}
+			U[egas_i][i] = ein + ek;
 			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());

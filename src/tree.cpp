@@ -487,7 +487,7 @@ void tree::get_hydro_boundaries(double this_time) {
 			j++;
 		}
 	}
-	for (int dir = 0; dir < NDIM; dir++) {
+	for (int dir = 0; dir < 2 * NDIM; dir++) {
 		if (dir % 2 == 0) {
 			if (box.min[dir / 2] == 0) {
 				hydro.enforce_physical_bc(dir);
