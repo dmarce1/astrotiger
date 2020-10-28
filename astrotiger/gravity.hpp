@@ -38,6 +38,8 @@ class gravity {
 	bool has_phi0;
 	bool has_phi1;
 	multi_range box;
+	std::array<vect<index_type>, NDIM> dir;
+
 
 public:
 

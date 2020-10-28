@@ -83,9 +83,8 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			grav.apply_prolong(coarse);
 		}
 	}
-	const auto iters = level == 0 ? opts.nmulti : 10 * opts.nmulti;
 	if (pass > 0 || level == fine_level) {
-		for (int i = 0; i < iters; i++) {
+		for (int i = 0; i < opts.nmulti; i++) {
 			get_gravity_boundaries();
 			if( level == fine_level ) {
 				grav.compute_amr_bounds(false);
@@ -119,7 +118,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			grav.apply_restrict(tmp);
 			max_resid = std::max(max_resid, tmp.resid);
 		}
-		for (int i = 0; i < iters; i++) {
+		for (int i = 0; i < opts.nmulti; i++) {
 			get_gravity_boundaries();
 			if( level == fine_level ) {
 				grav.compute_amr_bounds(false);

@@ -1,6 +1,7 @@
 #include <astrotiger/tree.hpp>
 #include <astrotiger/levels.hpp>
 #include <astrotiger/output.hpp>
+#include <astrotiger/timer.hpp>
 
 static tree_client root;
 
@@ -18,6 +19,7 @@ statistics solve_gravity() {
 		int pass = 0;
 		double r;
 		printf("Solving gravity\n");
+		auto ts = timer();
 		//	for (int i = 0; i < 10; i++) {
 		do {
 			r = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get().resid;
@@ -29,7 +31,7 @@ statistics solve_gravity() {
 		} while (r > toler);
 		//	}
 		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get().resid;
-		printf("%i %e\n", pass, r);
+		printf("%i %e %e\n", pass, r, timer() - ts);
 //		r = root.gravity_solve(0, l, std::vector<double>(), 0.0).get().resid;
 //		printf( "%e\n", r);
 //		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0).get().resid;

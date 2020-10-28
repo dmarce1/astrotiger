@@ -19,11 +19,21 @@ void gravity::resize(double dx_, const multi_range &box_) {
 		fbox[dim].max[dim]++;
 		flux[dim].resize(fbox[dim]);
 	}
-
+	for (int dim = 0; dim < NDIM; dim++) {
+		dir[dim] = 0;
+		dir[dim][dim] = 1;
+	}
+	for (multi_iterator i(box); !i.end(); i++) {
+		refined[i] = false;
+	}
 }
 
 void gravity::compute_flux() {
-
+	for (int dim = 0; dim < NDIM; dim++) {
+		for (multi_iterator i(fbox[dim]); !i.end(); i++) {
+			flux[dim][i] = (X[i] - X[i.index() - dir[dim]]) / dx;
+		}
+	}
 }
 
 void gravity::set_refined(const std::vector<multi_range> &boxes) {
@@ -200,24 +210,20 @@ void gravity::finish_fine() {
 
 void gravity::relax(bool init_zero) {
 	multi_array<double> X0;
+	compute_flux();
 	if (init_zero) {
 		for (multi_iterator i(box); !i.end(); i++) {
 			X[i] = 0.0;
 		}
 	}
 	const auto ibox = box.pad(-opts.gbw);
-	X0 = X;
-	auto *x0 = X0.data();
-	auto *x1 = X.data();
-	const auto s = X.get_strides();
 	for (multi_iterator i(ibox); !i.end(); i++) {
 		if (active[i]) {
-			const auto j = X.index(i);
-			x1[j] = 0.0;
+			double resid = R[i];
 			for (int dim = 0; dim < NDIM; dim++) {
-				x1[j] += (0.5 / NDIM) * (x0[j + s[dim]] + x0[j - s[dim]]);
+				resid -= (flux[dim][i.index() + dir[dim]] - flux[dim][i]) / dx;
 			}
-			x1[j] -= (0.5 / NDIM) * (R[i] * dx * dx);
+			X[i] -= (resid / (2 * NDIM)) * dx * dx;
 		}
 	}
 }

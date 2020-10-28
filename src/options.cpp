@@ -33,7 +33,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("problem", po::value < std::string > (&problem)->default_value("blast"), "Problem 1 - sod 2 - blast\n") //
 	("hydro", po::value<bool>(&hydro)->default_value(true), "use hydro") //
 	("gravity", po::value<bool>(&gravity)->default_value(false), "use gravity") //
-	("nmulti", po::value<int>(&nmulti)->default_value(4), "multigrid solver iterations)") //
+	("nmulti", po::value<int>(&nmulti)->default_value(16), "multigrid solver iterations)") //
 	("max_box", po::value<int>(&max_box)->default_value(32), "maximum (box volume)^(1/3)") //
 	("order", po::value<int>(&order)->default_value(2), "integration order") //
 	("window", po::value<int>(&window)->default_value(1), "refinement window size") //
