@@ -26,6 +26,8 @@ using gravity_solve_action_type = tree::gravity_solve_action;
 using set_boundary_action_type = tree::set_boundary_action;
 using get_statistics_action_type = tree::get_statistics_action;
 using restrict_all_action_type = tree::restrict_all_action;
+using get_gravity_flux_action_type = tree::get_gravity_flux_action;
+HPX_REGISTER_ACTION (get_gravity_flux_action_type);
 HPX_REGISTER_ACTION (restrict_all_action_type);
 HPX_REGISTER_ACTION (get_statistics_action_type);
 HPX_REGISTER_ACTION (set_boundary_action_type);
@@ -61,8 +63,23 @@ statistics tree::get_statistics() const {
 	return stats;
 }
 
-gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse, double this_t, double mtot) {
+std::vector<double> tree::get_gravity_flux() const {
+	return grav.get_flux_restrict();
+}
+
+gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse, double this_t, double mtot, bool flux_from_children) {
 	if (level == fine_level) {
+		std::vector<multi_range> child_boxes;
+		std::vector<hpx::future<std::vector<tree_client>>> sfuts;
+		std::vector<hpx::future<std::vector<double>>> cfuts;
+		if (flux_from_children) {
+			for (const auto &s : siblings) {
+				sfuts.push_back(s.client.get_children());
+			}
+			for (const auto &c : children) {
+				cfuts.push_back(c.get_gravity_flux());
+			}
+		}
 		if (pass == 0) {
 			if (level != 0) {
 				grav.initialize_fine(hydro.get_density(), mtot);
@@ -76,17 +93,35 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 				grav.apply_prolong(coarse);
 			}
 		}
-	} else if (pass == 0) {
-		grav.initialize_coarse(t);
+		std::vector<multi_range> refined_ranges;
+		if (flux_from_children) {
+			for (auto &f : sfuts) {
+				const auto &tmp = f.get();
+				for (const auto &c : tmp) {
+					refined_ranges.push_back(c.get_box());
+				}
+			}
+			grav.set_refined(refined_ranges);
+			for (int i = 0; i < children.size(); i++) {
+				grav.apply_flux_restrict(cfuts[i].get(), children[i].get_box().half());
+			}
+		} else {
+			grav.set_refined(std::vector<multi_range>());
+		}
 	} else {
-		if (level != 0) {
-			grav.apply_prolong(coarse);
+		grav.set_refined(std::vector<multi_range>());
+		if (pass == 0) {
+			grav.initialize_coarse(t);
+		} else {
+			if (level != 0) {
+				grav.apply_prolong(coarse);
+			}
 		}
 	}
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < opts.nmulti; i++) {
 			get_gravity_boundaries();
-			if( level == fine_level ) {
+			if (level == fine_level) {
 				grav.compute_amr_bounds(false);
 			}
 			grav.relax(false);
@@ -111,7 +146,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			} else {
 				coarse = grav.get_prolong(c.get_box().half());
 			}
-			futs.push_back(c.gravity_solve(pass, fine_level, std::move(coarse), w, mtot));
+			futs.push_back(c.gravity_solve(pass, fine_level, std::move(coarse), w, mtot, flux_from_children));
 		}
 		for (auto &f : futs) {
 			auto tmp = f.get();
@@ -120,15 +155,15 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 		for (int i = 0; i < opts.nmulti; i++) {
 			get_gravity_boundaries();
-			if( level == fine_level ) {
+			if (level == fine_level) {
 				grav.compute_amr_bounds(false);
 			}
 			grav.relax(pass == 0 && i == 0);
 		}
 	} else if (pass == GRAVITY_FINAL_PASS) {
 		grav.finish_fine();
-		hydro.set_phi(grav.get_phi());
 	}
+	hydro.set_phi(grav.get_phi());
 	if (level == 0 && fine_level == 0) {
 		grav.set_avg_zero();
 	}

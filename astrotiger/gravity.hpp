@@ -23,8 +23,6 @@ struct gravity_return {
 
 class gravity {
 
-	multi_array<double> phi0;
-	multi_array<double> phi1;
 	multi_array<double> phi;
 	multi_array<double> X;
 	multi_array<double> R;
@@ -35,8 +33,6 @@ class gravity {
 	std::array<multi_range,NDIM> fbox;
 	multi_array<double> phi_c;
 	double dx;
-	bool has_phi0;
-	bool has_phi1;
 	multi_range box;
 	std::array<vect<index_type>, NDIM> dir;
 
@@ -44,23 +40,14 @@ class gravity {
 public:
 
 	void print() const {
-//		for( int i = 0; i < box.volume(); i++) {
-//			printf( "%e %e %i\n", X.data()[i], R.data()[i], active.data()[i]);
-//		}
 	}
 	gravity() {
-		has_phi0 = false;
-		has_phi1 = false;
 	}
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {
 		arc & fbox;
 		arc & flux;
-		arc & has_phi0;
-		arc & has_phi1;
-		arc & phi0;
-		arc & phi1;
 		arc & phi;
 		arc & X;
 		arc & R;
@@ -92,6 +79,8 @@ public:
 
 	void relax(bool init_zero);
 	gravity_return get_restrict(double);
+	std::vector<double> get_flux_restrict() const;
+	void apply_flux_restrict(const std::vector<double>&, const multi_range &bbox);
 	void compute_amr_bounds(bool first_pass);
 	void apply_restrict(const gravity_return&);
 	std::vector<double> get_prolong(const multi_range&) const;
