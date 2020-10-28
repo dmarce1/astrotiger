@@ -191,7 +191,7 @@ void gravity::relax(bool init_zero) {
 	}
 }
 
-gravity_return gravity::get_restrict() {
+gravity_return gravity::get_restrict(double rho0) {
 	gravity_return rc;
 	multi_array<std::uint8_t> active_c;
 	auto rbox = box.pad(-opts.gbw).half();
@@ -222,7 +222,7 @@ gravity_return gravity::get_restrict() {
 		resid[i] += (2.0 * NDIM) * x[j] / (dx * dx);
 		resid[i] += R[i];
 //		phi[i] = resid[i];
-		rmax = std::max(rmax, std::abs(resid[i] * (dx * dx)));
+		rmax = std::max(rmax, std::abs(resid[i] / (4.0 * M_PI * opts.G) / rho0));
 	}
 	const auto resid_c = resid.restrict_(rbox);
 	for (multi_iterator i(rbox); !i.end(); i++) {

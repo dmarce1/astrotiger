@@ -132,7 +132,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	if (level == 0 && fine_level == 0) {
 		grav.set_avg_zero();
 	}
-	rc = grav.get_restrict();
+	rc = grav.get_restrict(mtot);
 	if (level < fine_level) {
 		rc.resid = max_resid;
 	}

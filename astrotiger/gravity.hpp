@@ -80,7 +80,7 @@ public:
 	void unpack(const std::vector<double>&, const multi_range &bbox);
 
 	void relax(bool init_zero);
-	gravity_return get_restrict() ;
+	gravity_return get_restrict(double) ;
 	void compute_amr_bounds(bool first_pass);
 	void apply_restrict(const gravity_return&);
 	std::vector<double> get_prolong(const multi_range&) const;
