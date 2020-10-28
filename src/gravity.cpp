@@ -72,7 +72,7 @@ void gravity::compute_amr_bounds(bool plus_interior) {
 			const auto ic = i / 2;
 			const auto icp = ic + d;
 			const auto icm = ic - d;
-			if (!amr[ip]) {
+			if (box.contains(ip) && !amr[ip]) {
 				X[i] = (-(1.0 / 14.0) * phi_c[icm] + (5.0 / 6.0) * phi_c[ic] + (5.0 / 21.0) * X[ip]);
 			} else {
 				X[i] = (-(3.0 / 32.0) * phi_c[icm] + (15.0 / 16.0) * phi_c[ic] + (5.0 / 32.0) * phi_c[icp]);
@@ -135,6 +135,16 @@ std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 	const auto &Y = type == PACK_PHI ? phi : X;
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		data.push_back(Y[i]);
+	}
+	return data;
+}
+
+std::vector<double> gravity::pack_amr(const multi_range &bbox, double w) const {
+	assert(box.contains(bbox));
+	std::vector<double> data;
+	data.reserve(bbox.volume());
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		data.push_back((1.0 - w) * phi0[i] + w * phi1[i]);
 	}
 	return data;
 }
@@ -258,22 +268,21 @@ void gravity::apply_restrict(const gravity_return &data) {
 
 std::vector<double> gravity::get_prolong(const multi_range &bbox) const {
 	std::vector<double> data;
-	auto prox = X.prolong(bbox, true);
 	for (multi_iterator i(bbox); !i.end(); i++) {
-		if (active[i.index() / 2]) {
-			data.push_back(prox[i]);
-		} else {
-			data.push_back(0.0);
-		}
+		data.push_back(X[i]);
 	}
 	return data;
 }
 
 void gravity::apply_prolong(const std::vector<double> &data) {
 	int k = 0;
-	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
+	const auto cbox = box.pad(-opts.gbw).half();
+	for (multi_iterator i(cbox); !i.end(); i++) {
 		assert(k < data.size());
-		X[i] += data[k];
+		const auto val = data[k];
+		for (multi_iterator j(multi_range(i.index()).double_()); !j.end(); j++) {
+			X[j] += val;
+		}
 		k++;
 	}
 	assert(k == data.size());

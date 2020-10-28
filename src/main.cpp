@@ -10,7 +10,7 @@ std::vector<double> tm;
 std::vector<int> super_step;
 
 statistics solve_gravity() {
-	const double toler = 5.0e-3;
+	const double toler = 1.0e-3;
 	statistics stats;
 	stats = root.get_statistics().get();
 	const auto mtot = stats.u[rho_i];

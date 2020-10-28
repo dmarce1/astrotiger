@@ -77,6 +77,7 @@ public:
 
 	multi_array<double> get_phi() const;
 	std::vector<double> pack(const multi_range&, int type) const;
+	std::vector<double> pack_amr(const multi_range&, double w) const;
 	void unpack(const std::vector<double>&, const multi_range &bbox);
 
 	void relax(bool init_zero);

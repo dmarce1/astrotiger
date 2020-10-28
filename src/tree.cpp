@@ -107,9 +107,9 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		for (const auto &c : children) {
 			std::vector<double> coarse;
 			if (pass == 0) {
-				coarse = grav.pack(c.get_box().half().pad(opts.gbw), PACK_PHI);
+				coarse = grav.pack_amr(c.get_box().half().pad(opts.gbw), w);
 			} else {
-				coarse = grav.get_prolong(c.get_box());
+				coarse = grav.get_prolong(c.get_box().half());
 			}
 			futs.push_back(c.gravity_solve(pass, fine_level, std::move(coarse), w, mtot));
 		}
