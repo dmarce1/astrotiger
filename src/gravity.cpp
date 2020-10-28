@@ -177,7 +177,6 @@ multi_array<double> gravity::get_phi() const {
 	rphi.resize(bbox);
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		rphi[i] = phi[i];
-		rphi[i] = X[i];
 	}
 	return rphi;
 }
@@ -198,7 +197,6 @@ void gravity::finish_fine() {
 
 void gravity::relax(bool init_zero) {
 	multi_array<double> X0;
-	compute_amr_bounds(false);
 	compute_flux();
 	if (init_zero) {
 		for (multi_iterator i(box); !i.end(); i++) {
@@ -215,6 +213,7 @@ void gravity::relax(bool init_zero) {
 			X[i] -= (resid / (2 * NDIM)) * dx * dx;
 		}
 	}
+	compute_amr_bounds(false);
 }
 
 std::vector<double> gravity::get_flux_restrict() const {
@@ -256,7 +255,6 @@ void gravity::apply_flux_restrict(const std::vector<double> &data, const multi_r
 }
 
 gravity_return gravity::get_restrict(double rho0) {
-	compute_amr_bounds(false);
 	compute_flux();
 	gravity_return rc;
 	multi_array<std::uint8_t> active_c;
@@ -337,7 +335,7 @@ void gravity::apply_prolong(const std::vector<double> &data) {
 		assert(k < data.size());
 		const auto val = data[k];
 		for (multi_iterator j(multi_range(i.index()).double_()); !j.end(); j++) {
-//			X[j] += val;
+			X[j] += val;
 		}
 		k++;
 	}

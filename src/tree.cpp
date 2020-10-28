@@ -80,10 +80,11 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 				cfuts.push_back(c.get_gravity_flux());
 			}
 		}
-		if (pass == 0) {
+		if (pass <= 0) {
 			if (level != 0) {
 				grav.initialize_fine(hydro.get_density(), mtot);
 				grav.set_amr_zones(get_amr_boxes(), coarse);
+				grav.compute_amr_bounds(pass < 0);
 			} else {
 				grav.initialize_coarse(t);
 				grav.initialize_fine(hydro.get_density(), mtot);
@@ -110,7 +111,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 	} else {
 		grav.set_refined(std::vector<multi_range>());
-		if (pass == 0) {
+		if (pass <= 0) {
 			grav.initialize_coarse(t);
 		} else {
 			if (level != 0) {
@@ -141,7 +142,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		std::vector<hpx::future<gravity_return>> futs;
 		for (const auto &c : children) {
 			std::vector<double> coarse;
-			if (pass == 0) {
+			if (pass <= 0) {
 				coarse = grav.pack_amr(c.get_box().half().pad(opts.gbw), w);
 			} else {
 				coarse = grav.get_prolong(c.get_box().half());
@@ -158,7 +159,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			if (level == fine_level) {
 				grav.compute_amr_bounds(false);
 			}
-			grav.relax(pass == 0 && i == 0);
+			grav.relax(pass <= 0 && i == 0);
 		}
 	} else if (pass == GRAVITY_FINAL_PASS) {
 		grav.finish_fine();
@@ -857,7 +858,7 @@ double tree::initialize(int this_level) {
 			hydro.compute_refinement_criteria();
 			refine_step++;
 			get_refinement_boundaries();
-			auto boxes = hydro.refined_ranges(std::vector<multi_range>(), std::vector<multi_range>());
+			auto boxes = hydro.refined_ranges(get_amr_boxes(), std::vector<multi_range>());
 
 			std::vector<hpx::future<tree_client>> futs(boxes.size());
 			children.resize(boxes.size());

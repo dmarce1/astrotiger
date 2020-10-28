@@ -20,29 +20,27 @@ double gravity_do_level(int this_level, int super_pass, double mtot) {
 	if (this_level <= opts.max_level) {
 		double this_r;
 		int pass = 0;
-		if (super_pass == 0) {
-			do {
-				this_r = root.gravity_solve(pass, this_level, std::vector<double>(), 0.0, mtot, false).get().resid;
-				printf("%i %i coarse to fine %i %e\n", oi, this_level, super_pass, this_r);
-				output_silo(std::string("X.")+ std::to_string(oi++)+".silo");
-				pass++;
-			} while (this_r > toler);
-			root.gravity_solve(GRAVITY_FINAL_PASS, this_level, std::vector<double>(), 0.0, mtot, false).get().resid;
-		}
+		do {
+			this_r = root.gravity_solve(super_pass == 0 && pass == 0 ? -1 : pass, this_level, std::vector<double>(), 0.0, mtot, false).get().resid;
+			printf("%i %i coarse to fine %i %e\n", oi, this_level, super_pass, this_r);
+	//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+			pass++;
+		} while (this_r > toler);
+		root.gravity_solve(GRAVITY_FINAL_PASS, this_level, std::vector<double>(), 0.0, mtot, false).get().resid;
 		printf("%i %i coarse to fine %i %e\n", oi, this_level, super_pass, this_r);
-		output_silo(std::string("X.")+ std::to_string(oi++)+".silo");
+//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 		printf("\n");
 		r = gravity_do_level(this_level + 1, super_pass, mtot);
 		pass = 0;
 		do {
 			this_r = root.gravity_solve(pass, this_level, std::vector<double>(), 0.0, mtot, true).get().resid;
 			printf("%i %i fine to coarse %i %e\n", oi, this_level, super_pass, this_r);
-			output_silo(std::string("X.")+ std::to_string(oi++)+".silo");
+//			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 			pass++;
 		} while (this_r > toler);
 		auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, this_level, std::vector<double>(), 0.0, mtot, true).get();
 		printf("%i %i fine to coarse %i %e\n", oi, this_level, super_pass, this_r);
-		output_silo(std::string("X.")+ std::to_string(oi++)+".silo");
+//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 		r = std::max(tmp.resid, r);
 		printf("\n");
 	}
@@ -54,13 +52,13 @@ statistics solve_gravity() {
 	stats = root.get_statistics().get();
 	const auto mtot = stats.u[rho_i];
 	auto ts = timer();
-	for (int level = 0; level < 1; level++) {
-		double r;
-		for (int i = 0; i < 4; i++) {
-			r = gravity_do_level(level, i, mtot);
-			printf("%e %e\n", r, timer() - ts);
-		}
-	}
+	double r;
+	int pass = 0;
+	do {
+		r = gravity_do_level(0, pass, mtot);
+		pass++;
+		printf("%e %e\n", r, timer() - ts);
+	} while (r > toler);
 	return stats;
 }
 
