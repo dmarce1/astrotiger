@@ -90,7 +90,7 @@ public:
 	hpx::future<gravity_return> gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m, bool b) const;
 	hpx::future<statistics> get_statistics() const;
 	hpx::future<std::vector<double>> restrict_all() const;
-	hpx::future<std::vector<double>> get_gravity_flux() const;
+	hpx::future<std::vector<double>> get_gravity_phi() const;
 
 
 	template<class A>

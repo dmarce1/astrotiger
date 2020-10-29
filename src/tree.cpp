@@ -26,8 +26,8 @@ using gravity_solve_action_type = tree::gravity_solve_action;
 using set_boundary_action_type = tree::set_boundary_action;
 using get_statistics_action_type = tree::get_statistics_action;
 using restrict_all_action_type = tree::restrict_all_action;
-using get_gravity_flux_action_type = tree::get_gravity_flux_action;
-HPX_REGISTER_ACTION (get_gravity_flux_action_type);
+using get_gravity_phi_action_type = tree::get_gravity_phi_action;
+HPX_REGISTER_ACTION (get_gravity_phi_action_type);
 HPX_REGISTER_ACTION (restrict_all_action_type);
 HPX_REGISTER_ACTION (get_statistics_action_type);
 HPX_REGISTER_ACTION (set_boundary_action_type);
@@ -63,8 +63,8 @@ statistics tree::get_statistics() const {
 	return stats;
 }
 
-std::vector<double> tree::get_gravity_flux() const {
-	return grav.get_flux_restrict();
+std::vector<double> tree::get_gravity_phi() const {
+	return grav.get_phi_restrict();
 }
 
 gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse, double this_t, double mtot, bool flux_from_children) {
@@ -77,7 +77,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 				sfuts.push_back(s.client.get_children());
 			}
 			for (const auto &c : children) {
-				cfuts.push_back(c.get_gravity_flux());
+				cfuts.push_back(c.get_gravity_phi());
 			}
 		}
 		if (pass <= 0) {
@@ -96,15 +96,21 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 		std::vector<multi_range> refined_ranges;
 		if (flux_from_children) {
+			for (const auto &c : children) {
+				refined_ranges.push_back(c.get_box());
+			}
 			for (auto &f : sfuts) {
 				const auto &tmp = f.get();
 				for (const auto &c : tmp) {
 					refined_ranges.push_back(c.get_box());
 				}
 			}
+			for (const auto &c : children) {
+				refined_ranges.push_back(c.get_box());
+			}
 			grav.set_refined(refined_ranges);
 			for (int i = 0; i < children.size(); i++) {
-				grav.apply_flux_restrict(cfuts[i].get(), children[i].get_box().half());
+				grav.apply_phi_restrict(cfuts[i].get(), children[i].get_box().half());
 			}
 		} else {
 			grav.set_refined(std::vector<multi_range>());

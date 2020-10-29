@@ -146,10 +146,10 @@ public:
 	statistics get_statistics() const;
 	std::vector<double> restrict_all();
 	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m, bool flux_from_children);
-	std::vector<double> get_gravity_flux() const;
+	std::vector<double> get_gravity_phi() const;
 
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,restrict_all);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_gravity_flux);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_gravity_phi);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_statistics);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_box);

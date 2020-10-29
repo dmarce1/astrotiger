@@ -22,27 +22,32 @@ double gravity_do_level(int this_level, int super_pass, double mtot) {
 		int pass = 0;
 		do {
 			this_r = root.gravity_solve(super_pass == 0 && pass == 0 ? -1 : pass, this_level, std::vector<double>(), 0.0, mtot, false).get().resid;
+			oi++;
 			printf("%i %i coarse to fine %i %e\n", oi, this_level, super_pass, this_r);
-	//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 			pass++;
 		} while (this_r > toler);
 		root.gravity_solve(GRAVITY_FINAL_PASS, this_level, std::vector<double>(), 0.0, mtot, false).get().resid;
+		oi++;
 		printf("%i %i coarse to fine %i %e\n", oi, this_level, super_pass, this_r);
-//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 		printf("\n");
 		r = gravity_do_level(this_level + 1, super_pass, mtot);
 		pass = 0;
 		do {
 			this_r = root.gravity_solve(pass, this_level, std::vector<double>(), 0.0, mtot, true).get().resid;
+			oi++;
 			printf("%i %i fine to coarse %i %e\n", oi, this_level, super_pass, this_r);
-//			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 			pass++;
 		} while (this_r > toler);
 		auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, this_level, std::vector<double>(), 0.0, mtot, true).get();
+		oi++;
 		printf("%i %i fine to coarse %i %e\n", oi, this_level, super_pass, this_r);
-//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 		r = std::max(tmp.resid, r);
 		printf("\n");
+		oi++;
 	}
 	return r;
 }

@@ -13,28 +13,12 @@ void gravity::resize(double dx_, const multi_range &box_) {
 	phi_c.resize(cbox);
 	refined.resize(box);
 	for (int dim = 0; dim < NDIM; dim++) {
-		fbox[dim] = box_;
-		fbox[dim].max[dim]++;
-		flux[dim].resize(fbox[dim]);
-	}
-	for (int dim = 0; dim < NDIM; dim++) {
 		dir[dim] = 0;
 		dir[dim][dim] = 1;
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
 		phi[i] = 0.0;
 		refined[i] = false;
-	}
-}
-
-void gravity::compute_flux() {
-	for (int dim = 0; dim < NDIM; dim++) {
-		for (multi_iterator i(fbox[dim]); !i.end(); i++) {
-			const auto im = i.index() - dir[dim];
-			if (!refined[im] && !refined[i]) {
-				flux[dim][i] = (X[i] - X[im]) / dx;
-			}
-		}
 	}
 }
 
@@ -75,23 +59,12 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 }
 void gravity::compute_amr_bounds(bool plus_interior) {
 	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw);
-	const auto to_dir = [](multi_index i) {
-		vect<index_type> j(0);
-		for (int dim = 0; dim < NDIM; dim++) {
-			if (i[dim] % 2 == 0) {
-				j[dim]--;
-			} else {
-				j[dim]++;
-			}
-		}
-		return j;
-	};
 	const auto ibox = box.pad(-opts.gbw);
 	if (plus_interior) {
 		for (multi_iterator I(ibox); !I.end(); I++) {
 			const auto i = I.index();
 			const auto ibox = box.pad(-opts.gbw);
-			const auto d = to_dir(i);
+			const auto d = diag_dir(i);
 			const auto ic = i / 2;
 			const auto icp = ic + d;
 			const auto icm = ic - d;
@@ -104,7 +77,7 @@ void gravity::compute_amr_bounds(bool plus_interior) {
 			continue;
 		}
 		if (amr[i]) {
-			const auto d = to_dir(i);
+			const auto d = diag_dir(i);
 			const auto ip = i + d;
 			const auto im = i - d;
 			const auto ic = i / 2;
@@ -197,65 +170,80 @@ void gravity::finish_fine() {
 
 void gravity::relax(bool init_zero) {
 	multi_array<double> X0;
-	compute_flux();
 	if (init_zero) {
 		for (multi_iterator i(box); !i.end(); i++) {
 			X[i] = 0.0;
 		}
 	}
 	const auto ibox = box.pad(-opts.gbw);
+	X0 = X;
 	for (multi_iterator i(ibox); !i.end(); i++) {
 		if (active[i]) {
 			double resid = R[i];
 			for (int dim = 0; dim < NDIM; dim++) {
-				resid -= (flux[dim][i.index() + dir[dim]] - flux[dim][i]) / dx;
+				const auto ip = i.index() + dir[dim];
+				const auto im = i.index() - dir[dim];
+				resid -= (X0[ip] + X0[im] - 2.0 * X0[i]) / (dx * dx);
 			}
-			X[i] -= (resid / (2 * NDIM)) * dx * dx;
+			X[i] -= resid * dx * dx / (2 * NDIM);
 		}
 	}
 	compute_amr_bounds(false);
 }
 
-std::vector<double> gravity::get_flux_restrict() const {
+std::vector<double> gravity::get_phi_restrict() const {
 	std::vector<double> data;
-	for (int dim = 0; dim < NDIM; dim++) {
-		auto cfbox = box.pad(-opts.gbw).half();
-		cfbox.max[dim]++;
-		multi_array<double> this_flux;
-		this_flux.resize(cfbox);
-		for (multi_iterator i(cfbox); !i.end(); i++) {
-			this_flux[i] = 0.0;
+	constexpr auto NDIAG = (1 << (NDIM - 1));
+	std::array<vect<index_type>, NDIAG> dirs;
+	for (int i = 0; i < NDIAG; i++) {
+		for (int dim = 0; dim < NDIM; dim++) {
+			dirs[i][dim] = ((i >> dim) & 1) == 0 ? -1 : 1;
 		}
-		for (multi_iterator i(fbox[dim]); !i.end(); i++) {
-			if (i.index()[dim] % 2 == 0) {
-				const auto ic = i.index() / 2;
-				const auto f = (phi[i] - phi[i.index() - dir[dim]]) / dx;
-				this_flux[ic] += f / (1 << (NDIM - 1));
+	}
+	const auto cbox = box.pad(-opts.gbw).half();
+	for (multi_iterator i(cbox); !i.end(); i++) {
+		double phi0 = 0.0;
+		for (int d = 0; d < NDIAG; d++) {
+			auto if0 = i.index() * 2;
+			for (int dim = 0; dim < NDIM; dim++) {
+				if (dirs[d][dim] == -1) {
+					if0[dim]++;
+				}
+			}
+			const auto ifm1 = if0 - dirs[d];
+			const auto ifp1 = if0 + dirs[d];
+			const auto ifp2 = if0 + dirs[d] * 2;
+			const auto icm = i.index() - dirs[d];
+			const auto icp = i.index() + dirs[d];
+			const auto amrr = amr[ifp2];
+			const auto amrl = amr[ifm1];
+			if (amrr && !amrl) {
+				phi0 += (-(1.0 / 35.0) * phi_c[icm] + (1.0 / 2.0) * phi[if0] + (3.0 / 5.0) * phi[ifp1] - (1.0 / 14.0) * phi[ifp2]) / NDIAG;
+			} else if (amrl && !amrr) {
+				phi0 += (-(1.0 / 35.0) * phi_c[icp] + (1.0 / 2.0) * phi[ifp1] + (3.0 / 5.0) * phi[if0] - (1.0 / 14.0) * phi[ifm1]) / NDIAG;
+			} else if (amrl && amrr) {
+				phi0 += (-(1.0 / 30.0) * phi_c[icm] + (8.0 / 15.0) * phi[if0] + (8.0 / 15.0) * phi[ifp1] - (1.0 / 30.0) * phi_c[icp]) / NDIAG;
+			} else {
+				phi0 += (-(1.0 / 16.0) * phi[ifm1] + (9.0 / 16.0) * phi[if0] + (9.0 / 16.0) * phi[ifp1] - (1.0 / 16.0) * phi[ifp2]) / NDIAG;
 			}
 		}
-		for (multi_iterator i(cfbox); !i.end(); i++) {
-			data.push_back(this_flux[i]);
-		}
+		//	printf( "%e\n",phi0);
+		data.push_back(phi0);
 	}
 	return std::move(data);
 }
 
-void gravity::apply_flux_restrict(const std::vector<double> &data, const multi_range &bbox) {
+void gravity::apply_phi_restrict(const std::vector<double> &data, const multi_range &bbox) {
 	int k = 0;
-	for (int dim = 0; dim < NDIM; dim++) {
-		auto this_box = bbox;
-		this_box.max[dim]++;
-		for (multi_iterator i(this_box); !i.end(); i++) {
-			assert(k < data.size());
-			flux[dim][i] = data[k];
-			k++;
-		}
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		assert(k < data.size());
+		X[i] = data[k];
+		k++;
 	}
 	assert(k == data.size());
 }
 
 gravity_return gravity::get_restrict(double rho0) {
-	compute_flux();
 	gravity_return rc;
 	multi_array<std::uint8_t> active_c;
 	auto rbox = box.pad(-opts.gbw).half();
@@ -282,7 +270,9 @@ gravity_return gravity::get_restrict(double rho0) {
 		if (active[i]) {
 			double res = R[i];
 			for (int dim = 0; dim < NDIM; dim++) {
-				res -= (flux[dim][i.index() + dir[dim]] - flux[dim][i]) / dx;
+				const auto ip = i.index() + dir[dim];
+				const auto im = i.index() - dir[dim];
+				res -= (X[ip] + X[im] - 2.0 * X[i]) / (dx * dx);
 			}
 			resid[i] = res;
 			rmax = std::max(rmax, std::abs(resid[i] / (4.0 * M_PI * opts.G) / rho0));
@@ -335,7 +325,7 @@ void gravity::apply_prolong(const std::vector<double> &data) {
 		assert(k < data.size());
 		const auto val = data[k];
 		for (multi_iterator j(multi_range(i.index()).double_()); !j.end(); j++) {
-			X[j] += val;
+//			X[j] += val;
 		}
 		k++;
 	}

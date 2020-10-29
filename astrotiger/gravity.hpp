@@ -29,8 +29,6 @@ class gravity {
 	multi_array<std::uint8_t> active;
 	multi_array<std::uint8_t> amr;
 	multi_array<std::uint8_t> refined;
-	std::array<multi_array<double>,NDIM> flux;
-	std::array<multi_range,NDIM> fbox;
 	multi_array<double> phi_c;
 	double dx;
 	multi_range box;
@@ -39,6 +37,18 @@ class gravity {
 
 public:
 
+	vect<index_type> diag_dir(multi_index i) {
+		vect<index_type> j(0);
+		for (int dim = 0; dim < NDIM; dim++) {
+			if (i[dim] % 2 == 0) {
+				j[dim]--;
+			} else {
+				j[dim]++;
+			}
+		}
+		return j;
+	}
+
 	void print() const {
 	}
 	gravity() {
@@ -46,8 +56,6 @@ public:
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {
-		arc & fbox;
-		arc & flux;
 		arc & phi;
 		arc & X;
 		arc & R;
@@ -57,7 +65,6 @@ public:
 		arc & refined;
 	}
 
-	void compute_flux();
 	void set_refined(const std::vector<multi_range>&);
 	void resize(double, const multi_range&);
 	void set_avg_zero();
@@ -79,8 +86,8 @@ public:
 
 	void relax(bool init_zero);
 	gravity_return get_restrict(double);
-	std::vector<double> get_flux_restrict() const;
-	void apply_flux_restrict(const std::vector<double>&, const multi_range &bbox);
+	std::vector<double> get_phi_restrict() const;
+	void apply_phi_restrict(const std::vector<double>&, const multi_range &bbox);
 	void compute_amr_bounds(bool first_pass);
 	void apply_restrict(const gravity_return&);
 	std::vector<double> get_prolong(const multi_range&) const;
