@@ -60,6 +60,14 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 void gravity::compute_amr_bounds(bool plus_interior) {
 	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw);
 	const auto ibox = box.pad(-opts.gbw);
+	auto phic = get_phi_restrict();
+	int k = 0;
+	for( multi_iterator i(ibox.half()); !i.end(); i++) {
+		assert(k < phic.size());
+		phi_c[i] = phic[k];
+		k++;
+	}
+	assert(k == phic.size());
 	if (plus_interior) {
 		for (multi_iterator I(ibox); !I.end(); I++) {
 			const auto i = I.index();
@@ -230,6 +238,9 @@ std::vector<double> gravity::get_phi_restrict() const {
 		//	printf( "%e\n",phi0);
 		data.push_back(phi0);
 	}
+
+
+
 	return std::move(data);
 }
 
@@ -325,7 +336,7 @@ void gravity::apply_prolong(const std::vector<double> &data) {
 		assert(k < data.size());
 		const auto val = data[k];
 		for (multi_iterator j(multi_range(i.index()).double_()); !j.end(); j++) {
-//			X[j] += val;
+			X[j] += val;
 		}
 		k++;
 	}
