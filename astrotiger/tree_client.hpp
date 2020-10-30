@@ -17,10 +17,23 @@ class tree;
 class sibling;
 class gravity_return;
 
+struct boundary {
+	std::vector<multi_range> boxes;
+	std::vector<std::vector<double>> data;
+
+	template<class A>
+	void serialize(A&& arc, unsigned) {
+		arc & boxes;
+		arc & data;
+	}
+};
+
+
 class tree_client {
 	hpx::id_type gid;
 	multi_range box;
 	channel<std::vector<double>> chan;
+	channel<boundary> gchan;
 
 public:
 	hpx::id_type get_id() {
@@ -54,6 +67,15 @@ public:
 		chan.put(std::move(data));
 	}
 
+	hpx::future<boundary> get_gravity() {
+		return hpx::async([this]() {
+			return gchan.get();
+		});
+	}
+	void put_gravity(boundary &&data) {
+		gchan.put(std::move(data));
+	}
+
 	hpx::future<std::vector<double>> get() {
 		return hpx::async([this]() {
 			return chan.get();
@@ -80,7 +102,8 @@ public:
 	hpx::future<void> set_family(tree_client p, tree_client, std::vector<sibling> c) const;
 	hpx::future<double> initialize(int) const;
 	hpx::future<std::vector<tree_client>> get_children() const;
-	hpx::future<void> set_boundary(std::vector<double>&& data, const multi_range& bbox) const;
+	hpx::future<void> set_hydro_boundary(std::vector<double> &&data, const multi_range &bbox) const;
+	hpx::future<void> set_gravity_boundary(boundary &&data, const multi_range &bbox) const;
 	hpx::future<std::vector<double>> get_energy_boundary(multi_range b, int) const;
 	hpx::future<std::vector<std::vector<double>>> get_hydro_prolong(std::vector<multi_range> b, double t) const;
 	hpx::future<std::vector<std::vector<double>>> get_energy_prolong(std::vector<multi_range> b, double t) const;

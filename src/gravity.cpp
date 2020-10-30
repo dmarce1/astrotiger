@@ -27,7 +27,7 @@ void gravity::compute_flux() {
 }
 
 void gravity::set_refined(const std::vector<multi_range> &boxes) {
-	for (multi_iterator i(box); !i.end(); i++) {
+	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
 		refined[i] = false;
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
@@ -57,7 +57,6 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 	compute_amr_bounds(true);
 }
 void gravity::compute_amr_bounds(bool plus_interior) {
-	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw);
 	const auto to_dir = [](multi_index i) {
 		vect<index_type> j(0);
 		for (int dim = 0; dim < NDIM; dim++) {
@@ -69,11 +68,10 @@ void gravity::compute_amr_bounds(bool plus_interior) {
 		}
 		return j;
 	};
-	const auto ibox = box.pad(-opts.gbw);
+	const auto ibox = box.pad(-1);
 	if (plus_interior) {
 		for (multi_iterator I(ibox); !I.end(); I++) {
 			const auto i = I.index();
-			const auto ibox = box.pad(-opts.gbw);
 			const auto d = to_dir(i);
 			const auto ic = i / 2;
 			const auto icp = ic + d;
@@ -107,7 +105,7 @@ void gravity::initialize_fine(const multi_array<double> &rho, double mtot) {
 		active[i] = true;
 	}
 	const auto rho0 = mtot;
-	for (multi_iterator i(box); !i.end(); i++) {
+	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
 		R[i] = 4.0 * M_PI * opts.G * (rho[i] - rho0);
 	}
 //	X = phi;
@@ -205,7 +203,7 @@ void gravity::relax(bool init_zero) {
 			X[i] = 0.0;
 		}
 	}
-	const auto ibox = box.pad(-opts.gbw);
+	const auto ibox = box.pad(-1);
 	X0 = X;
 	auto *x0 = X0.data();
 	auto *x1 = X.data();
@@ -225,7 +223,7 @@ void gravity::relax(bool init_zero) {
 gravity_return gravity::get_restrict(double rho0) {
 	gravity_return rc;
 	multi_array<std::uint8_t> active_c;
-	auto rbox = box.pad(-opts.gbw).half();
+	auto rbox = box.pad(-1).half();
 	active_c.resize(rbox);
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		const auto cbox = multi_range(i.index()).double_();
@@ -245,7 +243,7 @@ gravity_return gravity::get_restrict(double rho0) {
 	const auto *x = X.data();
 	const auto s = X.get_strides();
 	double rmax = 0.0;
-	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
+	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
 		const auto j = X.index(i);
 		for (int dim = 0; dim < NDIM; dim++) {
 			resid[i] -= (x[j + s[dim]] + x[j - s[dim]]) / (dx * dx);
@@ -297,12 +295,12 @@ std::vector<double> gravity::get_prolong(const multi_range &bbox) const {
 
 void gravity::apply_prolong(const std::vector<double> &data) {
 	int k = 0;
-	const auto cbox = box.pad(-opts.gbw).half();
+	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw / 2);
 	for (multi_iterator i(cbox); !i.end(); i++) {
 		assert(k < data.size());
 		const auto val = data[k];
 		for (multi_iterator j(multi_range(i.index()).double_()); !j.end(); j++) {
-			X[j] += val;
+//			X[j] += val;
 		}
 		k++;
 	}

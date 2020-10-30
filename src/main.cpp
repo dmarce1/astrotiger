@@ -23,7 +23,7 @@ statistics solve_gravity() {
 			r = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get().resid;
 			printf("%i %e\n", pass, r);
 			pass++;
-			if (pass > 1000) {
+			if (pass > 250) {
 				break;
 			}
 		} while (r > toler);
