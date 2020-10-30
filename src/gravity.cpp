@@ -34,7 +34,7 @@ void gravity::set_refined(const std::vector<multi_range> &boxes) {
 	}
 }
 
-void gravity::set_amr_zones(const std::vector<multi_range> &boxes,const std::vector<multi_range> &boxes2, const std::vector<double> &data) {
+void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::vector<multi_range> &boxes2, const std::vector<double> &data) {
 	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw);
 	int k = 0;
 	for (multi_iterator i(cbox); !i.end(); i++) {
@@ -56,7 +56,6 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes,const std::vec
 			}
 		}
 	}
-
 
 	assert(k == data.size());
 	for (multi_iterator i(box); !i.end(); i++) {
@@ -116,7 +115,7 @@ void gravity::initialize_fine(const multi_array<double> &rho, double mtot) {
 	}
 	const auto rho0 = mtot;
 	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
-		R[i] = 4.0 * M_PI * opts.G * (rho[i] - rho0);
+		R[i] = 4.0 * M_PI * opts.G * (rho[i] - (opts.problem == "sphere" ? 0.0 : rho0));
 	}
 //	X = phi;
 }
@@ -143,6 +142,41 @@ void gravity::initialize_coarse(double w) {
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
 		active[i] = false;
+	}
+}
+
+double gravity::coord(index_type i) const {
+	return (i + 0.5) * dx;
+}
+
+void gravity::set_outflow_boundaries() {
+	for (multi_iterator i(box); !i.end(); i++) {
+		if (!box.pad(-opts.gbw).contains(i)) {
+			double sum = 0.0;
+			double msum = 0.0;
+			for (multi_iterator j(box); !j.end(); j++) {
+				double r2 = 0.0;
+				for (int dim = 0; dim < NDIM; dim++) {
+					r2 += std::pow(coord(i.index()[dim]) - coord(j.index()[dim]), 2);
+				}
+				if (r2 != 0.0) {
+					const auto M = std::pow(dx, NDIM) * R[j] / (4.0 * M_PI * opts.G);
+					msum += M;
+					const auto r = std::sqrt(r2);
+					if ( NDIM == 1) {
+						sum += opts.G * 4.0 * M_PI * std::abs(r) * M;
+					} else if ( NDIM == 2) {
+						sum += 2.0 * opts.G * std::log(r) * M;
+					} else if ( NDIM == 3) {
+						sum -= opts.G * M / r;
+					}
+				}
+			}
+			X[i] = sum;
+			active[i] = false;
+		} else {
+			active[i] = true;
+		}
 	}
 }
 
@@ -183,7 +217,7 @@ multi_array<double> gravity::get_phi() const {
 	rphi.resize(box);
 	for (multi_iterator i(box); !i.end(); i++) {
 		rphi[i] = phi[i];
-	//	rphi[i] = resid[i];
+		//	rphi[i] = resid[i];
 	}
 	return rphi;
 }
@@ -225,7 +259,10 @@ void gravity::relax(bool init_zero) {
 			for (int dim = 0; dim < NDIM; dim++) {
 				x1[j] += (0.5 / NDIM) * (x0[j + s[dim]] + x0[j - s[dim]]);
 			}
-			x1[j] = x0[j] * 0.0 + 1.0 * (x1[j] - (0.5 / NDIM) * (R[i] * dx * dx));
+			x1[j] = (x1[j] - (0.5 / NDIM) * (R[i] * dx * dx));
+			if (i.index()[0] == -2) {
+				printf("%e\n", x1[j - s[0]]);
+			}
 		}
 	}
 }

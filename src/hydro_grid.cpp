@@ -707,7 +707,7 @@ statistics hydro_grid::get_statistics(const std::vector<multi_range> &child_rang
 		}
 		if (!refined) {
 			for (int f = 0; f < opts.nhydro; f++) {
-				stats.u[f] += std::pow(dx, 2) * U[f][i];
+				stats.u[f] += std::pow(dx, NDIM) * U[f][i];
 			}
 		}
 	}

@@ -83,7 +83,8 @@ public:
 			X[i] = 0.0;
 		}
 	}
-
+	double coord(index_type i) const;
+	void set_outflow_boundaries();
 	multi_array<double> get_phi() const;
 	std::vector<double> pack(const multi_range&, int type) const;
 	std::vector<double> pack_amr(const multi_range&, double w) const;

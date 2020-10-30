@@ -88,6 +88,9 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			} else {
 				grav.initialize_coarse(t);
 				grav.initialize_fine(hydro.get_density(), mtot);
+				if (opts.problem == "sphere") {
+					grav.set_outflow_boundaries();
+				}
 			}
 		} else {
 			if (level != 0) {
@@ -149,7 +152,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		hydro.set_phi(grav.get_phi());
 	}
 	get_gravity_boundaries();
-	if (level == 0 && fine_level == 0) {
+	if (level == 0 && fine_level == 0 && opts.problem != "sphere") {
 		grav.set_avg_zero();
 	}
 	rc = grav.get_restrict(mtot);
@@ -537,6 +540,9 @@ void tree::get_hydro_boundaries(double this_time) {
 }
 
 void tree::get_gravity_boundaries() {
+	if( opts.problem == "sphere" && level == 0 ) {
+		return;
+	}
 	const auto amr_boxes = get_amr_boxes();
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.gbw).intersection(box);
@@ -551,11 +557,9 @@ void tree::get_gravity_boundaries() {
 				const auto this_inter = this_box.intersection(box.pad(opts.gbw - 1));
 				if (this_inter.volume()) {
 					boxes.push_back(this_inter);
-//					printf( "%i %i\n", these_boxes.size(), this_inter.volume());
 				}
 			}
 		}
-//		printf( "%i\n", amr_boxes.size());
 		boundary bnd;
 		bnd.boxes = boxes;
 		for (const auto &b : boxes) {
