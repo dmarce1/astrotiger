@@ -14,6 +14,7 @@ statistics solve_gravity() {
 	statistics stats;
 	stats = root.get_statistics().get();
 	const auto mtot = stats.u[rho_i];
+	int oi = 0;
 	for (int l = 0; l <= opts.max_level; l++) {
 		int pass = 0;
 		double r;
@@ -24,12 +25,15 @@ statistics solve_gravity() {
 			printf("%i %e\n", pass, r);
 			pass++;
 			if (pass > 250) {
-				break;
+		//		break;
 			}
+//			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+
 		} while (r > toler);
 		//	}
 		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get().resid;
 		printf("%i %e\n", pass, r);
+		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 //		r = root.gravity_solve(0, l, std::vector<double>(), 0.0).get().resid;
 //		printf( "%e\n", r);
 //		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0).get().resid;
@@ -136,8 +140,9 @@ int hpx_main(int argc, char *argv[]) {
 	root.set_family(tree_client(), root, sibs).get();
 	root.restrict_all().get();
 //	master(0, 1.0e-100);
+	levels_show();
 	solve_gravity();
-	output_silo("X.0.silo");
+//	output_silo("X.0.silo");
 //	int i = 0;
 //	const auto dt = 0.01;
 //	levels_show();

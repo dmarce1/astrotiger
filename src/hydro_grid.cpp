@@ -567,7 +567,8 @@ std::vector<double> hydro_grid::pack_field(int f, multi_range bbox) const {
 
 std::vector<std::vector<double>> hydro_grid::pack_output() const {
 	std::vector<std::vector<double>> data;
-	auto bbox = box.pad(-opts.hbw);
+	//	auto bbox = box.pad(-opts.hbw);
+	auto bbox = box;
 	data.resize(opts.nhydro + 1);
 	if ( NDIM > 1) {
 		std::swap(bbox.min[0], bbox.min[NDIM - 1]);

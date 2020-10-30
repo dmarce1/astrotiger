@@ -68,7 +68,23 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		if (pass == 0) {
 			if (level != 0) {
 				grav.initialize_fine(hydro.get_density(), mtot);
-				grav.set_amr_zones(get_amr_boxes(), coarse);
+				auto boxes = get_amr_boxes();
+				std::vector<multi_range> tmp1;
+				std::vector<multi_range> tmp3;
+				std::vector<multi_range> tmp4;
+				for (const auto &b : boxes) {
+					tmp1.resize(1);
+					tmp1[0] = b;
+					for (const auto &s : siblings) {
+						for (const auto &this_box : tmp1) {
+							const auto tmp2 = this_box.subtract(s.box().pad(opts.gbw - 1));
+							tmp3.insert(tmp3.end(), tmp2.begin(), tmp2.end());
+						}
+						tmp1 = std::move(tmp3);
+					}
+					tmp4.insert(tmp4.end(), tmp1.begin(), tmp1.end());
+				}
+				grav.set_amr_zones(boxes, tmp4, coarse);
 			} else {
 				grav.initialize_coarse(t);
 				grav.initialize_fine(hydro.get_density(), mtot);
@@ -128,10 +144,11 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			}
 			grav.relax(pass == 0 && i == 0);
 		}
-	} else if (pass == GRAVITY_FINAL_PASS) {
+	} else if (level == fine_level) {
 		grav.finish_fine();
 		hydro.set_phi(grav.get_phi());
 	}
+	get_gravity_boundaries();
 	if (level == 0 && fine_level == 0) {
 		grav.set_avg_zero();
 	}
@@ -522,22 +539,23 @@ void tree::get_hydro_boundaries(double this_time) {
 void tree::get_gravity_boundaries() {
 	const auto amr_boxes = get_amr_boxes();
 	for (const auto &sib : siblings) {
-		const auto inter = sib.box().pad(1).intersection(box);
+		const auto inter = sib.box().pad(opts.gbw).intersection(box);
 		std::vector<multi_range> boxes;
 		if (inter.volume()) {
 			boxes.push_back(inter);
 		}
 		for (const auto &b : amr_boxes) {
-			const auto inter = sib.box().pad(-1).intersection(b);
-			const auto these_boxes = inter.pad(1).subtract(inter);
+			const auto inter = sib.box().pad(opts.gbw).intersection(b);
+			const auto these_boxes = inter.subtract(sib.box());
 			for (const auto &this_box : these_boxes) {
 				const auto this_inter = this_box.intersection(box.pad(opts.gbw - 1));
 				if (this_inter.volume()) {
 					boxes.push_back(this_inter);
+//					printf( "%i %i\n", these_boxes.size(), this_inter.volume());
 				}
 			}
 		}
-//		printf( "%i\n",  boxes.size());
+//		printf( "%i\n", amr_boxes.size());
 		boundary bnd;
 		bnd.boxes = boxes;
 		for (const auto &b : boxes) {
@@ -862,14 +880,14 @@ std::string tree::output(DBfile *db) const {
 	std::vector<std::vector<double>> vars;
 	vars.resize(opts.nhydro);
 	for (int dim = 0; dim < NDIM; dim++) {
-		dims1[dim] = box.dims()[dim]/* + 2* opts.hbw*/;
+		dims1[dim] = box.dims()[dim] + 2 * opts.hbw;
 		dims2[dim] = dims1[dim] + 1;
 		coordnames[dim] = new char[2];
 		coordnames[dim][0] = 'x' + dim;
 		coordnames[dim][1] = '\0';
 		coords[dim] = new double[dims2[dim]];
-		for (int i = box.min[dim]/* - opts.hbw*/; i <= box.max[dim] /*+ opts.hbw*/; i++) {
-			coords[dim][i - box.min[dim]/* + opts.hbw*/] = hydro.coord(i) - 0.5 * dx;
+		for (int i = box.min[dim] - opts.hbw; i <= box.max[dim] + opts.hbw; i++) {
+			coords[dim][i - box.min[dim] + opts.hbw] = hydro.coord(i) - 0.5 * dx;
 		}
 	}
 	vars = hydro.pack_output();
