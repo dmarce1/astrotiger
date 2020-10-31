@@ -113,6 +113,7 @@ public:
 	hpx::future<gravity_return> gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m) const;
 	hpx::future<statistics> get_statistics() const;
 	hpx::future<std::vector<double>> restrict_all() const;
+	hpx::future<double> compute_error() const;
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

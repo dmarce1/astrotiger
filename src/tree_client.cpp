@@ -60,6 +60,12 @@ hpx::future<std::vector<double>> tree_client::get_energy_boundary(multi_range b,
 	return hpx::async<tree::get_energy_boundary_action>(gid, b, step);
 }
 
+hpx::future<double> tree_client::compute_error() const {
+	return hpx::async<tree::compute_error_action>(gid);
+}
+
+
+
 hpx::future<std::pair<std::vector<std::uint8_t>, std::vector<multi_range>>> tree_client::get_refinement_boundary(multi_range b, int step) const {
 	assert(gid != hpx::invalid_id);
 	return hpx::async<tree::get_refinement_boundary_action>(gid, b, step);

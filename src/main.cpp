@@ -10,7 +10,7 @@ std::vector<double> tm;
 std::vector<int> super_step;
 
 statistics solve_gravity() {
-	const double toler = 1.0e-6;
+	const double toler = 1.0e-3;
 	statistics stats;
 	stats = root.get_statistics().get();
 	const auto mtot = stats.u[rho_i];
@@ -28,18 +28,21 @@ statistics solve_gravity() {
 			if (pass > 250) {
 		//		break;
 			}
-			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+//			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 
 		} while (r > toler);
 		//	}
 		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get().resid;
 		printf("%i %e\n", pass, r);
-		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 //		r = root.gravity_solve(0, l, std::vector<double>(), 0.0).get().resid;
 //		printf( "%e\n", r);
 //		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0).get().resid;
 //		printf( "%e\n", r);
 	}
+	auto rms = root.compute_error().get();
+	rms = std::sqrt(rms);
+	printf( "Error = %e\n",rms);
 	return stats;
 }
 
@@ -143,7 +146,7 @@ int hpx_main(int argc, char *argv[]) {
 //	master(0, 1.0e-100);
 	levels_show();
 	solve_gravity();
-//	output_silo("X.0.silo");
+	output_silo("X.0.silo");
 //	int i = 0;
 //	const auto dt = 0.01;
 //	levels_show();

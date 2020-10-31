@@ -141,6 +141,7 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 	U.resize(opts.nhydro);
 	S.resize(opts.nhydro);
 	phi.resize(box_.pad(1));
+	error.resize(box_.pad(1));
 	for (int f = 0; f < opts.nhydro; f++) {
 		U0[f].resize(box);
 		U[f].resize(box);
@@ -324,10 +325,21 @@ void hydro_grid::initialize() {
 			for (int f = 0; f < opts.nhydro; f++) {
 				U[f][i] = 0.0;
 			}
-			if (r < 0.1) {
-				U[rho_i][i] = 1.0;
+			constexpr auto r0 = 0.1;
+			constexpr auto rho0 = 1.0 / std::pow(r0, NDIM);
+			if (r < 0.5 * r0) {
+				U[rho_i][i] = rho0 * (1.0 - 6.0 * r / r0 * r / r0 * (1.0 - r / r0));
+			} else if (r < r0) {
+				U[rho_i][i] = rho0 * 2.0 * std::pow(1.0 - r / r0, 3);
 			} else {
 				U[rho_i][i] = 1.0e-5;
+			}
+			if ( NDIM == 3) {
+				U[rho_i][i] *= 8.0 / M_PI;
+			} else if ( NDIM == 2) {
+				U[rho_i][i] *= 40.0 / (7.0 * M_PI);
+			} else {
+				U[rho_i][i] *= 4.0 / 3.0;
 			}
 			U[egas_i][i] = 1e-5;
 		} else if (opts.problem == "rt") {
@@ -565,17 +577,110 @@ std::vector<double> hydro_grid::pack_field(int f, multi_range bbox) const {
 	return data;
 }
 
+void hydro_grid::set_error_field(multi_array<double> &&field) {
+	error = std::move(field);
+}
+
+double hydro_grid::compare_analytic(const std::vector<multi_range> &cboxes, multi_array<double> &results) const {
+	const auto r0 = 0.1;
+	const auto force = [](double r) {
+		const auto r2 = r * r;
+		const auto r3 = r2 * r;
+		const auto r4 = r2 * r2;
+		if ( NDIM == 3) {
+			if (r < 0.5) {
+				return (-32.0 / 3.0) * r + (192.0 / 5.0) * r3 - 32.0 * r4;
+			} else if (r < 1.0) {
+				const auto rinv = 1.0 / r;
+				const auto r2inv = rinv * rinv;
+				return (1.0 / 15.0) * r2inv - (64.0 / 3.0) * r + 48.0 * r2 - (192.0 / 5.0) * r3 + (32.0 / 3.0) * r4;
+			} else {
+				return -1.0 / (r * r);
+			}
+		} else if ( NDIM == 2) {
+			if (r < 0.5) {
+				return 2.0 * ((-40.0 / 7.0) * r + (120.0 / 7.0) * r3 - (96.0 / 7.0) * r4);
+			} else if (r < 1.0) {
+				const auto rinv = 1.0 / r;
+				return 2.0 * ((1.0 / 7.0) * rinv - (80.0 / 7.0) * r + (160.0 / 7.0) * r2 - (120.0 / 7.0) * r3 + (32.0 / 7.0) * r4);
+			} else {
+				return -2.0 / r;
+			}
+		} else {
+			if (r < 0.5) {
+				return M_PI * ((-32.0 / 3.0) * r + (64.0 / 3.0) * r3 - (16.0) * r4);
+			} else if (r < 1.0) {
+				return M_PI * ((4.0 / 3.0) - (64.0 / 3.0) * r + (32.0) * r2 - (64.0 / 3.0) * r3 + (16.0 / 3.0) * r4);
+			} else {
+				return -4.0 * M_PI;
+			}
+		}
+	};
+	std::array<multi_index, NDIM> dir;
+	for (int dim = 0; dim < NDIM; dim++) {
+		dir[dim] = 0;
+		dir[dim][dim] = 1;
+	}
+	double err_rms = 0.0;
+	results.resize(box.pad(-opts.hbw));
+	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+		bool child = false;
+		for (const auto &this_box : cboxes) {
+			if (this_box.contains(i)) {
+				child = true;
+				break;
+			}
+		}
+		if (!child) {
+			std::array<double, NDIM> g;
+			std::array<double, NDIM> ga;
+			std::array<double, NDIM> dg;
+			for (int dim = 0; dim < NDIM; dim++) {
+				g[dim] = -(phi[i.index() + dir[dim]] - phi[i.index() - dir[dim]]) / (2.0 * dx);
+			}
+			double r = 0.0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				r += std::pow(coord(i.index()[dim]) - 0.5, 2);
+			}
+			r = std::sqrt(r) / r0;
+			const auto f = force(r) / std::pow(r0, NDIM - 1);
+			for (int dim = 0; dim < NDIM; dim++) {
+				ga[dim] = f * (coord(i.index()[dim]) - 0.5) / (r * r0);
+				dg[dim] = g[dim] - ga[dim];
+			}
+			double dgabs = 0.0, gabs = 0.0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				dgabs += dg[dim] * dg[dim];
+			}
+			for (int dim = 0; dim < NDIM; dim++) {
+				gabs += ga[dim] * ga[dim];
+			}
+			if (gabs != 0.0) {
+				dgabs = std::sqrt(dgabs);
+				gabs = std::sqrt(gabs);
+				const auto err = dgabs / gabs;
+				results[i] = err;
+				err_rms += err * err;
+			} else{
+				results[i] = 1e+10;
+			}
+		}
+	}
+	err_rms *= std::pow(dx, NDIM);
+	return err_rms;
+}
+
 std::vector<std::vector<double>> hydro_grid::pack_output() const {
 	std::vector<std::vector<double>> data;
-	//	auto bbox = box.pad(-opts.hbw);
-	auto bbox = box;
-	data.resize(opts.nhydro + 1);
+	auto bbox = box.pad(-opts.hbw);
+//	auto bbox = box;
+	data.resize(opts.nhydro + 2);
 	if ( NDIM > 1) {
 		std::swap(bbox.min[0], bbox.min[NDIM - 1]);
 		std::swap(bbox.max[0], bbox.max[NDIM - 1]);
 	}
-	for (int f = 0; f <= opts.nhydro; f++) {
-		const auto &u = f == opts.nhydro ? phi : U[f];
+	for (int f = 0; f <= opts.nhydro + 1; f++) {
+		const auto &u = f == opts.nhydro ? phi : (f == opts.nhydro + 1 ? error : U[f]);
 		for (multi_iterator i(bbox); !i.end(); i++) {
 			multi_index j = i.index();
 			if ( NDIM > 1) {
@@ -723,6 +828,7 @@ std::vector<std::string> hydro_grid::field_names() {
 		names.push_back(std::string("S") + char('x' + dim));
 	}
 	names.push_back("phi");
+	names.push_back("error");
 	return names;
 }
 

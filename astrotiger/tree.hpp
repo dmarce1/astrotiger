@@ -148,6 +148,7 @@ public:
 	statistics get_statistics() const;
 	std::vector<double> restrict_all();
 	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
+	double compute_error();
 
 
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,restrict_all);
@@ -168,6 +169,7 @@ public:
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,delist);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,gravity_solve);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,initialize);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,compute_error);
 
 };
 

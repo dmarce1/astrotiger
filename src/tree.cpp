@@ -27,6 +27,8 @@ using get_statistics_action_type = tree::get_statistics_action;
 using restrict_all_action_type = tree::restrict_all_action;
 using set_gravity_boundary_action_type = tree::set_gravity_boundary_action;
 using set_hydro_boundary_action_type = tree::set_hydro_boundary_action;
+using compute_error_action_type = tree::compute_error_action;
+HPX_REGISTER_ACTION (compute_error_action_type);
 HPX_REGISTER_ACTION (set_gravity_boundary_action_type);
 HPX_REGISTER_ACTION (set_hydro_boundary_action_type);
 HPX_REGISTER_ACTION (restrict_all_action_type);
@@ -45,6 +47,29 @@ HPX_REGISTER_ACTION (set_family_action_type);
 HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
+
+double tree::compute_error() {
+
+	double error = 0.0;
+
+	std::vector<hpx::future<double>> futs;
+	std::vector<multi_range> cboxes;
+	for (const auto &c : children) {
+		futs.push_back(c.compute_error());
+		cboxes.push_back(c.get_box().half());
+	}
+	multi_array<double> results;
+	if (opts.problem == "sphere") {
+		error = hydro.compare_analytic(cboxes, results);
+		hydro.set_error_field(std::move(results));
+	}
+
+	for (auto &f : futs) {
+		error += f.get();
+	}
+	return error;
+
+}
 
 statistics tree::get_statistics() const {
 	std::vector<multi_range> cranges;
@@ -540,7 +565,7 @@ void tree::get_hydro_boundaries(double this_time) {
 }
 
 void tree::get_gravity_boundaries() {
-	if( opts.problem == "sphere" && level == 0 ) {
+	if (opts.problem == "sphere" && level == 0) {
 		return;
 	}
 	const auto amr_boxes = get_amr_boxes();
@@ -882,16 +907,16 @@ std::string tree::output(DBfile *db) const {
 	std::array<int, NDIM> dims2;
 	char *coordnames[NDIM];
 	std::vector<std::vector<double>> vars;
-	vars.resize(opts.nhydro);
+	vars.resize(opts.nhydro + 2);
 	for (int dim = 0; dim < NDIM; dim++) {
-		dims1[dim] = box.dims()[dim] + 2 * opts.hbw;
+		dims1[dim] = box.dims()[dim]/* + 2 * opts.hbw*/;
 		dims2[dim] = dims1[dim] + 1;
 		coordnames[dim] = new char[2];
 		coordnames[dim][0] = 'x' + dim;
 		coordnames[dim][1] = '\0';
 		coords[dim] = new double[dims2[dim]];
-		for (int i = box.min[dim] - opts.hbw; i <= box.max[dim] + opts.hbw; i++) {
-			coords[dim][i - box.min[dim] + opts.hbw] = hydro.coord(i) - 0.5 * dx;
+		for (int i = box.min[dim]/* - opts.hbw*/; i <= box.max[dim]/* + opts.hbw*/; i++) {
+			coords[dim][i - box.min[dim]/* + opts.hbw*/] = hydro.coord(i) - 0.5 * dx;
 		}
 	}
 	vars = hydro.pack_output();

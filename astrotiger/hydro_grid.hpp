@@ -42,6 +42,7 @@ class hydro_grid {
 	std::array<std::vector<multi_array<double>>, NDIM> Fc;
 	multi_array<std::uint8_t> R;
 	multi_array<double> phi;
+	multi_array<double> error;
 	double dx;
 
 public:
@@ -50,7 +51,7 @@ public:
 	~hydro_grid();
 
 	void resize(double dx, multi_range box_);
-
+	void set_error_field(multi_array<double>&&);
 	void sanity(const multi_range &ibox) const {
 		if (U0.size()) {
 			assert(box == U0[0].box);
@@ -86,7 +87,7 @@ public:
 	void substep_update(int rk, double dt);
 	void update_energy();
 	statistics get_statistics(const std::vector<multi_range>&) const;
-
+	double compare_analytic(const std::vector<multi_range> &cboxes, multi_array<double> &results) const;
 	static std::vector<std::string> field_names();
 
 	template<class A>

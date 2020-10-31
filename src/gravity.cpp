@@ -34,6 +34,7 @@ void gravity::set_refined(const std::vector<multi_range> &boxes) {
 	}
 }
 
+
 void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::vector<multi_range> &boxes2, const std::vector<double> &data) {
 	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw);
 	int k = 0;
@@ -89,6 +90,7 @@ void gravity::compute_amr_bounds(bool plus_interior) {
 			const auto icp = ic + d;
 			const auto icm = ic - d;
 			X[i] = (-(3.0 / 32.0) * phi_c[icm] + (15.0 / 16.0) * phi_c[ic] + (5.0 / 32.0) * phi_c[icp]);
+	//		X[i]= phi_c[ic];
 		}
 	}
 	const auto ibox = box.pad(-1);
@@ -105,6 +107,7 @@ void gravity::compute_amr_bounds(bool plus_interior) {
 			const auto icp = ic + d;
 			const auto icm = ic - d;
 			X[i] = (-(3.0 / 32.0) * phi_c[icm] + (15.0 / 16.0) * phi_c[ic] + (5.0 / 32.0) * phi_c[icp]);
+	//		X[i] = phi_c[ic];
 		}
 	}
 }
@@ -173,6 +176,7 @@ void gravity::set_outflow_boundaries() {
 				}
 			}
 			X[i] = sum;
+			//		printf( "%e\n", sum);
 			active[i] = false;
 		} else {
 			active[i] = true;
