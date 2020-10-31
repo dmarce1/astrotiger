@@ -17,18 +17,6 @@ class tree;
 class sibling;
 class gravity_return;
 
-struct boundary {
-	std::vector<multi_range> boxes;
-	std::vector<std::vector<double>> data;
-
-	template<class A>
-	void serialize(A&& arc, unsigned) {
-		arc & boxes;
-		arc & data;
-	}
-};
-
-
 class tree_client {
 	hpx::id_type gid;
 	multi_range box;
@@ -110,7 +98,7 @@ public:
 	hpx::future<std::pair<std::vector<double>, std::vector<double>>> get_hydro_restrict() const;
 	hpx::future<std::shared_ptr<tree>> get_ptr() const;
 	hpx::future<std::pair<std::vector<std::uint8_t>, std::vector<multi_range>>> get_refinement_boundary(multi_range, int) const;
-	hpx::future<gravity_return> gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m) const;
+	hpx::future<gravity_return> gravity_solve(int pass, int level,  std::vector<double>&& coarse,  boundary&& rhoc, double t, double m) const;
 	hpx::future<statistics> get_statistics() const;
 	hpx::future<std::vector<double>> restrict_all() const;
 	hpx::future<double> compute_error() const;

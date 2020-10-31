@@ -88,7 +88,11 @@ statistics tree::get_statistics() const {
 	return stats;
 }
 
-gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse, double this_t, double mtot) {
+gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse, boundary rhoc, double this_t, double mtot) {
+	grav.unpack_coarse_source(rhoc);
+	if (pass == 0 && level == fine_level) {
+		get_gravity_boundaries(PACK_SRC);
+	}
 	if (level == fine_level) {
 		if (pass == 0) {
 			if (level != 0) {
@@ -158,7 +162,15 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			} else {
 				coarse = grav.get_prolong(c.get_box().half().pad(opts.gbw / 2));
 			}
-			futs.push_back(c.gravity_solve(pass, fine_level, std::move(coarse), w, mtot));
+			boundary rho_c;
+			if (level == fine_level - 1 && pass == 0) {
+				const auto bnds = box.intersection(c.get_box().pad(opts.gbw - 1).half()).subtract(c.get_box().half());
+				for (const auto &bnd : bnds) {
+					rho_c.data.push_back(hydro.pack_field(rho_i, bnd));
+					rho_c.boxes.push_back(bnd);
+				}
+			}
+			futs.push_back(c.gravity_solve(pass, fine_level, std::move(coarse), std::move(rho_c), w, mtot));
 		}
 		for (auto &f : futs) {
 			auto tmp = f.get();
@@ -566,20 +578,23 @@ void tree::get_hydro_boundaries(double this_time) {
 	}
 }
 
-void tree::get_gravity_boundaries() {
+void tree::get_gravity_boundaries(int type) {
 	if (opts.problem == "sphere" && level == 0) {
 		return;
 	}
 	const auto amr_boxes = get_amr_boxes();
 	for (const auto &sib : siblings) {
-		const auto inter = sib.box().pad(1).intersection(box);
+		const auto outer_bnd = type == PACK_X ? opts.gbw : opts.gbw - 1;
+		const auto inner_bnd = type == PACK_X ? opts.gbw - 1 : 0;
+		const auto bwidth = type == PACK_X ? 1 : opts.gbw - 1;
+		const auto inter = sib.box().pad(bwidth).intersection(box);
 		std::vector<multi_range> boxes;
 		if (inter.volume()) {
 			boxes.push_back(inter);
 		}
 		for (const auto &b : amr_boxes) {
-			const auto A = sib.box().pad(opts.gbw).intersection(b).intersection(box.pad(opts.gbw - 1));
-			const auto B = sib.box().pad(opts.gbw - 1).intersection(b).intersection(box.pad(opts.gbw));
+			const auto A = sib.box().pad(outer_bnd).intersection(b).intersection(box.pad(inner_bnd));
+			const auto B = sib.box().pad(inner_bnd).intersection(b).intersection(box.pad(outer_bnd));
 			std::vector<multi_range> tmp2;
 			std::vector<multi_range> tmp3;
 			auto tmp1 = A.subtract(B);
@@ -592,11 +607,13 @@ void tree::get_gravity_boundaries() {
 					boxes.push_back(this_box);
 				}
 			}
-			tmp1 = b.pad(1).subtract(b);
-			for (const auto &this_box : tmp1) {
-				const auto inter = this_box.intersection(box).intersection(sib.box().pad(opts.gbw));
-				if (inter.volume()) {
-					boxes.push_back(inter);
+			if (type == PACK_X) {
+				tmp1 = b.pad(bwidth).subtract(b);
+				for (const auto &this_box : tmp1) {
+					const auto inter = this_box.intersection(box).intersection(sib.box().pad(outer_bnd));
+					if (inter.volume()) {
+						boxes.push_back(inter);
+					}
 				}
 			}
 		}
@@ -614,7 +631,7 @@ void tree::get_gravity_boundaries() {
 	for (auto &f : sib_futs) {
 		const auto bnd = f.get();
 		for (int j = 0; j < bnd.boxes.size(); j++) {
-			grav.unpack(bnd.data[j], bnd.boxes[j]);
+			grav.unpack(bnd.data[j], bnd.boxes[j], PACK_X);
 		}
 	}
 }

@@ -192,4 +192,18 @@ public:
 	}
 };
 
+
+struct boundary {
+	std::vector<multi_range> boxes;
+	std::vector<std::vector<double>> data;
+
+	template<class A>
+	void serialize(A&& arc, unsigned) {
+		arc & boxes;
+		arc & data;
+	}
+};
+
+
+
 #endif /* ASTROTIGER_MULTI_ARRAY_HPP_ */

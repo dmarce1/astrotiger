@@ -34,7 +34,6 @@ void gravity::set_refined(const std::vector<multi_range> &boxes) {
 	}
 }
 
-
 void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::vector<multi_range> &boxes2, const std::vector<double> &data) {
 	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw);
 	int k = 0;
@@ -90,7 +89,7 @@ void gravity::compute_amr_bounds(bool plus_interior) {
 			const auto icp = ic + d;
 			const auto icm = ic - d;
 			X[i] = (-(3.0 / 32.0) * phi_c[icm] + (15.0 / 16.0) * phi_c[ic] + (5.0 / 32.0) * phi_c[icp]);
-	//		X[i]= phi_c[ic];
+			//		X[i]= phi_c[ic];
 		}
 	}
 	const auto ibox = box.pad(-1);
@@ -107,7 +106,7 @@ void gravity::compute_amr_bounds(bool plus_interior) {
 			const auto icp = ic + d;
 			const auto icm = ic - d;
 			X[i] = (-(3.0 / 32.0) * phi_c[icm] + (15.0 / 16.0) * phi_c[ic] + (5.0 / 32.0) * phi_c[icp]);
-	//		X[i] = phi_c[ic];
+			//		X[i] = phi_c[ic];
 		}
 	}
 }
@@ -117,7 +116,7 @@ void gravity::initialize_fine(const multi_array<double> &rho, double mtot) {
 		active[i] = true;
 	}
 	const auto rho0 = mtot;
-	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
+	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 		R[i] = 4.0 * M_PI * opts.G * (rho[i] - (opts.problem == "sphere" ? 0.0 : rho0));
 	}
 //	X = phi;
@@ -152,6 +151,18 @@ double gravity::coord(index_type i) const {
 	return (i + 0.5) * dx;
 }
 
+void gravity::unpack_coarse_source(const boundary &bnds) {
+	for (int i = 0; i < bnds.data.size(); i++) {
+		int k = 0;
+		for (multi_iterator j(bnds.boxes[i]); !j.end(); j++) {
+			assert(k < bnds.data[i].size());
+			R[j.index() * 2] = 4.0 * M_PI * opts.G * bnds.data[i][k];
+			k++;
+		}
+		assert(k == bnds.data[i].size());
+	}
+}
+
 void gravity::set_outflow_boundaries() {
 	for (multi_iterator i(box); !i.end(); i++) {
 		if (!box.pad(-opts.gbw).contains(i)) {
@@ -163,7 +174,7 @@ void gravity::set_outflow_boundaries() {
 					r2 += std::pow(coord(i.index()[dim]) - coord(j.index()[dim]), 2);
 				}
 				if (r2 != 0.0) {
-					const auto M = std::pow(dx, NDIM) * R[j] / (4.0 * M_PI * opts.G);
+					const auto M = std::pow(dx, NDIM) * R[j]/(4.0 * M_PI * opts.G);
 					msum += M;
 					const auto r = std::sqrt(r2);
 					if ( NDIM == 1) {
@@ -199,7 +210,7 @@ std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 	assert(box.contains(bbox));
 	std::vector<double> data;
 	data.reserve(bbox.volume());
-	const auto &Y = type == PACK_PHI ? phi : X;
+	const auto &Y = type == PACK_X ? X : R;
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		data.push_back(Y[i]);
 	}
@@ -226,12 +237,13 @@ multi_array<double> gravity::get_phi() const {
 	return rphi;
 }
 
-void gravity::unpack(const std::vector<double> &data, const multi_range &bbox) {
+void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, int type) {
 	assert(box.contains(bbox));
 	int k = 0;
+	auto &Y = type == PACK_X ? X : R;
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		assert(k < data.size());
-		X[i] = data[k];
+		Y[i] = data[k];
 		k++;
 	}
 }
@@ -303,8 +315,8 @@ gravity_return gravity::get_restrict(double rho0) {
 			}
 			resid[i] += (2.0 * NDIM) * x[j] / (dx * dx);
 			resid[i] += R[i];
-			rc.resid += std::abs(resid[i]) * std::pow(dx,NDIM);
-			rc.mass += R[i] * std::pow(dx,NDIM);
+			rc.resid += std::abs(resid[i]) * std::pow(dx, NDIM);
+			rc.mass += R[i] * std::pow(dx, NDIM) / (4.0 * M_PI * opts.G );
 		}
 //		phi[i] = resid[i];
 	}

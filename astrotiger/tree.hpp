@@ -141,13 +141,13 @@ public:
 	multi_range get_box() const;
 	tree_client truncate(tree_client, multi_range box);
 	std::vector<multi_range> get_refinement_boundaries();
-	void get_gravity_boundaries();
+	void get_gravity_boundaries(int type = PACK_X);
 	void get_hydro_boundaries(double);
 	void get_energy_boundaries(double);
 	void sanity() const;
 	statistics get_statistics() const;
 	std::vector<double> restrict_all();
-	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
+	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, const boundary rhoc, double t, double m);
 	double compute_error();
 
 
