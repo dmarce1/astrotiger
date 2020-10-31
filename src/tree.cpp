@@ -140,7 +140,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 	}
 	gravity_return rc;
-	double max_resid = 0.0;
+	rc.resid = rc.mass = 0.0;
 	if (level < fine_level) {
 		double w;
 		if (t0 != t) {
@@ -163,7 +163,8 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		for (auto &f : futs) {
 			auto tmp = f.get();
 			grav.apply_restrict(tmp);
-			max_resid = std::max(max_resid, tmp.resid);
+			rc.resid += tmp.resid;
+			rc.mass += tmp.mass;
 		}
 		for (int i = 0; i < iters; i++) {
 			get_gravity_boundaries();
@@ -180,11 +181,12 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	if (level == 0 && fine_level == 0 && opts.problem != "sphere") {
 		grav.set_avg_zero();
 	}
-	rc = grav.get_restrict(mtot);
-	if (level < fine_level) {
-		rc.resid = max_resid;
+	auto tmp = grav.get_restrict(mtot);
+	if (level != fine_level) {
+		tmp.resid = rc.resid;
+		tmp.mass = rc.mass;
 	}
-	return rc;
+	return tmp;
 
 }
 

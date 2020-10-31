@@ -293,6 +293,8 @@ gravity_return gravity::get_restrict(double rho0) {
 	const auto *x = X.data();
 	const auto s = X.get_strides();
 	double rmax = 0.0;
+	rc.resid = 0.0;
+	rc.mass = 0.0;
 	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
 		if (active[i]) {
 			const auto j = X.index(i);
@@ -301,7 +303,8 @@ gravity_return gravity::get_restrict(double rho0) {
 			}
 			resid[i] += (2.0 * NDIM) * x[j] / (dx * dx);
 			resid[i] += R[i];
-			rmax = std::max(rmax, std::abs(resid[i] / (4.0 * M_PI * opts.G) / rho0));
+			rc.resid += std::abs(resid[i]) * std::pow(dx,NDIM);
+			rc.mass += R[i] * std::pow(dx,NDIM);
 		}
 //		phi[i] = resid[i];
 	}
@@ -311,7 +314,6 @@ gravity_return gravity::get_restrict(double rho0) {
 			rc.R.push_back(resid_c[i]);
 		}
 	}
-	rc.resid = rmax;
 	rc.box = rbox;
 	return rc;
 }

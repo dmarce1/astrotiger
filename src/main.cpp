@@ -10,7 +10,7 @@ std::vector<double> tm;
 std::vector<int> super_step;
 
 statistics solve_gravity() {
-	const double toler = 1.0e-3;
+	const double toler = 5.0e-4;
 	statistics stats;
 	stats = root.get_statistics().get();
 	const auto mtot = stats.u[rho_i];
@@ -22,17 +22,19 @@ statistics solve_gravity() {
 		printf("Solving gravity\n");
 		//	for (int i = 0; i < 10; i++) {
 		do {
-			r = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get().resid;
-			printf("%i %e\n", pass, r);
+			auto tmp = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get();
+			r = tmp.resid / tmp.mass;
+			printf("%i %e %e %e\n", pass, r, tmp.resid, tmp.mass);
 			pass++;
 			if (pass > 250) {
-		//		break;
+				break;
 			}
 //			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 
 		} while (r > toler);
 		//	}
-		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get().resid;
+		auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get();
+		r = tmp.resid / tmp.mass;
 		printf("%i %e\n", pass, r);
 //		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 //		r = root.gravity_solve(0, l, std::vector<double>(), 0.0).get().resid;

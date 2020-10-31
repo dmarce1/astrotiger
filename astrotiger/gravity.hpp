@@ -10,11 +10,13 @@
 
 struct gravity_return {
 	double resid;
+	double mass;
 	std::vector<std::uint8_t> active;
 	std::vector<double> R;
 	multi_range box;
 	template<class A>
 	void serialize(A &&arc, unsigned) {
+		arc & mass;
 		arc & resid;
 		arc & active;
 		arc & R;
