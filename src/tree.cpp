@@ -572,18 +572,31 @@ void tree::get_gravity_boundaries() {
 	}
 	const auto amr_boxes = get_amr_boxes();
 	for (const auto &sib : siblings) {
-		const auto inter = sib.box().pad(opts.gbw).intersection(box);
+		const auto inter = sib.box().pad(1).intersection(box);
 		std::vector<multi_range> boxes;
 		if (inter.volume()) {
 			boxes.push_back(inter);
 		}
 		for (const auto &b : amr_boxes) {
-			const auto inter = sib.box().pad(opts.gbw).intersection(b);
-			const auto these_boxes = inter.subtract(sib.box());
-			for (const auto &this_box : these_boxes) {
-				const auto this_inter = this_box.intersection(box.pad(opts.gbw - 1));
-				if (this_inter.volume()) {
-					boxes.push_back(this_inter);
+			const auto A = sib.box().pad(opts.gbw).intersection(b).intersection(box.pad(opts.gbw - 1));
+			const auto B = sib.box().pad(opts.gbw - 1).intersection(b).intersection(box.pad(opts.gbw));
+			std::vector<multi_range> tmp2;
+			std::vector<multi_range> tmp3;
+			auto tmp1 = A.subtract(B);
+			for (const auto &this_box : tmp1) {
+				tmp2 = this_box.subtract(sib.box());
+				tmp3.insert(tmp3.end(), tmp2.begin(), tmp2.end());
+			}
+			for (const auto &this_box : tmp3) {
+				if (this_box.volume()) {
+					boxes.push_back(this_box);
+				}
+			}
+			tmp1 = b.pad(1).subtract(b);
+			for (const auto &this_box : tmp1) {
+				const auto inter = this_box.intersection(box).intersection(sib.box().pad(opts.gbw));
+				if (inter.volume()) {
+					boxes.push_back(inter);
 				}
 			}
 		}
