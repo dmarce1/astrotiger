@@ -102,6 +102,7 @@ public:
 	hpx::future<statistics> get_statistics() const;
 	hpx::future<std::vector<double>> restrict_all() const;
 	hpx::future<double> compute_error() const;
+	hpx::future<std::pair<std::vector<double>,std::vector<double>>> get_gravity_amr_bnd(const multi_range& box, double w) const;
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

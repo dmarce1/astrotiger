@@ -1,9 +1,11 @@
 #include <astrotiger/gravity.hpp>
 #include <astrotiger/options.hpp>
 
+constexpr double omega = 1.5;
+
 void gravity::resize(double dx_, const multi_range &box_) {
 	dx = dx_;
-	const auto cbox = box_.half().pad(opts.gbw);
+	const auto cbox = box_.half().pad(opts.gbw / 2 + opts.gbw % 2 + 1);
 	box = box_.pad(opts.gbw);
 	phi0.resize(box);
 	phi1.resize(box);
@@ -35,7 +37,7 @@ void gravity::set_refined(const std::vector<multi_range> &boxes) {
 }
 
 void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::vector<multi_range> &boxes2, const std::vector<double> &data) {
-	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw);
+	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw / 2 + opts.gbw % 2 + 1);
 	int k = 0;
 	for (multi_iterator i(cbox); !i.end(); i++) {
 		assert(k < data.size());
@@ -69,6 +71,7 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 	}
 	compute_amr_bounds(true);
 }
+
 void gravity::compute_amr_bounds(bool plus_interior) {
 	const auto to_dir = [](multi_index i) {
 		vect<index_type> j(0);
@@ -89,6 +92,7 @@ void gravity::compute_amr_bounds(bool plus_interior) {
 			const auto icp = ic + d;
 			const auto icm = ic - d;
 			X[i] = (-(3.0 / 32.0) * phi_c[icm] + (15.0 / 16.0) * phi_c[ic] + (5.0 / 32.0) * phi_c[icp]);
+			//		printf( "%e\n", phi_c[ic]);
 			//		X[i]= phi_c[ic];
 		}
 	}
@@ -174,7 +178,7 @@ void gravity::set_outflow_boundaries() {
 					r2 += std::pow(coord(i.index()[dim]) - coord(j.index()[dim]), 2);
 				}
 				if (r2 != 0.0) {
-					const auto M = std::pow(dx, NDIM) * R[j]/(4.0 * M_PI * opts.G);
+					const auto M = std::pow(dx, NDIM) * R[j] / (4.0 * M_PI * opts.G);
 					msum += M;
 					const auto r = std::sqrt(r2);
 					if ( NDIM == 1) {
@@ -215,6 +219,19 @@ std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 		data.push_back(Y[i]);
 	}
 	return data;
+}
+
+void gravity::to_array(multi_array<double> &a, const multi_range &bbox, double w) const {
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		if (w == 0.0) {
+			a[i] = phi0[i];
+		} else if (w == 1.0) {
+			a[i] = X[i];
+		} else {
+			a[i] = w * X[i] + (1.0 - w) * phi0[i];
+		}
+//		printf( "%e %e\n", a[i], w );
+	}
 }
 
 std::vector<double> gravity::pack_amr(const multi_range &bbox, double w) const {
@@ -271,16 +288,24 @@ void gravity::relax(bool init_zero) {
 	for (multi_iterator i(ibox); !i.end(); i++) {
 		if (active[i]) {
 			const auto j = X.index(i);
-			x1[j] = 0.0;
+			int sum = 0;
 			for (int dim = 0; dim < NDIM; dim++) {
-				x1[j] += (0.5 / NDIM) * (x0[j + s[dim]] + x0[j - s[dim]]);
+				sum += i.index()[dim];
 			}
-			x1[j] = (x1[j] - (0.5 / NDIM) * (R[i] * dx * dx));
-			if (i.index()[0] == -2) {
-				printf("%e\n", x1[j - s[0]]);
+			if (sum % 2 == red % 2) {
+				double r = 0.0;
+				for (int dim = 0; dim < NDIM; dim++) {
+					r += (0.5 / NDIM) * (x1[j + s[dim]] + x1[j - s[dim]]);
+				}
+				r += -x1[j] - R[i] * dx * dx / (2.0 * NDIM);
+				x1[j] += omega * r;
 			}
+//			if (i.index()[0] == -2) {
+//				printf("%e\n", x1[j - s[0]]);
+//			}
 		}
 	}
+	red++;
 }
 
 gravity_return gravity::get_restrict(double rho0) {
@@ -316,7 +341,7 @@ gravity_return gravity::get_restrict(double rho0) {
 			resid[i] += (2.0 * NDIM) * x[j] / (dx * dx);
 			resid[i] += R[i];
 			rc.resid += std::abs(resid[i]) * std::pow(dx, NDIM);
-			rc.mass += R[i] * std::pow(dx, NDIM) / (4.0 * M_PI * opts.G );
+			rc.mass += R[i] * std::pow(dx, NDIM) / (4.0 * M_PI * opts.G);
 		}
 //		phi[i] = resid[i];
 	}

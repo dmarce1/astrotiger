@@ -40,6 +40,7 @@ class gravity {
 	double dx;
 	bool has_phi0;
 	bool has_phi1;
+	int red;
 	multi_range box;
 
 public:
@@ -52,10 +53,12 @@ public:
 	gravity() {
 		has_phi0 = false;
 		has_phi1 = false;
+		red = 0;
 	}
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {
+		arc & red;
 		arc & fbox;
 		arc & flux;
 		arc & has_phi0;
@@ -92,6 +95,7 @@ public:
 	std::vector<double> pack_amr(const multi_range&, double w) const;
 	void unpack(const std::vector<double>&, const multi_range &bbox, int type);
 	void unpack_coarse_source(const boundary&);
+	void to_array(multi_array<double> &a, const multi_range &bbox,  double w) const;
 
 	void relax(bool init_zero);
 	gravity_return get_restrict(double);

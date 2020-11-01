@@ -17,6 +17,12 @@ double rand1() {
 hydro_grid::hydro_grid() {
 }
 
+void hydro_grid::to_array(multi_array<double> &a, const multi_range &bbox, int f, double w) const {
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		a[i] = w * U[f][i] + (1.0 - w) * U0[f][i];
+	}
+}
+
 double hydro_grid::compute_flux(int rk) {
 	if (rk == 0) {
 		for (int f = 0; f < opts.nhydro; f++) {
@@ -661,7 +667,7 @@ double hydro_grid::compare_analytic(const std::vector<multi_range> &cboxes, mult
 				const auto err = dgabs / gabs;
 				results[i] = err;
 				err_rms += err * err;
-			} else{
+			} else {
 				results[i] = 1e+10;
 			}
 		}

@@ -28,6 +28,8 @@ using restrict_all_action_type = tree::restrict_all_action;
 using set_gravity_boundary_action_type = tree::set_gravity_boundary_action;
 using set_hydro_boundary_action_type = tree::set_hydro_boundary_action;
 using compute_error_action_type = tree::compute_error_action;
+using get_gravity_amr_bnd_action_type = tree::get_gravity_amr_bnd_action;
+HPX_REGISTER_ACTION (get_gravity_amr_bnd_action_type);
 HPX_REGISTER_ACTION (compute_error_action_type);
 HPX_REGISTER_ACTION (set_gravity_boundary_action_type);
 HPX_REGISTER_ACTION (set_hydro_boundary_action_type);
@@ -88,8 +90,77 @@ statistics tree::get_statistics() const {
 	return stats;
 }
 
-gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse, boundary rhoc, double this_t, double mtot) {
-	grav.unpack_coarse_source(rhoc);
+std::pair<std::vector<double>, std::vector<double>> tree::get_gravity_amr_bnd(const multi_range &box, double w) {
+	std::pair<std::vector<double>, std::vector<double>> rc;
+	rc.first = grav.pack(box, PACK_X);
+	rc.second = hydro.pack_field(rho_i, box);
+	return rc;
+}
+
+gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse_from_parent, boundary rhoc, double this_t, double mtot) {
+	double w;
+	if (t0 != t) {
+		w = (this_t - t0) / (t - t0);
+		assert(this_t >= t0);
+		assert(this_t <= t);
+	} else {
+		w = 1.0;
+	}
+	std::vector<std::vector<double>> phi_c(children.size());
+	std::vector<boundary> rho_c(children.size());
+	if (level == fine_level - 1 && pass == 0) {
+		std::vector<std::vector<hpx::future<std::pair<std::vector<double>, std::vector<double>>>>> sfuts(children.size());
+		for (int i = 0; i < children.size(); i++) {
+			const auto &c = children[i];
+			const auto cbox = c.get_box().half().pad(opts.gbw / 2 + (opts.gbw % 2) + 1);
+			for (const auto &s : siblings) {
+				const auto inter = cbox.intersection(s.box());
+				if (inter.volume()) {
+					sfuts[i].push_back(s.client.get_gravity_amr_bnd(inter.shift(-s.shift), w));
+				}
+			}
+		}
+		for (int i = 0; i < children.size(); i++) {
+			const auto &c = children[i];
+			const auto cbox = c.get_box().half().pad(opts.gbw / 2 + (opts.gbw % 2) + 1);
+			const auto cbox2 = c.get_box().half().pad(opts.gbw / 2);
+			multi_array<double> rho_tmp(cbox);
+			multi_array<double> phi_tmp(cbox);
+			const auto cibox = box.pad(opts.gbw - 1).intersection(cbox);
+			grav.to_array(phi_tmp, cibox, w);
+			int l = 0;
+			for (const auto &s : siblings) {
+				const auto inter = cbox.intersection(s.box());
+				if (inter.volume()) {
+					auto tmp = sfuts[i][l].get();
+					int k = 0;
+					for (multi_iterator j(inter); !j.end(); j++) {
+						assert(k < tmp.first.size());
+						assert(k < tmp.second.size());
+						rho_tmp[j] = tmp.first[k];
+						//		phi_tmp[j] = tmp.second[k];
+						k++;
+					}
+					assert(k == tmp.first.size());
+					assert(k == tmp.second.size());
+					std::vector<double> tmp2;
+					const auto inter2 = cbox2.intersection(s.box());
+					for (multi_iterator j(inter2); !j.end(); j++) {
+						tmp2.push_back(rho_tmp[j]);
+					}
+					rho_c[i].boxes.push_back(inter2);
+					rho_c[i].data.push_back(std::move(tmp2));
+					l++;
+				}
+			}
+			for (multi_iterator j(cbox); !j.end(); j++) {
+				phi_c[i].push_back(phi_tmp[j]);
+			}
+		}
+	}
+	if (level == fine_level && pass == 0) {
+		grav.unpack_coarse_source(rhoc);
+	}
 	if (pass == 0 && level == fine_level) {
 		get_gravity_boundaries(PACK_SRC);
 	}
@@ -113,7 +184,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 					}
 					tmp4.insert(tmp4.end(), tmp1.begin(), tmp1.end());
 				}
-				grav.set_amr_zones(boxes, tmp4, coarse);
+				grav.set_amr_zones(boxes, tmp4, coarse_from_parent);
 			} else {
 				grav.initialize_coarse(t);
 				grav.initialize_fine(hydro.get_density(), mtot);
@@ -123,54 +194,34 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			}
 		} else {
 			if (level != 0) {
-				grav.apply_prolong(coarse);
+				grav.apply_prolong(coarse_from_parent);
 			}
 		}
 	} else if (pass == 0) {
 		grav.initialize_coarse(t);
 	} else {
 		if (level != 0) {
-			grav.apply_prolong(coarse);
+			grav.apply_prolong(coarse_from_parent);
 		}
 	}
 	const auto iters = level == 0 ? opts.nmulti : 10 * opts.nmulti;
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < iters; i++) {
 			get_gravity_boundaries();
-			if (level == fine_level) {
-				grav.compute_amr_bounds(false);
-			}
 			grav.relax(false);
 		}
 	}
 	gravity_return rc;
 	rc.resid = rc.mass = 0.0;
 	if (level < fine_level) {
-		double w;
-		if (t0 != t) {
-			w = (this_t - t0) / (t - t0);
-			assert(this_t >= t0);
-			assert(this_t <= t);
-		} else {
-			w = 1.0;
-		}
 		std::vector<hpx::future<gravity_return>> futs;
-		for (const auto &c : children) {
-			std::vector<double> coarse;
-			if (pass == 0) {
-				coarse = grav.pack_amr(c.get_box().half().pad(opts.gbw), w);
-			} else {
-				coarse = grav.get_prolong(c.get_box().half().pad(opts.gbw / 2));
+		for (int i = 0; i < children.size(); i++) {
+			const auto &c = children[i];
+			std::vector<double> tmp5;
+			if (pass != 0) {
+				phi_c[i] = grav.get_prolong(c.get_box().half().pad(opts.gbw / 2));
 			}
-			boundary rho_c;
-			if (level == fine_level - 1 && pass == 0) {
-				const auto bnds = box.intersection(c.get_box().pad(opts.gbw - 1).half()).subtract(c.get_box().half());
-				for (const auto &bnd : bnds) {
-					rho_c.data.push_back(hydro.pack_field(rho_i, bnd));
-					rho_c.boxes.push_back(bnd);
-				}
-			}
-			futs.push_back(c.gravity_solve(pass, fine_level, std::move(coarse), std::move(rho_c), w, mtot));
+			futs.push_back(c.gravity_solve(pass, fine_level, std::move(phi_c[i]), std::move(rho_c[i]), w, mtot));
 		}
 		for (auto &f : futs) {
 			auto tmp = f.get();
@@ -180,9 +231,6 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 		for (int i = 0; i < iters; i++) {
 			get_gravity_boundaries();
-			if (level == fine_level) {
-				grav.compute_amr_bounds(false);
-			}
 			grav.relax(pass == 0 && i == 0);
 		}
 	} else if (level == fine_level) {

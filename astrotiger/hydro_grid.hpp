@@ -89,6 +89,7 @@ public:
 	statistics get_statistics(const std::vector<multi_range>&) const;
 	double compare_analytic(const std::vector<multi_range> &cboxes, multi_array<double> &results) const;
 	static std::vector<std::string> field_names();
+	void to_array(multi_array<double>&,const multi_range& bbox,  int, double) const;
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {
