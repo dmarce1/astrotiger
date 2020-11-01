@@ -124,7 +124,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			const auto &c = children[i];
 			const auto cbox = c.get_box().half().pad(opts.gbw / 2 + (opts.gbw % 2) + 1);
 			const auto cbox2 = c.get_box().half().pad(opts.gbw / 2);
-			multi_array<double> rho_tmp(cbox);
+			multi_array<double> rho_tmp(cbox2);
 			multi_array<double> phi_tmp(cbox);
 			const auto cibox = box.pad(opts.gbw - 1).intersection(cbox);
 			grav.to_array(phi_tmp, cibox, w);
@@ -137,19 +137,23 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 					for (multi_iterator j(inter); !j.end(); j++) {
 						assert(k < tmp.first.size());
 						assert(k < tmp.second.size());
-						rho_tmp[j] = tmp.first[k];
-						//		phi_tmp[j] = tmp.second[k];
+						if (cbox2.contains(j)) {
+							rho_tmp[j] = tmp.first[k];
+							//		phi_tmp[j] = tmp.second[k];
+						}
 						k++;
 					}
 					assert(k == tmp.first.size());
 					assert(k == tmp.second.size());
 					std::vector<double> tmp2;
 					const auto inter2 = cbox2.intersection(s.box());
-					for (multi_iterator j(inter2); !j.end(); j++) {
-						tmp2.push_back(rho_tmp[j]);
+					if (inter2.volume()) {
+						for (multi_iterator j(inter2); !j.end(); j++) {
+							tmp2.push_back(rho_tmp[j]);
+						}
+						rho_c[i].boxes.push_back(inter2);
+						rho_c[i].data.push_back(std::move(tmp2));
 					}
-					rho_c[i].boxes.push_back(inter2);
-					rho_c[i].data.push_back(std::move(tmp2));
 					l++;
 				}
 			}
