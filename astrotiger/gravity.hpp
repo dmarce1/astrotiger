@@ -5,8 +5,7 @@
 
 #include <array>
 
-#define PACK_SRC 1
-#define PACK_X 2
+#define OUTPUT_RESID
 
 struct gravity_return {
 	double resid;
@@ -26,22 +25,17 @@ struct gravity_return {
 class gravity {
 
 	multi_array<double> phi0;
-	multi_array<double> phi1;
 	multi_array<double> phi;
-	multi_array<double> X;
 	multi_array<double> R;
+	multi_array<double> X;
 	multi_array<std::uint8_t> active;
-	multi_array<std::uint8_t> amr;
-	multi_array<std::uint8_t> refined;
-	std::array<multi_array<double>,NDIM> flux;
-	std::array<multi_range,NDIM> fbox;
+#ifdef OUTPUT_RESID
 	multi_array<double> resid;
-	multi_array<double> phi_c;
+#endif
 	double dx;
-	bool has_phi0;
-	bool has_phi1;
 	int red;
 	multi_range box;
+	multi_range inner_box;
 
 public:
 
@@ -51,38 +45,31 @@ public:
 //		}
 	}
 	gravity() {
-		has_phi0 = false;
-		has_phi1 = false;
 		red = 0;
 	}
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {
 		arc & red;
-		arc & fbox;
-		arc & flux;
-		arc & has_phi0;
-		arc & has_phi1;
 		arc & phi0;
-		arc & phi1;
 		arc & phi;
 		arc & X;
 		arc & R;
 		arc & active;
-		arc & phi_c;
-		arc & amr;
-		arc & refined;
+#ifdef OUTPUT_RESID
+		arc & resid;
+#endif
 	}
 
+	void allocate(const multi_range&);
 	void compute_flux();
-	void set_refined(const std::vector<multi_range>&);
 	void resize(double, const multi_range&);
 	void set_avg_zero();
 	void store();
 	void initialize_fine(const multi_array<double>&, double mtot);
 	void initialize_coarse(double w);
 	void finish_fine();
-	void set_amr_zones(const std::vector<multi_range>&, const std::vector<multi_range>&, const std::vector<double>&);
+	void set_amr_zones(const std::vector<multi_range>&,  const std::vector<double>&);
 	void zero() {
 		for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 			X[i] = 0.0;
@@ -92,14 +79,13 @@ public:
 	void set_outflow_boundaries();
 	multi_array<double> get_phi() const;
 	std::vector<double> pack(const multi_range&) const;
-	std::vector<double> pack_amr(const multi_range&, double w) const;
+	std::vector<double> pack_phi(const multi_range&) const;
 	void unpack(const std::vector<double>&, const multi_range &bbox);
 	void unpack_coarse_source(const boundary&);
 	void to_array(multi_array<double> &a, const multi_range &bbox,  double w) const;
 
 	void relax(bool init_zero);
 	gravity_return get_restrict(double);
-	void compute_amr_bounds(bool first_pass);
 	void apply_restrict(const gravity_return&);
 	std::vector<double> get_prolong(const multi_range&) const;
 	void apply_prolong(const std::vector<double>&);
