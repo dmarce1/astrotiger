@@ -30,7 +30,7 @@ statistics solve_gravity() {
 			//	break;
 			}
 
-	//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 
 		} while (r > toler);
 		//	}
