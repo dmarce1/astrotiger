@@ -5,7 +5,7 @@
 
 #include <array>
 
-#define OUTPUT_RESID
+//#define OUTPUT_RESID
 
 struct gravity_return {
 	double resid;

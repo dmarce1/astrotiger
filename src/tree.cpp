@@ -137,8 +137,9 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			const auto cbox2 = c.get_box().half().pad(opts.gbw / 2);
 			multi_array<double> rho_tmp(cbox2);
 			multi_array<double> phi_tmp(cbox);
-			const auto cibox = box.pad(opts.gbw-1).intersection(cbox);
+			const auto cibox = box.pad(opts.gbw).intersection(cbox);
 			int l = 0;
+			grav.to_array(phi_tmp, cibox, w);
 			for (const auto &s : siblings) {
 				const auto inter = cbox.intersection(s.box());
 				if (inter.volume()) {
@@ -169,7 +170,6 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 					l++;
 				}
 			}
-			grav.to_array(phi_tmp, cibox, w);
 			for (multi_iterator j(cbox); !j.end(); j++) {
 				phi_c[i].push_back(phi_tmp[j]);
 			}
