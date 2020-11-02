@@ -310,11 +310,7 @@ gravity_return gravity::get_restrict(double rho0) {
 	}
 	const auto resid_c = resid.restrict_(rbox);
 	for (multi_iterator i(rbox); !i.end(); i++) {
-		if (box.contains(i)) {
-			rc.R.push_back(resid_c[i]);
-		} else {
-			rc.R.push_back(0.0);
-		}
+		rc.R.push_back(resid_c[i]);
 	}
 	rc.box = rbox;
 	return rc;

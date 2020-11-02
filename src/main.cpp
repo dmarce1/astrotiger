@@ -10,7 +10,7 @@ std::vector<double> tm;
 std::vector<int> super_step;
 
 statistics solve_gravity() {
-	const double toler = 5.0e-4;
+	const double toler = 1.0e-6;
 	statistics stats;
 	stats = root.get_statistics().get();
 	const auto mtot = stats.u[rho_i];
@@ -30,7 +30,7 @@ statistics solve_gravity() {
 			//	break;
 			}
 
-			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+//			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 
 		} while (r > toler);
 		//	}
