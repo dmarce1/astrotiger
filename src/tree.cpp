@@ -92,7 +92,7 @@ statistics tree::get_statistics() const {
 
 std::pair<std::vector<double>, std::vector<double>> tree::get_gravity_amr_bnd(const multi_range &box, double w) {
 	std::pair<std::vector<double>, std::vector<double>> rc;
-	rc.first = grav.pack(box, PACK_X);
+	rc.first = grav.pack(box);
 	rc.second = hydro.pack_field(rho_i, box);
 	return rc;
 }
@@ -166,7 +166,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		grav.unpack_coarse_source(rhoc);
 	}
 	if (pass == 0 && level == fine_level) {
-		get_gravity_boundaries(PACK_SRC);
+//		get_gravity_boundaries(PACK_SRC);
 	}
 	if (level == fine_level) {
 		if (pass == 0) {
@@ -630,15 +630,15 @@ void tree::get_hydro_boundaries(double this_time) {
 	}
 }
 
-void tree::get_gravity_boundaries(int type) {
+void tree::get_gravity_boundaries() {
 	if (opts.problem == "sphere" && level == 0) {
 		return;
 	}
 	const auto amr_boxes = get_amr_boxes();
 	for (const auto &sib : siblings) {
-		const auto outer_bnd = type == PACK_X ? opts.gbw : opts.gbw - 1;
-		const auto inner_bnd = type == PACK_X ? opts.gbw - 1 : 0;
-		const auto bwidth = type == PACK_X ? 1 : opts.gbw - 1;
+		const auto outer_bnd = opts.gbw;
+		const auto inner_bnd = opts.gbw - 1;
+		const auto bwidth = 1;
 		const auto inter = sib.box().pad(bwidth).intersection(box);
 		std::vector<multi_range> boxes;
 		if (inter.volume()) {
@@ -659,20 +659,18 @@ void tree::get_gravity_boundaries(int type) {
 					boxes.push_back(this_box);
 				}
 			}
-			if (type == PACK_X) {
-				tmp1 = b.pad(bwidth).subtract(b);
-				for (const auto &this_box : tmp1) {
-					const auto inter = this_box.intersection(box).intersection(sib.box().pad(outer_bnd));
-					if (inter.volume()) {
-						boxes.push_back(inter);
-					}
+			tmp1 = b.pad(bwidth).subtract(b);
+			for (const auto &this_box : tmp1) {
+				const auto inter = this_box.intersection(box).intersection(sib.box().pad(outer_bnd));
+				if (inter.volume()) {
+					boxes.push_back(inter);
 				}
 			}
 		}
 		boundary bnd;
 		bnd.boxes = boxes;
 		for (const auto &b : boxes) {
-			bnd.data.push_back(grav.pack(b, PACK_X));
+			bnd.data.push_back(grav.pack(b));
 		}
 		sib.client.set_gravity_boundary(std::move(bnd), box.shift(-sib.shift));
 	}
@@ -683,7 +681,7 @@ void tree::get_gravity_boundaries(int type) {
 	for (auto &f : sib_futs) {
 		const auto bnd = f.get();
 		for (int j = 0; j < bnd.boxes.size(); j++) {
-			grav.unpack(bnd.data[j], bnd.boxes[j], PACK_X);
+			grav.unpack(bnd.data[j], bnd.boxes[j]);
 		}
 	}
 }

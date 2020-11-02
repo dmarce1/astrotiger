@@ -210,13 +210,12 @@ void gravity::set_avg_zero() {
 	}
 }
 
-std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
+std::vector<double> gravity::pack(const multi_range &bbox) const {
 	assert(box.contains(bbox));
 	std::vector<double> data;
 	data.reserve(bbox.volume());
-	const auto &Y = type == PACK_X ? X : R;
 	for (multi_iterator i(bbox); !i.end(); i++) {
-		data.push_back(Y[i]);
+		data.push_back(X[i]);
 	}
 	return data;
 }
@@ -249,18 +248,17 @@ multi_array<double> gravity::get_phi() const {
 	rphi.resize(box);
 	for (multi_iterator i(box); !i.end(); i++) {
 		rphi[i] = phi[i];
-		//	rphi[i] = resid[i];
+	//	rphi[i] = resid[i];
 	}
 	return rphi;
 }
 
-void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, int type) {
+void gravity::unpack(const std::vector<double> &data, const multi_range &bbox) {
 	assert(box.contains(bbox));
 	int k = 0;
-	auto &Y = type == PACK_X ? X : R;
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		assert(k < data.size());
-		Y[i] = data[k];
+		X[i] = data[k];
 		k++;
 	}
 }
