@@ -1,7 +1,7 @@
 #include <astrotiger/gravity.hpp>
 #include <astrotiger/options.hpp>
 
-constexpr double omega = 1.9;
+constexpr double omega = 1.0;
 
 void gravity::resize(double dx_, const multi_range &box_) {
 	inner_box = box_;

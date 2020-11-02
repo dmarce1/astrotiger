@@ -19,12 +19,15 @@ statistics solve_gravity() {
 	for (int l = 0; l <= opts.max_level; l++) {
 		int pass = 0;
 		double r;
-		printf("Solving gravity\n");
+		printf("Solving gravity on level %i\n", l);
 		//	for (int i = 0; i < 10; i++) {
 		do {
 			auto tmp = root.gravity_solve(pass, l, std::vector<double>(),boundary(), 0.0, mtot).get();
 			r = tmp.resid / tmp.mass;
 			printf("%i %e %e %e\n", pass, r, tmp.resid, tmp.mass);
+//			if( r < 5e-03 && l == opts.max_level) {
+//				break;
+//			}
 			pass++;
 			if (pass > 250) {
 			//	break;
