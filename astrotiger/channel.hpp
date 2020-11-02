@@ -1,32 +1,28 @@
 #pragma once
 
 #include <astrotiger/hpx.hpp>
-#include <queue>
+#include <unordered_map>
 
 template<class T>
 class channel {
-	std::queue<T> q;
+	std::unordered_map<int,T> q;
 	mutex_type mtx;
 
 public:
-	void put(T &&data) {
+	void put(T &&data, int step) {
 		std::lock_guard<mutex_type> lock(mtx);
-		q.push(std::move(data));
+		q[step] = std::move(data);
 	}
-	T get() {
-		bool ready = false;
-		do {
-			std::unique_lock<mutex_type> lock(mtx);
-			if (!q.empty()) {
-				ready = true;
-				break;
-			} else {
-				lock.unlock();
-				hpx::this_thread::yield();
+	T get(int step) {
+		std::unique_lock<mutex_type> lock(mtx);
+		while(1) {
+			if(q.find(step) != q.end()) {
+				auto  data = std::move(q[step]);
+				return std::move(data);
 			}
-		} while (!ready);
-		T data = std::move(q.front());
-		q.pop();
-		return data;
+			lock.unlock();
+			hpx::this_thread::yield();
+			lock.lock();
+		}
 	}
 };

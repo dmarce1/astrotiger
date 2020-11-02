@@ -280,24 +280,24 @@ multi_range tree::get_box() const {
 	return box;
 }
 
-void tree::set_hydro_boundary(std::vector<double> &&data, const multi_range &bbox) {
+void tree::set_hydro_boundary(std::vector<double> &&data, const multi_range &bbox, int step) {
 	bool found = false;
 	for (int i = 0; i < siblings.size(); i++) {
 		if (siblings[i].box() == bbox) {
 			assert(!found);
-			siblings[i].client.put(std::move(data));
+			siblings[i].client.put(std::move(data), hydro_step);
 			found = true;
 		}
 	}
 	assert(found);
 }
 
-void tree::set_gravity_boundary(boundary &&data, const multi_range &bbox) {
+void tree::set_gravity_boundary(boundary &&data, const multi_range &bbox, int step) {
 	bool found = false;
 	for (int i = 0; i < siblings.size(); i++) {
 		if (siblings[i].box() == bbox) {
 			assert(!found);
-			siblings[i].client.put_gravity(std::move(data));
+			siblings[i].client.put_gravity(std::move(data), step);
 			found = true;
 		}
 	}
@@ -562,7 +562,7 @@ void tree::get_hydro_boundaries(double this_time) {
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.hbw).intersection(box);
 		if (inter.volume()) {
-			sib.client.set_hydro_boundary(hydro.pack(inter), box.shift(-sib.shift));
+			sib.client.set_hydro_boundary(hydro.pack(inter), box.shift(-sib.shift),hydro_step);
 		}
 	}
 
@@ -611,7 +611,7 @@ void tree::get_hydro_boundaries(double this_time) {
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
 			auto shifted_box = sib_ranges[i].shift(-siblings[i].shift);
-			sib_futs.push_back(siblings[i].client.get());
+			sib_futs.push_back(siblings[i].client.get(hydro_step));
 		}
 	}
 	if (parent != tree_client()) {
@@ -641,6 +641,7 @@ void tree::get_hydro_boundaries(double this_time) {
 			}
 		}
 	}
+	hydro_step++;
 }
 
 void tree::get_gravity_boundaries() {
@@ -657,39 +658,39 @@ void tree::get_gravity_boundaries() {
 		if (inter.volume()) {
 			boxes.push_back(inter);
 		}
-//		for (const auto &b : amr_boxes) {
-//			const auto A = sib.box().pad(outer_bnd).intersection(b).intersection(box.pad(inner_bnd));
-//			const auto B = sib.box().pad(inner_bnd).intersection(b).intersection(box.pad(outer_bnd));
-//			std::vector<multi_range> tmp2;
-//			std::vector<multi_range> tmp3;
-//			auto tmp1 = A.subtract(B);
-//			for (const auto &this_box : tmp1) {
-//				tmp2 = this_box.subtract(sib.box());
-//				tmp3.insert(tmp3.end(), tmp2.begin(), tmp2.end());
-//			}
-//			for (const auto &this_box : tmp3) {
-//				if (this_box.volume()) {
-//					boxes.push_back(this_box);
-//				}
-//			}
-//			tmp1 = b.pad(bwidth).subtract(b);
-//			for (const auto &this_box : tmp1) {
-//				const auto inter = this_box.intersection(box).intersection(sib.box().pad(outer_bnd));
-//				if (inter.volume()) {
-//					boxes.push_back(inter);
-//				}
-//			}
-//		}
+		for (const auto &b : amr_boxes) {
+			const auto A = sib.box().pad(outer_bnd).intersection(b).intersection(box.pad(inner_bnd));
+			const auto B = sib.box().pad(inner_bnd).intersection(b).intersection(box.pad(outer_bnd));
+			std::vector<multi_range> tmp2;
+			std::vector<multi_range> tmp3;
+			auto tmp1 = A.subtract(B);
+			for (const auto &this_box : tmp1) {
+				tmp2 = this_box.subtract(sib.box());
+				tmp3.insert(tmp3.end(), tmp2.begin(), tmp2.end());
+			}
+			for (const auto &this_box : tmp3) {
+				if (this_box.volume()) {
+					boxes.push_back(this_box);
+				}
+			}
+			tmp1 = b.pad(bwidth).subtract(b);
+			for (const auto &this_box : tmp1) {
+				const auto inter = this_box.intersection(box).intersection(sib.box().pad(outer_bnd));
+				if (inter.volume()) {
+					boxes.push_back(inter);
+				}
+			}
+		}
 		boundary bnd;
 		bnd.boxes = boxes;
 		for (const auto &b : boxes) {
 			bnd.data.push_back(grav.pack(b));
 		}
-		sib.client.set_gravity_boundary(std::move(bnd), box.shift(-sib.shift));
+		sib.client.set_gravity_boundary(std::move(bnd), box.shift(-sib.shift), gravity_step);
 	}
 	std::vector<hpx::future<boundary>> sib_futs;
 	for (auto &s : siblings) {
-		sib_futs.push_back(s.client.get_gravity());
+		sib_futs.push_back(s.client.get_gravity(gravity_step));
 	}
 	for (auto &f : sib_futs) {
 		const auto bnd = f.get();
@@ -697,6 +698,7 @@ void tree::get_gravity_boundaries() {
 			grav.unpack(bnd.data[j], bnd.boxes[j]);
 		}
 	}
+	gravity_step++;
 }
 
 void tree::get_energy_boundaries(double this_time) {
@@ -818,7 +820,7 @@ std::vector<multi_range> tree::get_refinement_boundaries() {
 }
 
 tree::tree() :
-		refine_step(0), energy_step(0) {
+		refine_step(0), energy_step(0), gravity_step(0), hydro_step(0) {
 	level = -1;
 	dt = 0.0;
 }

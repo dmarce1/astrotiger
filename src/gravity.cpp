@@ -38,7 +38,7 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 		phi_c[i] = data[k];
 		k++;
 	}
-	assert(k==data.size());
+	assert(k == data.size());
 
 	for (multi_iterator i(box); !i.end(); i++) {
 		if (!inner_box.contains(i)) {
@@ -202,7 +202,7 @@ multi_array<double> gravity::get_phi() const {
 	rphi.resize(box);
 	for (multi_iterator i(box); !i.end(); i++) {
 #ifdef OUTPUT_RESID
-			rphi[i] = resid[i];
+		rphi[i] = resid[i];
 #else
 		rphi[i] = phi[i];
 #endif
@@ -211,11 +211,12 @@ multi_array<double> gravity::get_phi() const {
 }
 
 void gravity::unpack(const std::vector<double> &data, const multi_range &bbox) {
-	assert(box.contains(bbox));
 	int k = 0;
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		assert(k < data.size());
-		X[i] = data[k];
+		if (box.contains(i)) {
+			X[i] = data[k];
+		}
 		k++;
 	}
 }

@@ -51,22 +51,22 @@ public:
 		return gid != other.gid;
 	}
 
-	void put(std::vector<double> &&data) {
-		chan.put(std::move(data));
+	void put(std::vector<double> &&data, int step) {
+		chan.put(std::move(data), step);
 	}
 
-	hpx::future<boundary> get_gravity() {
-		return hpx::async([this]() {
-			return gchan.get();
+	hpx::future<boundary> get_gravity(int step) {
+		return hpx::async([this,step]() {
+			return gchan.get(step);
 		});
 	}
-	void put_gravity(boundary &&data) {
-		gchan.put(std::move(data));
+	void put_gravity(boundary &&data, int step) {
+		gchan.put(std::move(data), step);
 	}
 
-	hpx::future<std::vector<double>> get() {
-		return hpx::async([this]() {
-			return chan.get();
+	hpx::future<std::vector<double>> get(int step) {
+		return hpx::async([this,step]() {
+			return chan.get(step);
 		});
 	}
 
@@ -90,8 +90,8 @@ public:
 	hpx::future<void> set_family(tree_client p, tree_client, std::vector<sibling> c) const;
 	hpx::future<double> initialize(int) const;
 	hpx::future<std::vector<tree_client>> get_children() const;
-	hpx::future<void> set_hydro_boundary(std::vector<double> &&data, const multi_range &bbox) const;
-	hpx::future<void> set_gravity_boundary(boundary &&data, const multi_range &bbox) const;
+	hpx::future<void> set_hydro_boundary(std::vector<double> &&data, const multi_range &bbox, int) const;
+	hpx::future<void> set_gravity_boundary(boundary &&data, const multi_range &bbox, int ) const;
 	hpx::future<std::vector<double>> get_energy_boundary(multi_range b, int) const;
 	hpx::future<std::vector<std::vector<double>>> get_hydro_prolong(std::vector<multi_range> b, double t) const;
 	hpx::future<std::vector<std::vector<double>>> get_energy_prolong(std::vector<multi_range> b, double t) const;

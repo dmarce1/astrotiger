@@ -46,6 +46,8 @@ class tree: public hpx::components::managed_component_base<tree> {
 	std::atomic<int> energy_step;
 	std::vector<multi_range> grandchild_boxes;
 	mutex_type mtx;
+	int gravity_step;
+	int hydro_step;
 	double dx;
 	double t0;
 	double t;
@@ -55,7 +57,7 @@ public:
 	static hpx::future<tree_client> allocate(int, multi_range box);
 
 	tree(tree &&other) :
-			refine_step(0), energy_step(0) {
+			refine_step(0), energy_step(0), gravity_step(0), hydro_step(0) {
 		dt = std::move(other.dt);
 		box = std::move(other.box);
 		hydro = std::move(other.hydro);
@@ -128,8 +130,8 @@ public:
 	void delist();
 	void list();
 	void set_child_family();
-	void set_gravity_boundary(boundary&&, const multi_range&);
-	void set_hydro_boundary(std::vector<double>&&, const multi_range&);
+	void set_gravity_boundary(boundary&&, const multi_range&, int);
+	void set_hydro_boundary(std::vector<double>&&, const multi_range&, int);
 	std::vector<double> get_energy_boundary(multi_range, int);
 	std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> get_refinement_boundary(multi_range, int);
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
