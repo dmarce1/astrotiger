@@ -318,10 +318,14 @@ gravity_return gravity::get_restrict(double rho0) {
 
 void gravity::apply_restrict(const gravity_return &data) {
 	int k = 0;
+	multi_array<std::uint8_t> this_active(data.box);
 	for (multi_iterator i(data.box); !i.end(); i++) {
 		assert(k < data.active.size());
 		if (box.contains(i)) {
-			active[i] = data.active[k];
+			this_active[i] = data.active[k];
+			if( this_active[i] ) {
+				active[i] = true;
+			}
 		}
 		k++;
 	}
@@ -329,7 +333,7 @@ void gravity::apply_restrict(const gravity_return &data) {
 	k = 0;
 	for (multi_iterator i(data.box); !i.end(); i++) {
 		assert(k < data.R.size());
-		if (box.contains(i)) {
+		if (box.contains(i) && this_active[i]) {
 			R[i] = data.R[k];
 		}
 		k++;

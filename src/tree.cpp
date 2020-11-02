@@ -829,7 +829,7 @@ tree::~tree() {
 }
 
 tree::tree(int level_, multi_range box_) :
-		refine_step(0), energy_step(0) {
+		refine_step(0), energy_step(0), gravity_step(0), hydro_step(0) {
 	dt = 0.0;
 	t0 = 0.0;
 	t = 0.0;
