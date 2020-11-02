@@ -76,7 +76,7 @@ public:
 //		printf("Adding entry %i\n", level);
 	}
 	tree(const tree &other) :
-			refine_step(0), energy_step(0), gravity_step(0), refine_step(0) {
+			refine_step(0), energy_step(0), gravity_step(0),hydro_step(0) {
 		dt = other.dt;
 		box = other.box;
 		hydro = other.hydro;
