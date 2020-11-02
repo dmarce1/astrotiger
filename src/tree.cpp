@@ -221,7 +221,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			grav.apply_prolong(coarse_from_parent);
 		}
 	}
-	const auto iters = level == 0 ? opts.nmulti : 10 * opts.nmulti;
+	const auto iters = opts.nmulti;
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < iters; i++) {
 			get_gravity_boundaries();

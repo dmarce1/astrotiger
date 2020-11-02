@@ -99,6 +99,7 @@ void gravity::initialize_fine(const multi_array<double> &rho, double mtot) {
 void gravity::initialize_coarse(double w) {
 	for (multi_iterator i(box); !i.end(); i++) {
 		X[i] = 0.0;
+		R[i] = 0.0;
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
 		active[i] = false;
@@ -191,7 +192,7 @@ std::vector<double> gravity::pack_phi(const multi_range &bbox) const {
 
 void gravity::to_array(multi_array<double> &a, const multi_range &bbox, double w) const {
 	for (multi_iterator i(bbox); !i.end(); i++) {
-		if (box.contains(i)) {
+		if (box.pad(-1).contains(i)) {
 			a[i] = w == 0.0 ? phi[i] : w * phi[i] + (1.0 - w) * phi0[i];
 		}
 	}
@@ -251,7 +252,7 @@ void gravity::relax(bool init_zero) {
 					r += (0.5 / NDIM) * (x1[j + s[dim]] + x1[j - s[dim]]);
 				}
 				r += -x1[j] - R[i] * dx * dx / (2.0 * NDIM);
-				x1[j] += omega * r;
+				x1[j] += r;
 			}
 //			if (i.index()[0] == -2) {
 //				printf("%e\n", x1[j - s[0]]);
@@ -361,7 +362,10 @@ void gravity::apply_prolong(const std::vector<double> &data) {
 		const auto val = data[k];
 		for (multi_iterator j(multi_range(i.index()).double_()); !j.end(); j++) {
 			if (box.pad(-1).contains(j)) {
-				X[j] += val;
+			//	assert(active[j] || val == 0.0);
+				if( active[j]) {
+					X[j] += val;
+				}
 			}
 		}
 		k++;
