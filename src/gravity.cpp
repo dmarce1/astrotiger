@@ -1,7 +1,6 @@
 #include <astrotiger/gravity.hpp>
 #include <astrotiger/options.hpp>
 
-
 void gravity::resize(double dx_, const multi_range &box_) {
 	dx = dx_;
 	box = box_.pad(opts.gbw);
@@ -208,7 +207,7 @@ void gravity::relax(bool init_zero) {
 					r += (0.5 / NDIM) * (x1[j + s[dim]] + x1[j - s[dim]]);
 				}
 				r += -x1[j] - R[i] * dx * dx / (2.0 * NDIM);
-				x1[j] += r;
+				x1[j] += 1.5 * r;
 			}
 //			if (i.index()[0] == -2) {
 //				printf("%e\n", x1[j - s[0]]);
@@ -261,9 +260,9 @@ gravity_return gravity::get_restrict(double rho0) {
 			}
 			resid[i] += (2.0 * NDIM) * x[j] / (dx * dx);
 			resid[i] += R[i];
-			rc.resid += std::abs(resid[i]) * std::pow(dx, NDIM);
+			rc.resid = std::max(std::abs(resid[i] / (4.0 * M_PI * opts.G)), rc.resid);
 			rc.mass += R[i] * std::pow(dx, NDIM) / (4.0 * M_PI * opts.G);
-	//		printf( "%e %e\n", rc.mass, rc.resid);
+			//		printf( "%e %e\n", rc.mass, rc.resid);
 		}
 //		printf( "%i %i not active\n", i.index()[0], i.index()[1]);
 	}

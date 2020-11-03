@@ -98,7 +98,6 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		w = 1.0;
 	}
 
-
 	std::vector<std::vector<double>> phi_c(children.size());
 	if (level == fine_level - 1 && pass == 0) {
 		for (int i = 0; i < children.size(); i++) {
@@ -137,7 +136,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			grav.apply_prolong(coarse_from_parent);
 		}
 	}
-	const auto iters = opts.nmulti;
+	const auto iters = 2 * opts.nmulti;
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < iters; i++) {
 			get_gravity_boundaries();
@@ -155,12 +154,12 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			if (pass != 0) {
 				phi_c[i] = grav.get_prolong(c.get_box().half());
 			}
-			futs.push_back(c.gravity_solve(pass, fine_level, std::move(phi_c[i]),  this_t, mtot));
+			futs.push_back(c.gravity_solve(pass, fine_level, std::move(phi_c[i]), this_t, mtot));
 		}
 		for (auto &f : futs) {
 			auto tmp = f.get();
 			grav.apply_restrict(tmp);
-			rc.resid += tmp.resid;
+			rc.resid = std::max(tmp.resid, rc.resid);
 			rc.mass += tmp.mass;
 		}
 		for (int i = 0; i < iters; i++) {
@@ -480,7 +479,7 @@ void tree::get_hydro_boundaries(double this_time) {
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.hbw).intersection(box);
 		if (inter.volume()) {
-			sib.client.set_hydro_boundary(hydro.pack(inter), box.shift(-sib.shift),hydro_step);
+			sib.client.set_hydro_boundary(hydro.pack(inter), box.shift(-sib.shift), hydro_step);
 		}
 	}
 
