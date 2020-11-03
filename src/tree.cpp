@@ -28,8 +28,6 @@ using restrict_all_action_type = tree::restrict_all_action;
 using set_gravity_boundary_action_type = tree::set_gravity_boundary_action;
 using set_hydro_boundary_action_type = tree::set_hydro_boundary_action;
 using compute_error_action_type = tree::compute_error_action;
-using get_gravity_amr_bnd_action_type = tree::get_gravity_amr_bnd_action;
-HPX_REGISTER_ACTION (get_gravity_amr_bnd_action_type);
 HPX_REGISTER_ACTION (compute_error_action_type);
 HPX_REGISTER_ACTION (set_gravity_boundary_action_type);
 HPX_REGISTER_ACTION (set_hydro_boundary_action_type);
@@ -90,14 +88,7 @@ statistics tree::get_statistics() const {
 	return stats;
 }
 
-std::pair<std::vector<double>, std::vector<double>> tree::get_gravity_amr_bnd(const multi_range &box, double w) {
-	std::pair<std::vector<double>, std::vector<double>> rc;
-	rc.first = grav.pack_phi(box);
-	rc.second = hydro.pack_field(rho_i, box);
-	return rc;
-}
-
-gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse_from_parent, boundary rhoc, double this_t, double mtot) {
+gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse_from_parent, double this_t, double mtot) {
 	double w;
 	if (t0 != t) {
 		w = (this_t - t0) / (t - t0);
@@ -107,100 +98,25 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		w = 1.0;
 	}
 
-	if (pass == 0) {
-		const auto boxes = get_amr_boxes();
-		const auto bigbox = box.pad(opts.gbw);
-		auto mybox = box.pad(1);
-		for (const auto &b : boxes) {
-			mybox = mybox.union_(b.intersection(bigbox));
-		}
-		grav.allocate(mybox);
-	}
 
 	std::vector<std::vector<double>> phi_c(children.size());
-	std::vector<boundary> rho_c(children.size());
 	if (level == fine_level - 1 && pass == 0) {
-		std::vector<std::vector<hpx::future<std::pair<std::vector<double>, std::vector<double>>>>> sfuts(children.size());
 		for (int i = 0; i < children.size(); i++) {
 			const auto &c = children[i];
-			const auto cbox = c.get_box().half().pad(opts.gbw / 2 + (opts.gbw % 2) + 1);
-			for (const auto &s : siblings) {
-				const auto inter = cbox.intersection(s.box());
-				if (inter.volume()) {
-					sfuts[i].push_back(s.client.get_gravity_amr_bnd(inter.shift(-s.shift), w));
-				}
-			}
-		}
-		for (int i = 0; i < children.size(); i++) {
-			const auto &c = children[i];
-			const auto cbox = c.get_box().half().pad(opts.gbw / 2 + (opts.gbw % 2) + 1);
-			const auto cbox2 = c.get_box().half().pad(opts.gbw / 2);
-			multi_array<double> rho_tmp(cbox2);
+			const auto cbox = c.get_box().half().pad(opts.gbw);
 			multi_array<double> phi_tmp(cbox);
-			const auto cibox = box.pad(opts.gbw).intersection(cbox);
 			int l = 0;
-			grav.to_array(phi_tmp, cibox, w);
-			for (const auto &s : siblings) {
-				const auto inter = cbox.intersection(s.box());
-				if (inter.volume()) {
-					auto tmp = sfuts[i][l].get();
-					int k = 0;
-					for (multi_iterator j(inter); !j.end(); j++) {
-						assert(k < tmp.first.size());
-						assert(k < tmp.second.size());
-						if (cbox2.contains(j)) {
-							rho_tmp[j] = tmp.second[k];
-						}
-						if (cbox.contains(j)) {
-							phi_tmp[j] = tmp.first[k];
-						}
-						k++;
-					}
-					assert(k == tmp.first.size());
-					assert(k == tmp.second.size());
-					std::vector<double> tmp2;
-					const auto inter2 = cbox2.intersection(s.box());
-					if (inter2.volume()) {
-						for (multi_iterator j(inter2); !j.end(); j++) {
-							tmp2.push_back(rho_tmp[j]);
-						}
-						rho_c[i].boxes.push_back(inter2);
-						rho_c[i].data.push_back(std::move(tmp2));
-					}
-					l++;
-				}
-			}
+			grav.to_array(phi_tmp, cbox, w);
 			for (multi_iterator j(cbox); !j.end(); j++) {
 				phi_c[i].push_back(phi_tmp[j]);
 			}
 		}
-	}
-	if (level == fine_level && pass == 0) {
-		grav.unpack_coarse_source(rhoc);
-	}
-	if (pass == 0 && level == fine_level) {
-//		get_gravity_boundaries(PACK_SRC);
 	}
 	if (level == fine_level) {
 		if (pass == 0) {
 			if (level != 0) {
 				grav.initialize_fine(hydro.get_density(), mtot);
 				auto boxes = get_amr_boxes();
-//				std::vector<multi_range> tmp1;
-//				std::vector<multi_range> tmp3;
-//				std::vector<multi_range> tmp4;
-//				for (const auto &b : boxes) {
-//					tmp1.resize(1);
-//					tmp1[0] = b;
-//					for (const auto &s : siblings) {
-//						for (const auto &this_box : tmp1) {
-//							const auto tmp2 = this_box.subtract(s.box().pad(opts.gbw - 1));
-//							tmp3.insert(tmp3.end(), tmp2.begin(), tmp2.end());
-//						}
-//						tmp1 = std::move(tmp3);
-//					}
-//					tmp4.insert(tmp4.end(), tmp1.begin(), tmp1.end());
-//				}
 				grav.set_amr_zones(boxes, coarse_from_parent);
 			} else {
 				grav.initialize_coarse(t);
@@ -232,13 +148,14 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	rc.resid = rc.mass = 0.0;
 	if (level < fine_level) {
 		std::vector<hpx::future<gravity_return>> futs;
+		get_gravity_boundaries();
 		for (int i = 0; i < children.size(); i++) {
 			const auto &c = children[i];
 			std::vector<double> tmp5;
 			if (pass != 0) {
-				phi_c[i] = grav.get_prolong(c.get_box().half().pad(opts.gbw - 1));
+				phi_c[i] = grav.get_prolong(c.get_box().half());
 			}
-			futs.push_back(c.gravity_solve(pass, fine_level, std::move(phi_c[i]), std::move(rho_c[i]), w, mtot));
+			futs.push_back(c.gravity_solve(pass, fine_level, std::move(phi_c[i]),  this_t, mtot));
 		}
 		for (auto &f : futs) {
 			auto tmp = f.get();
@@ -261,6 +178,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	auto tmp = grav.get_restrict(mtot);
 	if (level != fine_level) {
 		tmp.resid = rc.resid;
+//		printf( "%e\n", rc.resid);
 		tmp.mass = rc.mass;
 	}
 	return tmp;
@@ -653,33 +571,10 @@ void tree::get_gravity_boundaries() {
 		const auto outer_bnd = opts.gbw;
 		const auto inner_bnd = opts.gbw - 1;
 		const auto bwidth = 1;
-		const auto inter = sib.box().pad(bwidth).intersection(box);
+		const auto inter = sib.box().pad(opts.gbw).intersection(box);
 		std::vector<multi_range> boxes;
 		if (inter.volume()) {
 			boxes.push_back(inter);
-		}
-		for (const auto &b : amr_boxes) {
-			const auto A = sib.box().pad(outer_bnd).intersection(b).intersection(box.pad(inner_bnd));
-			const auto B = sib.box().pad(inner_bnd).intersection(b).intersection(box.pad(outer_bnd));
-			std::vector<multi_range> tmp2;
-			std::vector<multi_range> tmp3;
-			auto tmp1 = A.subtract(B);
-			for (const auto &this_box : tmp1) {
-				tmp2 = this_box.subtract(sib.box());
-				tmp3.insert(tmp3.end(), tmp2.begin(), tmp2.end());
-			}
-			for (const auto &this_box : tmp3) {
-				if (this_box.volume()) {
-					boxes.push_back(this_box);
-				}
-			}
-			tmp1 = b.pad(bwidth).subtract(b);
-			for (const auto &this_box : tmp1) {
-				const auto inter = this_box.intersection(box).intersection(sib.box().pad(outer_bnd));
-				if (inter.volume()) {
-					boxes.push_back(inter);
-				}
-			}
 		}
 		boundary bnd;
 		bnd.boxes = boxes;

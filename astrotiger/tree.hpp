@@ -149,12 +149,10 @@ public:
 	void sanity() const;
 	statistics get_statistics() const;
 	std::vector<double> restrict_all();
-	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, const boundary rhoc, double t, double m);
+	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
 	double compute_error();
-	std::pair<std::vector<double>,std::vector<double>> get_gravity_amr_bnd(const multi_range& box, double w);
 
 
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_gravity_amr_bnd);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,restrict_all);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_statistics);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);

@@ -13,13 +13,9 @@ hpx::future<void> tree_client::delist() const {
 }
 
 
-hpx::future<std::pair<std::vector<double>,std::vector<double>>> tree_client::get_gravity_amr_bnd(const multi_range& box, double w) const {
-	return hpx::async<tree::get_gravity_amr_bnd_action>(gid, box, w);
-}
 
-
-hpx::future<gravity_return> tree_client::gravity_solve(int pass, int level, std::vector<double>&& coarse, boundary&& rhoc,  double t, double m) const {
-	return hpx::async<tree::gravity_solve_action>(gid, pass, level, std::move(coarse), std::move(rhoc), t, m);
+hpx::future<gravity_return> tree_client::gravity_solve(int pass, int level, std::vector<double>&& coarse, double t, double m) const {
+	return hpx::async<tree::gravity_solve_action>(gid, pass, level, std::move(coarse), t, m);
 }
 
 hpx::future<statistics> tree_client::get_statistics() const {

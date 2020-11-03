@@ -22,7 +22,7 @@ statistics solve_gravity() {
 		printf("Solving gravity on level %i\n", l);
 		//	for (int i = 0; i < 10; i++) {
 		do {
-			auto tmp = root.gravity_solve(pass, l, std::vector<double>(),boundary(), 0.0, mtot).get();
+			auto tmp = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get();
 			r = tmp.resid / tmp.mass;
 			printf("%i %e %e %e\n", pass, r, tmp.resid, tmp.mass);
 //			if( r < 5e-03 && l == opts.max_level) {
@@ -32,12 +32,12 @@ statistics solve_gravity() {
 			if (pass > 250) {
 			//	break;
 			}
-			if( l == 6 )
+	//		if( l == 6 )
 			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 
 		} while (r > toler);
 		//	}
-		auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(),boundary(), 0.0, mtot).get();
+		auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get();
 		r = tmp.resid / tmp.mass;
 		printf("%i %e\n", pass, r);
 //		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");

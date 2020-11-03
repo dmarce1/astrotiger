@@ -96,7 +96,7 @@ bool options::process_options(int argc, char *argv[]) {
 
 	nhydro = 3 + NDIM;
 	hbw = 2;
-	gbw = 5;
+	gbw = 2;
 	max_bw = std::max(hbw, window);
 	max_bw = std::max(max_bw, gbw);
 	nrk = order;

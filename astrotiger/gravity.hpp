@@ -5,7 +5,7 @@
 
 #include <array>
 
-#define OUTPUT_RESID
+//#define OUTPUT_RESID
 
 struct gravity_return {
 	double resid;
@@ -35,7 +35,6 @@ class gravity {
 	double dx;
 	int red;
 	multi_range box;
-	multi_range inner_box;
 
 public:
 
@@ -61,8 +60,6 @@ public:
 #endif
 	}
 
-	void allocate(const multi_range&);
-	void compute_flux();
 	void resize(double, const multi_range&);
 	void set_avg_zero();
 	void store();
@@ -81,7 +78,6 @@ public:
 	std::vector<double> pack(const multi_range&) const;
 	std::vector<double> pack_phi(const multi_range&) const;
 	void unpack(const std::vector<double>&, const multi_range &bbox);
-	void unpack_coarse_source(const boundary&);
 	void to_array(multi_array<double> &a, const multi_range &bbox,  double w) const;
 
 	void relax(bool init_zero);
