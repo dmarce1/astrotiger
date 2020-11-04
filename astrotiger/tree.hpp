@@ -143,7 +143,7 @@ public:
 	multi_range get_box() const;
 	tree_client truncate(tree_client, multi_range box);
 	std::vector<multi_range> get_refinement_boundaries();
-	void get_gravity_boundaries();
+	void get_gravity_boundaries(int);
 	void get_hydro_boundaries(double);
 	void get_energy_boundaries(double);
 	void sanity() const;

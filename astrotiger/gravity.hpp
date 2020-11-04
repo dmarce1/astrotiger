@@ -5,7 +5,9 @@
 
 #include <array>
 
-//#define OUTPUT_RESID
+#define PACK_POTENTIAL 1
+#define PACK_ACTIVE 2
+#define PACK_SOURCE 3
 
 struct gravity_return {
 	double resid;
@@ -66,7 +68,7 @@ public:
 	void initialize_fine(const multi_array<double>&, double mtot, int level);
 	void initialize_coarse(double w);
 	void finish_fine();
-	void set_amr_zones(const std::vector<multi_range>&,  const std::vector<double>&);
+	void set_amr_zones(const std::vector<multi_range>&, const std::vector<double>&);
 	void zero() {
 		for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 			X[i] = 0.0;
@@ -75,12 +77,12 @@ public:
 	double coord(index_type i) const;
 	void set_outflow_boundaries();
 	multi_array<double> get_phi() const;
-	std::vector<double> pack(const multi_range&) const;
+	std::vector<double> pack(const multi_range&, int) const;
 	std::vector<double> pack_phi(const multi_range&) const;
-	void unpack(const std::vector<double>&, const multi_range &bbox, int level);
-	void to_array(multi_array<double> &a, const multi_range &bbox,  double w) const;
+	void unpack(const std::vector<double>&, const multi_range &bbox, int);
+	void to_array(multi_array<double> &a, const multi_range &bbox, double w) const;
 
-	void relax(bool init_zero, int );
+	void relax(bool init_zero, int);
 	gravity_return get_restrict(double);
 	void apply_restrict(const gravity_return&);
 	std::vector<double> get_prolong(const multi_range&) const;

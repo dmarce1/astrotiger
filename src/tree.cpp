@@ -139,7 +139,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	const auto iters = opts.nmulti;
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < iters; i++) {
-			get_gravity_boundaries();
+			get_gravity_boundaries(PACK_POTENTIAL);
 			grav.relax(false, level);
 		}
 	}
@@ -147,7 +147,6 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	rc.resid = rc.mass = 0.0;
 	if (level < fine_level) {
 		std::vector<hpx::future<gravity_return>> futs;
-		get_gravity_boundaries();
 		for (int i = 0; i < children.size(); i++) {
 			const auto &c = children[i];
 			std::vector<double> tmp5;
@@ -163,21 +162,24 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			rc.mass += tmp.mass;
 		}
 		for (int i = 0; i < iters; i++) {
-			get_gravity_boundaries();
+			int type = PACK_POTENTIAL;
+			if( i == 0 ) {
+				type |= PACK_ACTIVE | PACK_SOURCE;
+			}
+			get_gravity_boundaries(type);
 			grav.relax(pass == 0 && i == 0, level);
 		}
 	} else if (level == fine_level) {
+		get_gravity_boundaries(PACK_POTENTIAL);
 		grav.finish_fine();
 		hydro.set_phi(grav.get_phi());
 	}
-	get_gravity_boundaries();
 	if (level == 0 && fine_level == 0 && opts.problem != "sphere") {
 		grav.set_avg_zero();
 	}
 	auto tmp = grav.get_restrict(mtot);
 	if (level != fine_level) {
 		tmp.resid = rc.resid;
-//		printf( "%e\n", rc.resid);
 		tmp.mass = rc.mass;
 	}
 	return tmp;
@@ -561,7 +563,7 @@ void tree::get_hydro_boundaries(double this_time) {
 	hydro_step++;
 }
 
-void tree::get_gravity_boundaries() {
+void tree::get_gravity_boundaries(int type) {
 	if (opts.problem == "sphere" && level == 0) {
 		return;
 	}
@@ -575,7 +577,7 @@ void tree::get_gravity_boundaries() {
 		boundary bnd;
 		bnd.boxes = boxes;
 		for (const auto &b : boxes) {
-			bnd.data.push_back(grav.pack(b));
+			bnd.data.push_back(grav.pack(b, type));
 		}
 		sib.client.set_gravity_boundary(std::move(bnd), box.shift(-sib.shift), gravity_step);
 	}
@@ -586,14 +588,13 @@ void tree::get_gravity_boundaries() {
 	for (auto &f : sib_futs) {
 		const auto bnd = f.get();
 		for (int j = 0; j < bnd.boxes.size(); j++) {
-			grav.unpack(bnd.data[j], bnd.boxes[j], level);
+			grav.unpack(bnd.data[j], bnd.boxes[j], type);
 		}
 	}
 	gravity_step++;
 }
 
 void tree::get_energy_boundaries(double this_time) {
-	return;
 	std::vector<multi_range> bnd_ranges;
 	std::vector<multi_range> parent_ranges;
 	std::vector<multi_range> sib_ranges;

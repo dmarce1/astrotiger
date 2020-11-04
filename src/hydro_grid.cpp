@@ -335,17 +335,15 @@ void hydro_grid::initialize() {
 			constexpr auto rho0 = 1.0 / std::pow(r0, NDIM);
 			if (r < 0.5 * r0) {
 				U[rho_i][i] = rho0 * (1.0 - 6.0 * r / r0 * r / r0 * (1.0 - r / r0));
-				U[rho_i][i] = 1.0/4.0/M_PI;
 			} else if (r < r0) {
 				U[rho_i][i] = rho0 * 2.0 * std::pow(1.0 - r / r0, 3);
-				U[rho_i][i] = 1.0/4.0/M_PI;
 			} else {
 				U[rho_i][i] = 1.0e-6/4.0/M_PI;
 			}
 			if ( NDIM == 3) {
-	//			U[rho_i][i] *= 8.0 / M_PI;
+				U[rho_i][i] *= 8.0 / M_PI;
 			} else if ( NDIM == 2) {
-		//		U[rho_i][i] *= 40.0 / (7.0 * M_PI);
+				U[rho_i][i] *= 40.0 / (7.0 * M_PI);
 			} else {
 				U[rho_i][i] *= 4.0 / 3.0;
 			}
