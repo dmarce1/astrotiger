@@ -57,13 +57,16 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 	}
 }
 
-void gravity::initialize_fine(const multi_array<double> &rho, double mtot) {
+void gravity::initialize_fine(const multi_array<double> &rho, double mtot, int level) {
 	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 		active[i] = true;
 	}
 	const auto rho0 = mtot;
 	for (multi_iterator i(box.pad(std::min(opts.gbw-opts.hbw,0))); !i.end(); i++) {
 		R[i] = 4.0 * M_PI * opts.G * (rho[i] - (opts.problem == "sphere" ? 0.0 : rho0));
+		if( level == 3 ) {
+			printf( "%e\n", R[i]);
+		}
 	}
 //	X = phi;
 }
@@ -185,9 +188,9 @@ void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, i
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		assert(k < data.size());
 		if( R[i] != data[k] && level == 3 ) {
-			printf( "%e %e\n", R[i], data[k]);
+//			printf( "%e %e\n", R[i], data[k]);
 		}
-		R[i] = data[k];
+//		R[i] = data[k];
 		k++;
 	}
 	assert(k == data.size());

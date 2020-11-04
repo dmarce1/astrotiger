@@ -32,7 +32,7 @@ statistics solve_gravity() {
 			if (pass > 250) {
 			//	break;
 			}
-	//		if( l == 6 )
+			if( l == 3 )
 			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 
 		} while (r > toler);

@@ -63,7 +63,7 @@ public:
 	void resize(double, const multi_range&);
 	void set_avg_zero();
 	void store();
-	void initialize_fine(const multi_array<double>&, double mtot);
+	void initialize_fine(const multi_array<double>&, double mtot, int level);
 	void initialize_coarse(double w);
 	void finish_fine();
 	void set_amr_zones(const std::vector<multi_range>&,  const std::vector<double>&);

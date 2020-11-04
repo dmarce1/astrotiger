@@ -114,12 +114,12 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	if (level == fine_level) {
 		if (pass == 0) {
 			if (level != 0) {
-				grav.initialize_fine(hydro.get_density(), mtot);
+				grav.initialize_fine(hydro.get_density(), mtot, level);
 				auto boxes = get_amr_boxes();
 				grav.set_amr_zones(boxes, coarse_from_parent);
 			} else {
 				grav.initialize_coarse(t);
-				grav.initialize_fine(hydro.get_density(), mtot);
+				grav.initialize_fine(hydro.get_density(), mtot, level);
 				if (opts.problem == "sphere") {
 					grav.set_outflow_boundaries();
 				}
