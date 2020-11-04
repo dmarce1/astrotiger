@@ -77,10 +77,10 @@ public:
 	multi_array<double> get_phi() const;
 	std::vector<double> pack(const multi_range&) const;
 	std::vector<double> pack_phi(const multi_range&) const;
-	void unpack(const std::vector<double>&, const multi_range &bbox);
+	void unpack(const std::vector<double>&, const multi_range &bbox, int level);
 	void to_array(multi_array<double> &a, const multi_range &bbox,  double w) const;
 
-	void relax(bool init_zero);
+	void relax(bool init_zero, int );
 	gravity_return get_restrict(double);
 	void apply_restrict(const gravity_return&);
 	std::vector<double> get_prolong(const multi_range&) const;

@@ -27,9 +27,7 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 	assert(k == data.size());
 
 	for (multi_iterator i(box); !i.end(); i++) {
-		if (!box.pad(-opts.gbw).contains(i)) {
-			active[i] = false;
-		}
+			active[i] = true;
 	}
 	for (const auto &b : boxes) {
 		for (multi_iterator i(b); !i.end(); i++) {
@@ -60,11 +58,11 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 }
 
 void gravity::initialize_fine(const multi_array<double> &rho, double mtot) {
-	for (multi_iterator i(box.pad(-1)); !i.end(); i++) {
+	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 		active[i] = true;
 	}
 	const auto rho0 = mtot;
-	for (multi_iterator i(box); !i.end(); i++) {
+	for (multi_iterator i(box.pad(std::min(opts.gbw-opts.hbw,0))); !i.end(); i++) {
 		R[i] = 4.0 * M_PI * opts.G * (rho[i] - (opts.problem == "sphere" ? 0.0 : rho0));
 	}
 //	X = phi;
@@ -134,6 +132,12 @@ std::vector<double> gravity::pack(const multi_range &bbox) const {
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		data.push_back(X[i]);
 	}
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		data.push_back(active[i]);
+	}
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		data.push_back(R[i]);
+	}
 	return data;
 }
 
@@ -166,15 +170,27 @@ multi_array<double> gravity::get_phi() const {
 	return rphi;
 }
 
-void gravity::unpack(const std::vector<double> &data, const multi_range &bbox) {
+void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, int level) {
 	int k = 0;
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		assert(k < data.size());
-		if (box.contains(i)) {
-			X[i] = data[k];
-		}
+		X[i] = data[k];
 		k++;
 	}
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		assert(k < data.size());
+		active[i] = data[k];
+		k++;
+	}
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		assert(k < data.size());
+		if( R[i] != data[k] && level == 3 ) {
+			printf( "%e %e\n", R[i], data[k]);
+		}
+		R[i] = data[k];
+		k++;
+	}
+	assert(k == data.size());
 }
 
 void gravity::finish_fine() {
@@ -182,11 +198,11 @@ void gravity::finish_fine() {
 	phi = X;
 }
 
-void gravity::relax(bool init_zero) {
+void gravity::relax(bool init_zero, int level) {
 	multi_array<double> X0;
 	if (init_zero) {
 		for (multi_iterator i(box); !i.end(); i++) {
-			X[i] = 0.0;
+//			X[i] = 0.0;
 		}
 	}
 	const auto ibox = box.pad(-1);
@@ -194,27 +210,33 @@ void gravity::relax(bool init_zero) {
 	auto *x0 = X0.data();
 	auto *x1 = X.data();
 	const auto s = X.get_strides();
-	for (multi_iterator i(ibox); !i.end(); i++) {
-		if (active[i]) {
-			const auto j = X.index(i);
-			int sum = 0;
-			for (int dim = 0; dim < NDIM; dim++) {
-				sum += i.index()[dim];
-			}
-			if (sum % 2 == red % 2) {
-				double r = 0.0;
+	for (int red = 0; red < 2; red++) {
+		for (multi_iterator i(ibox); !i.end(); i++) {
+			if (active[i]) {
+	//			printf( "%e\n", R[i]);
+	//			if( level == 3 ) printf( "active %s %i %i level %i\n", box.pad(-opts.gbw).to_string().c_str(), i.index()[0], i.index()[1], level);
+				const auto j = X.index(i);
+				int sum = 0;
 				for (int dim = 0; dim < NDIM; dim++) {
-					r += (0.5 / NDIM) * (x1[j + s[dim]] + x1[j - s[dim]]);
+					sum += i.index()[dim];
 				}
-				r += -x1[j] - R[i] * dx * dx / (2.0 * NDIM);
-				x1[j] += 1.5 * r;
-			}
+				if (sum % 2 == red % 2) {
+					double r = 0.0;
+					for (int dim = 0; dim < NDIM; dim++) {
+						r += (0.5 / NDIM) * (x1[j + s[dim]] + x1[j - s[dim]]);
+					}
+					r += -x1[j] - R[i] * dx * dx / (2.0 * NDIM);
+					x1[j] += 1.5 * r;
+				}
 //			if (i.index()[0] == -2) {
 //				printf("%e\n", x1[j - s[0]]);
 //			}
+			} else {
+	//			if( level ==3 ) printf( "inactive %s %i %i level %i\n", box.pad(-opts.gbw).to_string().c_str(), i.index()[0], i.index()[1], level);
+			}
 		}
+//	}
 	}
-	red++;
 }
 
 gravity_return gravity::get_restrict(double rho0) {
@@ -224,16 +246,12 @@ gravity_return gravity::get_restrict(double rho0) {
 	active_c.resize(rbox);
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		const auto id = i.index();
-		if (box.pad(-1).contains(id * 2)) {
-			const auto cbox = multi_range(id).double_();
-			bool this_active = true;
-			for (multi_iterator ci(cbox); !ci.end(); ci++) {
-				this_active = this_active && active[ci];
-			}
-			active_c[i] = this_active;
-		} else {
-			active_c[i] = false;
+		const auto cbox = multi_range(id).double_();
+		bool this_active = true;
+		for (multi_iterator ci(cbox); !ci.end(); ci++) {
+			this_active = this_active && active[ci];
 		}
+		active_c[i] = this_active;
 	}
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		rc.active.push_back(active_c[i]);
