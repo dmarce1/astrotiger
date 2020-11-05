@@ -25,12 +25,10 @@ using get_energy_prolong_action_type = tree::get_energy_prolong_action;
 using gravity_solve_action_type = tree::gravity_solve_action;
 using get_statistics_action_type = tree::get_statistics_action;
 using restrict_all_action_type = tree::restrict_all_action;
-using set_gravity_boundary_action_type = tree::set_gravity_boundary_action;
-using set_hydro_boundary_action_type = tree::set_hydro_boundary_action;
+using set_boundary_action_type = tree::set_boundary_action;
 using compute_error_action_type = tree::compute_error_action;
 HPX_REGISTER_ACTION (compute_error_action_type);
-HPX_REGISTER_ACTION (set_gravity_boundary_action_type);
-HPX_REGISTER_ACTION (set_hydro_boundary_action_type);
+HPX_REGISTER_ACTION (set_boundary_action_type);
 HPX_REGISTER_ACTION (restrict_all_action_type);
 HPX_REGISTER_ACTION (get_statistics_action_type);
 HPX_REGISTER_ACTION (gravity_solve_action_type);
@@ -100,26 +98,11 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	} else {
 		w = 1.0;
 	}
-
-	std::vector<std::vector<double>> phi_c(children.size());
-	if (level == fine_level - 1 && pass == 0) {
-		for (int i = 0; i < children.size(); i++) {
-			const auto &c = children[i];
-			const auto cbox = c.get_box().half().pad(opts.gbw);
-			multi_array<double> phi_tmp(cbox);
-			int l = 0;
-			grav.to_array(phi_tmp, cbox, w);
-			for (multi_iterator j(cbox); !j.end(); j++) {
-				phi_c[i].push_back(phi_tmp[j]);
-			}
-		}
-	}
 	if (level == fine_level) {
 		if (pass == 0) {
 			if (level != 0) {
 				grav.initialize_fine(hydro.get_density(), mtot, level);
-				auto boxes = get_amr_boxes();
-				grav.set_amr_zones(boxes, coarse_from_parent);
+				grav.set_amr_zones(get_amr_boxes(), coarse_from_parent);
 			} else {
 				grav.initialize_coarse(t);
 				grav.initialize_fine(hydro.get_density(), mtot, level);
@@ -142,32 +125,33 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	const auto iters = opts.nmulti;
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < iters; i++) {
-			get_gravity_boundaries(PACK_POTENTIAL);
+			get_gravity_boundaries(PACK_POTENTIAL_REDBLACK);
 			grav.relax();
 		}
 	}
 	gravity_return rc;
-	rc.resid = rc.mass = 0.0;
+	rc.resid = 0.0;
 	if (level < fine_level) {
 		std::vector<hpx::future<gravity_return>> futs;
+		futs.reserve(children.size());
 		for (int i = 0; i < children.size(); i++) {
 			const auto &c = children[i];
-			std::vector<double> tmp5;
-			if (pass != 0) {
-				phi_c[i] = grav.get_prolong(c.get_box().half());
+			if (pass == 0) {
+				const auto this_box = c.get_box().half().pad(opts.gbw);
+				futs.push_back(c.gravity_solve(pass, fine_level, grav.pack(this_box, w), this_t, mtot));
+			} else {
+				futs.push_back(c.gravity_solve(pass, fine_level, grav.get_prolong(c.get_box().half()), this_t, mtot));
 			}
-			futs.push_back(c.gravity_solve(pass, fine_level, std::move(phi_c[i]), this_t, mtot));
 		}
 		for (auto &f : futs) {
 			auto tmp = f.get();
 			grav.apply_restrict(tmp);
 			rc.resid = std::max(tmp.resid, rc.resid);
-			rc.mass += tmp.mass;
 		}
 		for (int i = 0; i < iters; i++) {
-			int type = PACK_POTENTIAL;
+			int type = PACK_POTENTIAL_REDBLACK;
 			if (i == 0) {
-				type |= PACK_ACTIVE | PACK_SOURCE;
+				type |= (PACK_ACTIVE | PACK_SOURCE);
 			}
 			get_gravity_boundaries(type);
 			grav.relax();
@@ -183,7 +167,6 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	auto tmp = grav.get_restrict(mtot);
 	if (level != fine_level) {
 		tmp.resid = rc.resid;
-		tmp.mass = rc.mass;
 	}
 	return tmp;
 
@@ -202,25 +185,14 @@ multi_range tree::get_box() const {
 	return box;
 }
 
-void tree::set_hydro_boundary(std::vector<double> &&data, const multi_range &bbox, int step) {
+void tree::set_boundary(std::vector<double> &&data, const multi_range &bbox, int step) {
 	bool found = false;
 	for (int i = 0; i < siblings.size(); i++) {
 		if (siblings[i].box() == bbox) {
 			assert(!found);
-			siblings[i].client.put(std::move(data), hydro_step);
+			siblings[i].client.put(std::move(data), step);
 			found = true;
-		}
-	}
-	assert(found);
-}
-
-void tree::set_gravity_boundary(boundary &&data, const multi_range &bbox, int step) {
-	bool found = false;
-	for (int i = 0; i < siblings.size(); i++) {
-		if (siblings[i].box() == bbox) {
-			assert(!found);
-			siblings[i].client.put_gravity(std::move(data), step);
-			found = true;
+			break;
 		}
 	}
 	assert(found);
@@ -484,7 +456,7 @@ void tree::get_hydro_boundaries(double this_time) {
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.hbw).intersection(box);
 		if (inter.volume()) {
-			sib.client.set_hydro_boundary(hydro.pack(inter), box.shift(-sib.shift), hydro_step);
+			sib.client.set_boundary(hydro.pack(inter), box.shift(-sib.shift), hydro_step);
 		}
 	}
 
@@ -570,27 +542,17 @@ void tree::get_gravity_boundaries(int type) {
 	if (opts.problem == "sphere" && level == 0) {
 		return;
 	}
+//	assert( !((type & PACK_POTENTIAL) && (type != PACK_POTENTIAL)));
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.gbw).intersection(box);
-		std::vector<multi_range> boxes;
 		if (inter.volume()) {
-			boxes.push_back(inter);
+			sib.client.set_boundary(grav.pack(inter, type), box.shift(-sib.shift), gravity_step);
 		}
-		boundary bnd;
-		bnd.boxes = boxes;
-		for (const auto &b : boxes) {
-			bnd.data.push_back(grav.pack(b, type));
-		}
-		sib.client.set_gravity_boundary(std::move(bnd), box.shift(-sib.shift), gravity_step);
 	}
-	std::vector<hpx::future<boundary>> sib_futs;
-	for (auto &s : siblings) {
-		sib_futs.push_back(s.client.get_gravity(gravity_step));
-	}
-	for (auto &f : sib_futs) {
-		const auto bnd = f.get();
-		for (int j = 0; j < bnd.boxes.size(); j++) {
-			grav.unpack(bnd.data[j], bnd.boxes[j], type);
+	for (auto &sib : siblings) {
+		const auto inter = sib.box().intersection(box.pad(opts.gbw));
+		if (inter.volume()) {
+			grav.unpack(sib.client.get(gravity_step).get(), inter, type);
 		}
 	}
 	gravity_step++;
@@ -769,18 +731,17 @@ std::vector<multi_range> tree::get_amr_boxes() const {
 	if (level > 0) {
 		const auto bnd_ranges = box.pad(opts.max_bw).subtract(box);
 		for (int i = 0; i < bnd_ranges.size(); i++) {
-			std::vector<multi_range> tmp;
-			std::vector<multi_range> these_ranges(1, bnd_ranges[i]);
+			static thread_local std::vector<multi_range> tmp;
+			static thread_local std::vector<multi_range> these_ranges;
+			these_ranges.resize(1);
+			these_ranges[0] = bnd_ranges[i];
 			for (const auto &sib : siblings) {
 				tmp.resize(0);
 				for (int j = 0; j < these_ranges.size(); j++) {
 					auto new_ranges = these_ranges[j].subtract(sib.box());
-					for (const auto &b : new_ranges) {
-						assert(b.volume());
-					}
 					tmp.insert(tmp.end(), new_ranges.begin(), new_ranges.end());
 				}
-				these_ranges = std::move(tmp);
+				std::swap(these_ranges, tmp);
 			}
 			amr_ranges.insert(amr_ranges.end(), these_ranges.begin(), these_ranges.end());
 		}

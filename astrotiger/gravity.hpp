@@ -5,19 +5,20 @@
 
 #include <array>
 
-#define PACK_POTENTIAL 1
+#define OUTPUT_RESID
+
+#define PACK_POTENTIAL_REDBLACK 1
+#define PACK_POTENTIAL 8
 #define PACK_ACTIVE 2
-#define PACK_SOURCE 3
+#define PACK_SOURCE 4
 
 struct gravity_return {
 	double resid;
-	double mass;
 	std::vector<std::uint8_t> active;
 	std::vector<double> R;
 	multi_range box;
 	template<class A>
 	void serialize(A &&arc, unsigned) {
-		arc & mass;
 		arc & resid;
 		arc & active;
 		arc & R;
@@ -77,10 +78,10 @@ public:
 	double coord(index_type i) const;
 	void set_outflow_boundaries();
 	multi_array<double> get_phi() const;
+	std::vector<double> pack(const multi_range&, double) const;
 	std::vector<double> pack(const multi_range&, int) const;
 	std::vector<double> pack_phi(const multi_range&) const;
 	void unpack(const std::vector<double>&, const multi_range &bbox, int);
-	void to_array(multi_array<double> &a, const multi_range &bbox, double w) const;
 
 	void relax();
 	gravity_return get_restrict(double);

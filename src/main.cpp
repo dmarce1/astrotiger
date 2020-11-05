@@ -24,7 +24,7 @@ statistics solve_gravity() {
 		do {
 			auto tmp = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get();
 			r = tmp.resid /mtot;
-			printf("%i %e %e %e\n", pass, r, tmp.resid, tmp.mass);
+			printf("%i %e %e\n", pass, r, tmp.resid);
 //			if( r < 5e-03 && l == opts.max_level) {
 //				break;
 //			}
@@ -32,8 +32,8 @@ statistics solve_gravity() {
 			if (pass > 250) {
 			//	break;
 			}
-//			if( l == 3 )
-//			output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
+	//		if( l == 5 )
+	//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
 
 		} while (r > toler);
 		//	}
@@ -155,7 +155,7 @@ int hpx_main(int argc, char *argv[]) {
 //	master(0, 1.0e-100);
 	levels_show();
 	solve_gravity();
-//	output_silo("X.0.silo");
+	output_silo("X.0.silo");
 //	int i = 0;
 //	const auto dt = 0.01;
 //	levels_show();

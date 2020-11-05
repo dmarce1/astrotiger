@@ -1,5 +1,6 @@
 #include <astrotiger/gravity.hpp>
 #include <astrotiger/options.hpp>
+#include <astrotiger/boxes.hpp>
 
 void gravity::resize(double dx_, const multi_range &box_) {
 	dx = dx_;
@@ -128,8 +129,27 @@ void gravity::set_avg_zero() {
 std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 	assert(box.contains(bbox));
 	std::vector<double> data;
-
+	int size = 0;
+	const int vol = bbox.volume();
 	if (type | PACK_POTENTIAL) {
+		size += vol;
+	}
+	if (type | PACK_POTENTIAL_REDBLACK) {
+		size += vol / 2;
+	}
+	if (type | PACK_ACTIVE) {
+		size += vol / 2;
+	}
+	if (type | PACK_SOURCE) {
+		size += vol / 2;
+	}
+	data.reserve(size);
+	if (type | PACK_POTENTIAL) {
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			data.push_back(X[i]);
+		}
+	}
+	if (type | PACK_POTENTIAL_REDBLACK) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
 			if (i.index().sum() % 2 == 1) {
 				data.push_back(X[i]);
@@ -153,6 +173,55 @@ std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 	return data;
 }
 
+std::vector<double> gravity::pack(const multi_range &bbox, double w) const {
+	assert(box.contains(bbox));
+	std::vector<double> data;
+	data.reserve(bbox.volume());
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		data.push_back(w * phi[i] + (1.0 - w) * phi0[i]);
+	}
+	return data;
+}
+
+void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, int type) {
+	int k = 0;
+	if (type | PACK_POTENTIAL) {
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			assert(k < data.size());
+			X[i] = data[k];
+			k++;
+		}
+	}
+	if (type | PACK_POTENTIAL_REDBLACK) {
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			if (i.index().sum() % 2 == 1) {
+				assert(k < data.size());
+				X[i] = data[k];
+				k++;
+			}
+		}
+	}
+	if (type | PACK_ACTIVE) {
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			if (i.index().sum() % 2 == 0) {
+				assert(k < data.size());
+				active[i] = data[k];
+				k++;
+			}
+		}
+	}
+	if (type | PACK_SOURCE) {
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			if (i.index().sum() % 2 == 0) {
+				assert(k < data.size());
+				R[i] = data[k];
+				k++;
+			}
+		}
+	}
+	assert(k == data.size());
+}
+
 std::vector<double> gravity::pack_phi(const multi_range &bbox) const {
 	assert(box.contains(bbox));
 	std::vector<double> data;
@@ -161,12 +230,6 @@ std::vector<double> gravity::pack_phi(const multi_range &bbox) const {
 		data.push_back(phi[i]);
 	}
 	return data;
-}
-
-void gravity::to_array(multi_array<double> &a, const multi_range &bbox, double w) const {
-	for (multi_iterator i(bbox); !i.end(); i++) {
-		a[i] = w == 0.0 ? phi[i] : w * phi[i] + (1.0 - w) * phi0[i];
-	}
 }
 
 multi_array<double> gravity::get_phi() const {
@@ -182,63 +245,38 @@ multi_array<double> gravity::get_phi() const {
 	return rphi;
 }
 
-void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, int type) {
-	int k = 0;
-	if (type | PACK_POTENTIAL) {
-		for (multi_iterator i(bbox); !i.end(); i++) {
-			assert(k < data.size());
-			if (i.index().sum() % 2 == 1) {
-				X[i] = data[k];
-				k++;
-			}
-		}
-	}
-	if (type | PACK_ACTIVE) {
-		for (multi_iterator i(bbox); !i.end(); i++) {
-			assert(k < data.size());
-			if (i.index().sum() % 2 == 0) {
-				active[i] = data[k];
-				k++;
-			}
-		}
-	}
-	if (type | PACK_SOURCE) {
-		for (multi_iterator i(bbox); !i.end(); i++) {
-			assert(k < data.size());
-			if (i.index().sum() % 2 == 0) {
-				R[i] = data[k];
-				k++;
-			}
-		}
-	}
-	assert(k == data.size());
-}
-
 void gravity::finish_fine() {
 	phi0 = phi;
 	phi = X;
 }
 
 void gravity::relax() {
-	multi_array<double> X0;
-	const auto ibox = box.pad(-1);
-	X0 = X;
-	auto *x0 = X0.data();
-	auto *x1 = X.data();
+	auto *x = X.data();
+	const auto redi_ptr = get_red_indices(box);
+	const auto blacki_ptr = get_black_indices(box);
+	const auto redi = *redi_ptr;
+	const auto blacki = *blacki_ptr;
+	const auto *a = active.data();
+	const auto *src = R.data();
 	const auto s = X.get_strides();
-	for (int red = 0; red < 2; red++) {
-		for (multi_iterator i(ibox); !i.end(); i++) {
-			if (active[i]) {
-				const auto j = X.index(i);
-				if (i.index().sum() % 2 == red % 2) {
-					double r = 0.0;
-					for (int dim = 0; dim < NDIM; dim++) {
-						r += (0.5 / NDIM) * (x1[j + s[dim]] + x1[j - s[dim]]);
-					}
-					r += -x1[j] - R[i] * dx * dx / (2.0 * NDIM);
-					x1[j] += 1.5 * r;
-				}
+	const auto c0 = 0.5 / NDIM;
+	const auto d0 = dx * dx * 0.5 / NDIM;
+	for (const auto i : redi) {
+		if (a[i]) {
+			double r = -(x[i] + d0 * src[i]);
+			for (int dim = 0; dim < NDIM; dim++) {
+				r += c0 * (x[i + s[dim]] + x[i - s[dim]]);
 			}
+			x[i] += 1.5 * r;
+		}
+	}
+	for (const auto i : blacki) {
+		if (a[i]) {
+			double r = -(x[i] + d0 * src[i]);
+			for (int dim = 0; dim < NDIM; dim++) {
+				r += c0 * (x[i + s[dim]] + x[i - s[dim]]);
+			}
+			x[i] += 1.5 * r;
 		}
 	}
 }
@@ -248,6 +286,8 @@ gravity_return gravity::get_restrict(double rho0) {
 	multi_array<std::uint8_t> active_c;
 	auto rbox = box.pad(-opts.gbw).half();
 	active_c.resize(rbox);
+	int active_vol = 0;
+	rc.active.reserve(rbox.volume());
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		const auto id = i.index();
 		const auto cbox = multi_range(id).double_();
@@ -256,6 +296,9 @@ gravity_return gravity::get_restrict(double rho0) {
 			this_active = this_active && active[ci];
 		}
 		active_c[i] = this_active;
+		if (this_active) {
+			active_vol++;
+		}
 	}
 	for (multi_iterator i(rbox); !i.end(); i++) {
 		rc.active.push_back(active_c[i]);
@@ -272,8 +315,6 @@ gravity_return gravity::get_restrict(double rho0) {
 	const auto s = X.get_strides();
 	double rmax = 0.0;
 	rc.resid = 0.0;
-	rc.mass = 0.0;
-///	printf( "!\n");
 	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 		if (active[i]) {
 			const auto j = X.index(i);
@@ -283,14 +324,14 @@ gravity_return gravity::get_restrict(double rho0) {
 			resid[i] += (2.0 * NDIM) * x[j] / (dx * dx);
 			resid[i] += R[i];
 			rc.resid = std::max(std::abs(resid[i] / (4.0 * M_PI * opts.G)), rc.resid);
-			rc.mass += R[i] * std::pow(dx, NDIM) / (4.0 * M_PI * opts.G);
-			//		printf( "%e %e\n", rc.mass, rc.resid);
 		}
-//		printf( "%i %i not active\n", i.index()[0], i.index()[1]);
 	}
+	rc.R.reserve(active_vol);
 	const auto resid_c = resid.restrict_(rbox);
 	for (multi_iterator i(rbox); !i.end(); i++) {
-		rc.R.push_back(resid_c[i]);
+		if (active_c[i]) {
+			rc.R.push_back(resid_c[i]);
+		}
 	}
 	rc.box = rbox;
 	return rc;
@@ -298,29 +339,26 @@ gravity_return gravity::get_restrict(double rho0) {
 
 void gravity::apply_restrict(const gravity_return &data) {
 	int k = 0;
-	multi_array<std::uint8_t> this_active(data.box);
 	for (multi_iterator i(data.box); !i.end(); i++) {
 		assert(k < data.active.size());
-		this_active[i] = data.active[k];
-		if (this_active[i]) {
-			active[i] = true;
-		}
+		active[i] = data.active[k];
 		k++;
 	}
 	assert(k == data.active.size());
 	k = 0;
 	for (multi_iterator i(data.box); !i.end(); i++) {
-		assert(k < data.R.size());
-		if (this_active[i]) {
+		if (active[i]) {
+			assert(k < data.R.size());
 			R[i] = data.R[k];
+			k++;
 		}
-		k++;
 	}
 	assert(k == data.R.size());
 }
 
 std::vector<double> gravity::get_prolong(const multi_range &bbox) const {
 	std::vector<double> data;
+	data.reserve(bbox.volume());
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		data.push_back(X[i]);
 	}

@@ -26,6 +26,7 @@ find_package(Boost REQUIRED)
 set(CMAKE_CXX_FLAGS "-isystem /home/dmarce1/local/boost/include -DBOOST_ALL_NO_LIB -DBOOST_DISABLE_ASSERTS -g -std=c++17 -ffast-math -march=native")
 
 set(astrotiger_source_files
+	src/boxes.cpp
 	src/geometry.cpp
 	src/gravity.cpp
 	src/hpx.cpp
@@ -40,6 +41,7 @@ set(astrotiger_source_files
 
 
 set(astrotiger_header_files
+ 	astrotiger/boxes.hpp	
  	astrotiger/channel.hpp	
  	astrotiger/defs.hpp	
  	astrotiger/geometry.hpp	
