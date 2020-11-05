@@ -133,11 +133,13 @@ int hpx_main(int argc, char *argv[]) {
 	tm.resize(opts.max_level + 1);
 	super_step.resize(opts.max_level + 1);
 	for (int l = 0; l <= opts.max_level; l++) {
+		printf( "Forming level %i\n", l );
 		super_step[l] = 0;
 		dx[l] = 1.0 / (opts.max_box * (1 << l));
 		tm[l] = 0.0;
 		auto fut = root.initialize(l);
 		auto amax = fut.get();
+		printf( "Initialized. Setting families\n");
 		if (l >= 1) {
 			levels_set_child_families(l - 1);
 		}
@@ -146,13 +148,14 @@ int hpx_main(int argc, char *argv[]) {
 		} else {
 			dt[l] = 0.0;
 		}
+		printf( "Done\n");
 	}
 	root.set_family(tree_client(), root, sibs).get();
 	root.restrict_all().get();
 //	master(0, 1.0e-100);
 	levels_show();
 	solve_gravity();
-	output_silo("X.0.silo");
+//	output_silo("X.0.silo");
 //	int i = 0;
 //	const auto dt = 0.01;
 //	levels_show();

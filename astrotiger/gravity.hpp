@@ -82,7 +82,7 @@ public:
 	void unpack(const std::vector<double>&, const multi_range &bbox, int);
 	void to_array(multi_array<double> &a, const multi_range &bbox, double w) const;
 
-	void relax(bool init_zero, int);
+	void relax();
 	gravity_return get_restrict(double);
 	void apply_restrict(const gravity_return&);
 	std::vector<double> get_prolong(const multi_range&) const;

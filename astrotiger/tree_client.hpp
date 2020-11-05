@@ -56,18 +56,14 @@ public:
 	}
 
 	hpx::future<boundary> get_gravity(int step) {
-		return hpx::async([this,step]() {
-			return gchan.get(step);
-		});
+		return gchan.get(step);
 	}
 	void put_gravity(boundary &&data, int step) {
 		gchan.put(std::move(data), step);
 	}
 
 	hpx::future<std::vector<double>> get(int step) {
-		return hpx::async([this,step]() {
-			return chan.get(step);
-		});
+		return chan.get(step);
 	}
 
 	tree_client() {
@@ -91,14 +87,14 @@ public:
 	hpx::future<double> initialize(int) const;
 	hpx::future<std::vector<tree_client>> get_children() const;
 	hpx::future<void> set_hydro_boundary(std::vector<double> &&data, const multi_range &bbox, int) const;
-	hpx::future<void> set_gravity_boundary(boundary &&data, const multi_range &bbox, int ) const;
+	hpx::future<void> set_gravity_boundary(boundary &&data, const multi_range &bbox, int) const;
 	hpx::future<std::vector<double>> get_energy_boundary(multi_range b, int) const;
 	hpx::future<std::vector<std::vector<double>>> get_hydro_prolong(std::vector<multi_range> b, double t) const;
 	hpx::future<std::vector<std::vector<double>>> get_energy_prolong(std::vector<multi_range> b, double t) const;
 	hpx::future<std::pair<std::vector<double>, std::vector<double>>> get_hydro_restrict() const;
 	hpx::future<std::shared_ptr<tree>> get_ptr() const;
 	hpx::future<std::pair<std::vector<std::uint8_t>, std::vector<multi_range>>> get_refinement_boundary(multi_range, int) const;
-	hpx::future<gravity_return> gravity_solve(int pass, int level,  std::vector<double>&& coarse,  double t, double m) const;
+	hpx::future<gravity_return> gravity_solve(int pass, int level, std::vector<double> &&coarse, double t, double m) const;
 	hpx::future<statistics> get_statistics() const;
 	hpx::future<std::vector<double>> restrict_all() const;
 	hpx::future<double> compute_error() const;

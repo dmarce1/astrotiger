@@ -42,6 +42,13 @@ public:
 			a & v[i];
 		}
 	}
+	inline T sum() const {
+		T sum = v[0];
+		for( int i = 1; i < NDIM; i++) {
+			sum += v[i];
+		}
+		return sum;
+	}
 
 };
 

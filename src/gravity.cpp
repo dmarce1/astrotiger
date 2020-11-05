@@ -131,17 +131,23 @@ std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 
 	if (type | PACK_POTENTIAL) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			data.push_back(X[i]);
+			if (i.index().sum() % 2 == 1) {
+				data.push_back(X[i]);
+			}
 		}
 	}
 	if (type | PACK_ACTIVE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			data.push_back(active[i]);
+			if (i.index().sum() % 2 == 0) {
+				data.push_back(active[i]);
+			}
 		}
 	}
 	if (type | PACK_SOURCE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			data.push_back(R[i]);
+			if (i.index().sum() % 2 == 0) {
+				data.push_back(R[i]);
+			}
 		}
 	}
 	return data;
@@ -181,22 +187,28 @@ void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, i
 	if (type | PACK_POTENTIAL) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
 			assert(k < data.size());
-			X[i] = data[k];
-			k++;
+			if (i.index().sum() % 2 == 1) {
+				X[i] = data[k];
+				k++;
+			}
 		}
 	}
 	if (type | PACK_ACTIVE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
 			assert(k < data.size());
-			active[i] = data[k];
-			k++;
+			if (i.index().sum() % 2 == 0) {
+				active[i] = data[k];
+				k++;
+			}
 		}
 	}
 	if (type | PACK_SOURCE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
 			assert(k < data.size());
-			R[i] = data[k];
-			k++;
+			if (i.index().sum() % 2 == 0) {
+				R[i] = data[k];
+				k++;
+			}
 		}
 	}
 	assert(k == data.size());
@@ -207,7 +219,7 @@ void gravity::finish_fine() {
 	phi = X;
 }
 
-void gravity::relax(bool init_zero, int level) {
+void gravity::relax() {
 	multi_array<double> X0;
 	const auto ibox = box.pad(-1);
 	X0 = X;
@@ -218,11 +230,7 @@ void gravity::relax(bool init_zero, int level) {
 		for (multi_iterator i(ibox); !i.end(); i++) {
 			if (active[i]) {
 				const auto j = X.index(i);
-				int sum = 0;
-				for (int dim = 0; dim < NDIM; dim++) {
-					sum += i.index()[dim];
-				}
-				if (sum % 2 == red % 2) {
+				if (i.index().sum() % 2 == red % 2) {
 					double r = 0.0;
 					for (int dim = 0; dim < NDIM; dim++) {
 						r += (0.5 / NDIM) * (x1[j + s[dim]] + x1[j - s[dim]]);

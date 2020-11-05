@@ -88,7 +88,10 @@ statistics tree::get_statistics() const {
 	return stats;
 }
 
+std::atomic<int> counter(0);
+
 gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse_from_parent, double this_t, double mtot) {
+	gravity_step = 0;
 	double w;
 	if (t0 != t) {
 		w = (this_t - t0) / (t - t0);
@@ -140,7 +143,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < iters; i++) {
 			get_gravity_boundaries(PACK_POTENTIAL);
-			grav.relax(false, level);
+			grav.relax();
 		}
 	}
 	gravity_return rc;
@@ -163,11 +166,11 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 		for (int i = 0; i < iters; i++) {
 			int type = PACK_POTENTIAL;
-			if( i == 0 ) {
+			if (i == 0) {
 				type |= PACK_ACTIVE | PACK_SOURCE;
 			}
 			get_gravity_boundaries(type);
-			grav.relax(pass == 0 && i == 0, level);
+			grav.relax();
 		}
 	} else if (level == fine_level) {
 		get_gravity_boundaries(PACK_POTENTIAL);
@@ -567,7 +570,6 @@ void tree::get_gravity_boundaries(int type) {
 	if (opts.problem == "sphere" && level == 0) {
 		return;
 	}
-	const auto amr_boxes = get_amr_boxes();
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.gbw).intersection(box);
 		std::vector<multi_range> boxes;
