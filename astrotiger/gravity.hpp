@@ -5,7 +5,7 @@
 
 #include <array>
 
-#define OUTPUT_RESID
+//#define OUTPUT_RESID
 
 #define PACK_POTENTIAL_REDBLACK 1
 #define PACK_POTENTIAL 8

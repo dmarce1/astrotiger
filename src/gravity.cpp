@@ -1,6 +1,9 @@
 #include <astrotiger/gravity.hpp>
 #include <astrotiger/options.hpp>
 #include <astrotiger/boxes.hpp>
+#include <astrotiger/hpx.hpp>
+
+#include <thread>
 
 void gravity::resize(double dx_, const multi_range &box_) {
 	dx = dx_;
@@ -84,33 +87,40 @@ double gravity::coord(index_type i) const {
 }
 
 void gravity::set_outflow_boundaries() {
+	multi_array<hpx::future<double>> futs(box);
 	for (multi_iterator i(box); !i.end(); i++) {
-		if (!box.pad(-opts.gbw).contains(i)) {
-			double sum = 0.0;
-			double msum = 0.0;
-			for (multi_iterator j(box); !j.end(); j++) {
-				double r2 = 0.0;
-				for (int dim = 0; dim < NDIM; dim++) {
-					r2 += std::pow(coord(i.index()[dim]) - coord(j.index()[dim]), 2);
-				}
-				if (r2 != 0.0) {
-					const auto M = std::pow(dx, NDIM) * R[j] / (4.0 * M_PI * opts.G);
-					msum += M;
-					const auto r = std::sqrt(r2);
-					if ( NDIM == 1) {
-						sum += opts.G * 4.0 * M_PI * std::abs(r) * M;
-					} else if ( NDIM == 2) {
-						sum += 2.0 * opts.G * std::log(r) * M;
-					} else if ( NDIM == 3) {
-						sum -= opts.G * M / r;
+		if (!box.pad(-1).contains(i)) {
+			futs[i] = hpx::async([i,this]() {
+				double sum = 0.0;
+				for (multi_iterator j(box); !j.end(); j++) {
+					if (box.pad(-1).contains(j)) {
+						double r2 = 0.0;
+						for (int dim = 0; dim < NDIM; dim++) {
+							r2 += std::pow(coord(i.index()[dim]) - coord(j.index()[dim]), 2);
+						}
+						if (r2 != 0.0) {
+							const auto M = std::pow(dx, NDIM) * R[j] / (4.0 * M_PI * opts.G);
+							const auto r = std::sqrt(r2);
+							if ( NDIM == 1) {
+								sum += opts.G * 4.0 * M_PI * std::abs(r) * M;
+							} else if ( NDIM == 2) {
+								sum += 2.0 * opts.G * std::log(r) * M;
+							} else if ( NDIM == 3) {
+								sum -= opts.G * M / r;
+							}
+						}
 					}
 				}
-			}
-			X[i] = sum;
-			//		printf( "%e\n", sum);
+				return sum;
+			});
 			active[i] = false;
 		} else {
 			active[i] = true;
+		}
+	}
+	for (multi_iterator i(box); !i.end(); i++) {
+		if (!box.pad(-1).contains(i)) {
+			X[i] = futs[i].get();
 		}
 	}
 }
