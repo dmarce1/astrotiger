@@ -810,19 +810,18 @@ void tree::hydro_substep(int rk, double this_dt) {
 	dt = this_dt;
 	if (rk == 0) {
 		refine_step = 1;
-	} else {
-		hydro.compute_flux(rk);
 	}
 	hydro.substep_update(rk, dt);
-	if (rk != opts.nrk - 1) {
-		get_hydro_boundaries(t + opts.alpha[rk] * this_dt);
-	} else {
+	if (rk == opts.nrk - 1) {
 		energy_step++;
 		get_energy_boundaries(t);
 		hydro.update_energy();
 		t0 = t;
 		t += dt;
+
 	}
+	get_hydro_boundaries(t + opts.alpha[rk] * this_dt);
+	hydro.compute_flux(rk);
 }
 
 double tree::initialize(int this_level) {
