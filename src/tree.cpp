@@ -820,7 +820,8 @@ void tree::hydro_substep(int rk, double this_dt) {
 		t += dt;
 
 	}
-	get_hydro_boundaries(t + opts.alpha[rk] * this_dt);
+	const double next_t = ((rk == 0) ? (t + opts.alpha[rk] * this_dt) : t);
+	get_hydro_boundaries(next_t);
 	hydro.compute_flux(rk);
 }
 

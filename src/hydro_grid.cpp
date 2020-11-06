@@ -8,6 +8,7 @@
 #include <astrotiger/hydro_grid.hpp>
 #include <astrotiger/hydro_flux.hpp>
 #include <astrotiger/multi_array.hpp>
+#include <astrotiger/polytrope.hpp>
 #include <vector>
 
 double rand1() {
@@ -50,7 +51,7 @@ double hydro_grid::compute_flux(int rk) {
 			V[sx_i + dim][i] = U[sx_i + dim][i] * rhoinv;
 		}
 		V[egas_i][i] = U[egas_i][i] - ek;
-		assert( U[tau_i][i] >= 0.0);
+		assert(U[tau_i][i] >= 0.0);
 		V[tau_i][i] = std::pow(U[tau_i][i], opts.gamma);
 
 	}
@@ -368,6 +369,13 @@ void hydro_grid::initialize() {
 			}
 			U[egas_i][i] = ein + ek;
 			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
+		} else if (opts.problem == "polytrope") {
+			const auto n = 1.5;
+			const auto unit = 10.0;
+			const auto theta = lane_emden(r * unit, dx * unit / 2.0, n);
+			U[rho_i][i] = std::max(1.0e-3, std::pow(theta, n));
+			U[egas_i][i] = std::max(1.0e-6, std::pow(theta, 1.0 + n) / (opts.gamma - 1.0));
+			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());
 			abort();
@@ -744,7 +752,7 @@ std::vector<double> hydro_grid::pack_coarse_flux() const {
 	const auto inv = 1.0 / (1 << (NDIM - 1));
 	std::vector<double> data;
 	int size = 0;
-	for( int dim = 0; dim < NDIM;dim++) {
+	for (int dim = 0; dim < NDIM; dim++) {
 		auto cbox = box.pad(-opts.gbw).half();
 		cbox.max[dim]++;
 		size += cbox.volume();
@@ -768,7 +776,7 @@ std::vector<double> hydro_grid::pack_coarse_flux() const {
 	return data;
 }
 
-void hydro_grid::unpack_fine_flux(const std::vector<double>& data, const multi_range& bbox) {
+void hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi_range &bbox) {
 	int k = 0;
 	for (int dim = 0; dim < NDIM; dim++) {
 		auto this_box = bbox;
@@ -781,7 +789,7 @@ void hydro_grid::unpack_fine_flux(const std::vector<double>& data, const multi_r
 			}
 		}
 	}
-	assert(k==data.size());
+	assert(k == data.size());
 }
 
 void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const multi_range &bbox, double dt) {
@@ -794,7 +802,7 @@ void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const
 			for (multi_iterator i(this_box); !i.end(); i++) {
 				assert(k < data.size());
 				const auto flux = data[k] / dx - lambda * F[dim][f][i];
-		//		printf("%e %e\n", data[k] / dx, lambda * F[dim][f][i]);
+				//		printf("%e %e\n", data[k] / dx, lambda * F[dim][f][i]);
 				auto im = i.index();
 				im[dim]--;
 				U[f][i] += flux;

@@ -56,11 +56,10 @@ void master(int level, double tmax) {
 	if (level > opts.max_level) {
 		return;
 	}
-
+	int oi = 0;
 	double nstep = -1;
 	const int refine_freq = opts.window / opts.cfl;
 	do {
-		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		if (level > 0 && nstep == -1) {
 			levels_set_child_families(level - 1);
 		}
@@ -68,6 +67,9 @@ void master(int level, double tmax) {
 		if (refine) {
 			printf("Refining on level %i\n", level);
 		}
+		std::string fname = "X." + std::to_string(oi++) + ".silo";
+		output_silo(fname);
+
 		printf( "Hydro pre-step\n");
 		dt[level] = levels_hydro_initialize(level, refine);
 		if (dt[level] == 0.0) {
@@ -79,6 +81,8 @@ void master(int level, double tmax) {
 		dt[level] = opts.cfl * dx[level] / dt[level];
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
 		dt[level] = (tmax - tm[level]) / nstep;
+		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
+//		printf( "%e %e %e %e\n", nstep, tm[level], tmax, dt[level]);
 		printf( "Hydro step 1\n");
 		levels_hydro_substep(level, 0, dt[level]);
 //		printf("...\n");
@@ -166,7 +170,7 @@ int hpx_main(int argc, char *argv[]) {
 		i++;
 		master(0, std::min(t + dt, opts.tmax));
 		std::string fname = "X." + std::to_string(i) + ".silo";
-		output_silo(fname);
+//		output_silo(fname);
 	}
 	std::string fname = "X." + std::to_string(i) + ".silo";
 	output_silo(fname);
