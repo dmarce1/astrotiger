@@ -79,8 +79,8 @@ public:
 	std::vector<double> pack_prolong(multi_range bbox, double w) const;
 	std::vector<double> pack_field_prolong(int f, multi_range bbox, double w) const;
 	std::vector<double> pack_restrict(multi_range bbox) const;
-	std::vector<double> pack_coarse_flux();
-	void unpack_coarse_flux(const std::vector<double>&, const multi_range &bbox, double dt);
+	std::vector<double> pack_coarse_correction();
+	void unpack_coarse_correction(const std::vector<double>&, const multi_range &bbox, double dt);
 	void unpack(const std::vector<double>&, multi_range bbox);
 	void unpack_field(int f, const std::vector<double>&, multi_range bbox);
 	void unpack_refinement(const std::vector<std::uint8_t>&, multi_range bbox);
@@ -89,7 +89,9 @@ public:
 	statistics get_statistics(const std::vector<multi_range>&) const;
 	double compare_analytic(const std::vector<multi_range> &cboxes, multi_array<double> &results) const;
 	static std::vector<std::string> field_names();
-	void to_array(multi_array<double>&,const multi_range& bbox,  int, double) const;
+	void to_array(multi_array<double>&, const multi_range &bbox, int, double) const;
+	std::vector<double> pack_coarse_flux() const;
+	void unpack_fine_flux(const std::vector<double>&, const multi_range&);
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

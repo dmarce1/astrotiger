@@ -50,6 +50,7 @@ double hydro_grid::compute_flux(int rk) {
 			V[sx_i + dim][i] = U[sx_i + dim][i] * rhoinv;
 		}
 		V[egas_i][i] = U[egas_i][i] - ek;
+		assert( U[tau_i][i] >= 0.0);
 		V[tau_i][i] = std::pow(U[tau_i][i], opts.gamma);
 
 	}
@@ -338,7 +339,7 @@ void hydro_grid::initialize() {
 			} else if (r < r0) {
 				U[rho_i][i] = rho0 * 2.0 * std::pow(1.0 - r / r0, 3);
 			} else {
-				U[rho_i][i] = 1.0e-6/4.0/M_PI;
+				U[rho_i][i] = 1.0e-6 / 4.0 / M_PI;
 			}
 			if ( NDIM == 3) {
 				U[rho_i][i] *= 8.0 / M_PI;
@@ -542,7 +543,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 		for (const auto &amr : amr_boxes) {
 			tmp.resize(0);
 			for (const auto &b : boxes) {
-				const auto amrbox = amr.pad(1);
+				const auto amrbox = amr.pad(opts.window);
 				if (!amrbox.intersection(b).empty()) {
 					auto tmp2 = b.subtract(amrbox);
 					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
@@ -739,7 +740,51 @@ std::vector<double> hydro_grid::pack_restrict(multi_range bbox) const {
 	return data;
 }
 
-void hydro_grid::unpack_coarse_flux(const std::vector<double> &data, const multi_range &bbox, double dt) {
+std::vector<double> hydro_grid::pack_coarse_flux() const {
+	const auto inv = 1.0 / (1 << (NDIM - 1));
+	std::vector<double> data;
+	int size = 0;
+	for( int dim = 0; dim < NDIM;dim++) {
+		auto cbox = box.pad(-opts.gbw).half();
+		cbox.max[dim]++;
+		size += cbox.volume();
+	}
+	data.reserve(size);
+	for (int dim = 0; dim < NDIM; dim++) {
+		auto cbox = box.pad(-opts.gbw).half();
+		cbox.max[dim]++;
+		for (int f = 0; f < opts.nhydro; f++) {
+			for (multi_iterator i(cbox); !i.end(); i++) {
+				double this_flux = 0.0;
+				auto this_box = multi_range(i.index()).double_();
+				this_box.max[dim]--;
+				for (multi_iterator j(this_box); !j.end(); j++) {
+					this_flux += F[dim][f][j] * inv;
+				}
+				data.push_back(this_flux);
+			}
+		}
+	}
+	return data;
+}
+
+void hydro_grid::unpack_fine_flux(const std::vector<double>& data, const multi_range& bbox) {
+	int k = 0;
+	for (int dim = 0; dim < NDIM; dim++) {
+		auto this_box = bbox;
+		this_box.max[dim]++;
+		for (int f = 0; f < opts.nhydro; f++) {
+			for (multi_iterator i(this_box); !i.end(); i++) {
+				assert(k < data.size());
+				F[dim][f][i] = data[k];
+				k++;
+			}
+		}
+	}
+	assert(k==data.size());
+}
+
+void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const multi_range &bbox, double dt) {
 	int k = 0;
 	const auto lambda = dt / dx;
 	for (int dim = 0; dim < NDIM; dim++) {
@@ -749,7 +794,7 @@ void hydro_grid::unpack_coarse_flux(const std::vector<double> &data, const multi
 			for (multi_iterator i(this_box); !i.end(); i++) {
 				assert(k < data.size());
 				const auto flux = data[k] / dx - lambda * F[dim][f][i];
-				//			printf("%e %e\n", data[k] / dx, lambda * F[dim][f][i]);
+		//		printf("%e %e\n", data[k] / dx, lambda * F[dim][f][i]);
 				auto im = i.index();
 				im[dim]--;
 				U[f][i] += flux;
@@ -760,7 +805,7 @@ void hydro_grid::unpack_coarse_flux(const std::vector<double> &data, const multi
 	}
 }
 
-std::vector<double> hydro_grid::pack_coarse_flux() {
+std::vector<double> hydro_grid::pack_coarse_correction() {
 	std::vector<double> data;
 	for (int dim = 0; dim < NDIM; dim++) {
 		for (int f = 0; f < opts.nhydro; f++) {

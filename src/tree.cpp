@@ -27,6 +27,8 @@ using get_statistics_action_type = tree::get_statistics_action;
 using restrict_all_action_type = tree::restrict_all_action;
 using set_boundary_action_type = tree::set_boundary_action;
 using compute_error_action_type = tree::compute_error_action;
+using get_fine_flux_action_type = tree::get_fine_flux_action;
+HPX_REGISTER_ACTION (get_fine_flux_action_type);
 HPX_REGISTER_ACTION (compute_error_action_type);
 HPX_REGISTER_ACTION (set_boundary_action_type);
 HPX_REGISTER_ACTION (restrict_all_action_type);
@@ -252,7 +254,7 @@ std::pair<std::vector<double>, std::vector<double>> tree::get_hydro_restrict() {
 	std::pair<std::vector<double>, std::vector<double>> rc;
 	const auto bbox = box.half();
 	rc.first = hydro.pack_restrict(bbox);
-	rc.second = hydro.pack_coarse_flux();
+	rc.second = hydro.pack_coarse_correction();
 	return rc;
 }
 
@@ -323,8 +325,13 @@ std::vector<double> tree::restrict_all() {
 	return hydro.pack_restrict(box.half());
 }
 
+std::vector<double> tree::get_fine_flux() const {
+	return hydro.pack_coarse_flux();
+}
+
 double tree::hydro_initialize(bool refine) {
-	sanity();
+	hydro_step = 0;
+	energy_step = 0;
 	std::vector<multi_range> force_refine_boxes;
 	energy_step++;
 	std::vector<hpx::future<std::pair<std::vector<double>, std::vector<double>>>> futs;
@@ -335,7 +342,7 @@ double tree::hydro_initialize(bool refine) {
 		const auto tmp = futs[i].get();
 		const auto cbox = children[i].get_box().half();
 		if (dt != 0.0) {
-			hydro.unpack_coarse_flux(tmp.second, cbox, dt);
+			hydro.unpack_coarse_correction(tmp.second, cbox, dt);
 		}
 		hydro.unpack(tmp.first, cbox);
 	}
@@ -447,9 +454,15 @@ double tree::hydro_initialize(bool refine) {
 		}
 		hpx::wait_all(void_futs.begin(), void_futs.end());
 	}
-
-	return hydro.compute_flux(0);
-
+	const auto amax = hydro.compute_flux(0);
+	std::vector<hpx::future<std::vector<double>>> cfuts;
+	for (const auto &c : children) {
+		cfuts.push_back(c.get_fine_flux());
+	}
+	for (int i = 0; i < children.size(); i++) {
+		hydro.unpack_fine_flux(cfuts[i].get(), children[i].get_box().half());
+	}
+	return amax;
 }
 
 void tree::get_hydro_boundaries(double this_time) {

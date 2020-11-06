@@ -23,7 +23,7 @@ statistics solve_gravity() {
 		//	for (int i = 0; i < 10; i++) {
 		do {
 			auto tmp = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get();
-			r = tmp.resid /mtot;
+			r = tmp.resid;
 			printf("%i %e %e\n", pass, r, tmp.resid);
 //			if( r < 5e-03 && l == opts.max_level) {
 //				break;
@@ -68,6 +68,7 @@ void master(int level, double tmax) {
 		if (refine) {
 			printf("Refining on level %i\n", level);
 		}
+		printf( "Hydro pre-step\n");
 		dt[level] = levels_hydro_initialize(level, refine);
 		if (dt[level] == 0.0) {
 			tm[level] = tm[level - 1];
@@ -78,9 +79,11 @@ void master(int level, double tmax) {
 		dt[level] = opts.cfl * dx[level] / dt[level];
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
 		dt[level] = (tmax - tm[level]) / nstep;
+		printf( "Hydro step 1\n");
 		levels_hydro_substep(level, 0, dt[level]);
 //		printf("...\n");
 		for (int rk = 1; rk < opts.nrk; rk++) {
+			printf( "Hydro step 2\n");
 			levels_hydro_substep(level, rk, dt[level]);
 		}
 		tm[level] += dt[level];
@@ -127,7 +130,6 @@ int hpx_main(int argc, char *argv[]) {
 			}
 		}
 	}
-	printf("%i\n", sibs.size());
 	dx.resize(opts.max_level + 1);
 	dt.resize(opts.max_level + 1);
 	tm.resize(opts.max_level + 1);
@@ -142,6 +144,8 @@ int hpx_main(int argc, char *argv[]) {
 		printf( "Initialized. Setting families\n");
 		if (l >= 1) {
 			levels_set_child_families(l - 1);
+		} else {
+			root.set_family(tree_client(), root, sibs).get();
 		}
 		if (amax != 0.0) {
 			dt[l] = opts.cfl * dx[l] / amax;
@@ -150,23 +154,22 @@ int hpx_main(int argc, char *argv[]) {
 		}
 		printf( "Done\n");
 	}
-	root.set_family(tree_client(), root, sibs).get();
 	root.restrict_all().get();
 //	master(0, 1.0e-100);
 	levels_show();
-	solve_gravity();
+//	solve_gravity();
 	output_silo("X.0.silo");
-//	int i = 0;
-//	const auto dt = 0.01;
-//	levels_show();
-//	for (double t = 0.0; t < opts.tmax; t += dt) {
-//		i++;
-//		master(0, std::min(t + dt, opts.tmax));
-//		std::string fname = "X." + std::to_string(i) + ".silo";
-//		output_silo(fname);
-//	}
-//	std::string fname = "X." + std::to_string(i) + ".silo";
-//	output_silo(fname);
+	int i = 0;
+	const auto dt = 0.01;
+	levels_show();
+	for (double t = 0.0; t < opts.tmax; t += dt) {
+		i++;
+		master(0, std::min(t + dt, opts.tmax));
+		std::string fname = "X." + std::to_string(i) + ".silo";
+		output_silo(fname);
+	}
+	std::string fname = "X." + std::to_string(i) + ".silo";
+	output_silo(fname);
 	return hpx::finalize();
 }
 

@@ -73,6 +73,7 @@ public:
 		box = box_;
 	}
 
+	hpx::future<std::vector<double>> get_fine_flux() const;
 	hpx::future<tree_client> truncate(multi_range box) const;
 	hpx::future<void> delist() const;
 	hpx::future<void> list() const;

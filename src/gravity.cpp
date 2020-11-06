@@ -333,7 +333,7 @@ gravity_return gravity::get_restrict(double rho0) {
 			}
 			resid[i] += (2.0 * NDIM) * x[j] / (dx * dx);
 			resid[i] += R[i];
-			rc.resid = std::max(std::abs(resid[i] / (4.0 * M_PI * opts.G)), rc.resid);
+			rc.resid = std::max(std::abs(resid[i] / (4.0 * M_PI * opts.G) / std::max(rho0, R[i])), rc.resid);
 		}
 	}
 	rc.R.reserve(active_vol);
