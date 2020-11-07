@@ -374,7 +374,7 @@ void hydro_grid::initialize() {
 			const auto unit = 10.0;
 			const auto theta = lane_emden(r * unit, dx * unit / 2.0, n);
 			U[rho_i][i] = std::max(1.0e-6, std::pow(theta, n));
-			U[egas_i][i] = std::max(1.0e-6, std::pow(theta, 1.0 + n) / (opts.gamma - 1.0));
+			U[egas_i][i] = std::max(1.0e-6, std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)) / (unit * unit);
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());
@@ -488,6 +488,19 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 	}
 	if (!range.empty()) {
 		boxes.push_back(range);
+		for (const auto &amr : amr_boxes) {
+			tmp.resize(0);
+			for (const auto &b : boxes) {
+				const auto amrbox = amr.pad(opts.window);
+				if (amrbox.intersection(b).volume()) {
+					auto tmp2 = b.subtract(amrbox);
+					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
+				} else {
+					tmp.push_back(b);
+				}
+			}
+			boxes = std::move(tmp);
+		}
 		bool change;
 		const auto max_vol = std::pow(opts.max_box / 2, NDIM);
 		const auto min_vol = std::pow(opts.min_box / 2, NDIM);
@@ -548,19 +561,6 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 			boxes = std::move(tmp);
 		} while (change);
 		boxes = std::move(finished);
-		for (const auto &amr : amr_boxes) {
-			tmp.resize(0);
-			for (const auto &b : boxes) {
-				const auto amrbox = amr.pad(opts.window);
-				if (!amrbox.intersection(b).empty()) {
-					auto tmp2 = b.subtract(amrbox);
-					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
-				} else {
-					tmp.push_back(b);
-				}
-			}
-			boxes = std::move(tmp);
-		}
 	}
 	return std::move(boxes);
 }

@@ -846,7 +846,7 @@ double tree::initialize(int this_level) {
 			hydro.compute_refinement_criteria();
 			refine_step++;
 			get_refinement_boundaries();
-			auto boxes = hydro.refined_ranges(std::vector<multi_range>(), std::vector<multi_range>());
+			auto boxes = hydro.refined_ranges(get_amr_boxes(), std::vector<multi_range>());
 
 			std::vector<hpx::future<tree_client>> futs(boxes.size());
 			children.resize(boxes.size());

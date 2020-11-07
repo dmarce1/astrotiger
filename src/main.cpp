@@ -9,46 +9,23 @@ std::vector<double> dt;
 std::vector<double> tm;
 std::vector<int> super_step;
 
-statistics solve_gravity() {
+statistics solve_gravity(int l) {
 	const double toler = 5.0e-4;
 	statistics stats;
 	stats = root.get_statistics().get();
 	const auto mtot = stats.u[rho_i];
-	printf( "Total Mass = %e\n", mtot);
-	int oi = 0;
-	for (int l = 0; l <= opts.max_level; l++) {
-		int pass = 0;
-		double r;
-		printf("Solving gravity on level %i\n", l);
-		//	for (int i = 0; i < 10; i++) {
-		do {
-			auto tmp = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get();
-			r = tmp.resid;
-			printf("%i %e %e\n", pass, r, tmp.resid);
-//			if( r < 5e-03 && l == opts.max_level) {
-//				break;
-//			}
-			pass++;
-			if (pass > 250) {
-			//	break;
-			}
-	//		if( l == 5 )
-	//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
-
-		} while (r > toler);
-		//	}
-		auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get();
-		r = tmp.resid / mtot;
+	int pass = 0;
+	double r;
+	printf("Solving gravity on level %i\n", l);
+	do {
+		auto tmp = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get();
+		r = tmp.resid;
 		printf("%i %e\n", pass, r);
-//		output_silo(std::string("X.") + std::to_string(oi++) + ".silo");
-//		r = root.gravity_solve(0, l, std::vector<double>(), 0.0).get().resid;
-//		printf( "%e\n", r);
-//		r = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0).get().resid;
-//		printf( "%e\n", r);
-	}
-	auto rms = root.compute_error().get();
-	rms = std::sqrt(rms);
-	printf( "Error = %e\n",rms);
+		pass++;
+	} while (r > toler);
+	auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get();
+	r = tmp.resid / mtot;
+	printf("%i %e\n", pass, tmp.resid);
 	return stats;
 }
 
@@ -70,7 +47,7 @@ void master(int level, double tmax) {
 //		std::string fname = "X." + std::to_string(oi++) + ".silo";
 //		output_silo(fname);
 
-		printf( "Hydro pre-step\n");
+		printf("Hydro pre-step\n");
 		dt[level] = levels_hydro_initialize(level, refine);
 		if (dt[level] == 0.0) {
 			tm[level] = tm[level - 1];
@@ -83,11 +60,11 @@ void master(int level, double tmax) {
 		dt[level] = (tmax - tm[level]) / nstep;
 		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 //		printf( "%e %e %e %e\n", nstep, tm[level], tmax, dt[level]);
-		printf( "Hydro step 1\n");
+		printf("Hydro step 1\n");
 		levels_hydro_substep(level, 0, dt[level]);
 //		printf("...\n");
 		for (int rk = 1; rk < opts.nrk; rk++) {
-			printf( "Hydro step 2\n");
+			printf("Hydro step 2\n");
 			levels_hydro_substep(level, rk, dt[level]);
 		}
 		tm[level] += dt[level];
@@ -139,13 +116,13 @@ int hpx_main(int argc, char *argv[]) {
 	tm.resize(opts.max_level + 1);
 	super_step.resize(opts.max_level + 1);
 	for (int l = 0; l <= opts.max_level; l++) {
-		printf( "Forming level %i\n", l );
+		printf("Forming level %i\n", l);
 		super_step[l] = 0;
 		dx[l] = 1.0 / (opts.max_box * (1 << l));
 		tm[l] = 0.0;
 		auto fut = root.initialize(l);
 		auto amax = fut.get();
-		printf( "Initialized. Setting families\n");
+		printf("Initialized. Setting families\n");
 		if (l >= 1) {
 			levels_set_child_families(l - 1);
 		} else {
@@ -156,12 +133,16 @@ int hpx_main(int argc, char *argv[]) {
 		} else {
 			dt[l] = 0.0;
 		}
-		printf( "Done\n");
+		printf("Done\n");
 	}
 	root.restrict_all().get();
 //	master(0, 1.0e-100);
 	levels_show();
-	solve_gravity();
+	if (opts.self_gravity) {
+		for (int l = 0; l <= opts.max_level; l++) {
+			solve_gravity(l);
+		}
+	}
 	output_silo("X.0.silo");
 //	int i = 0;
 //	const auto dt = 0.1;
