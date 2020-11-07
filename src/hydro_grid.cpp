@@ -9,6 +9,7 @@
 #include <astrotiger/hydro_flux.hpp>
 #include <astrotiger/multi_array.hpp>
 #include <astrotiger/polytrope.hpp>
+#include <astrotiger/tree.hpp>
 #include <vector>
 
 double rand1() {
@@ -373,10 +374,16 @@ void hydro_grid::initialize() {
 			const auto n = 1.5;
 			const auto alpha = 0.005;
 			const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
-			U[rho_i][i] = std::max(1.0e-6, std::pow(theta, n));
+			auto &rho = U[rho_i][i];
+			rho = std::max(1.0e-6, std::pow(theta, n));
+			const auto vx = 0.1;
+			const auto vy = 0.05;
+			U[sx_i][i] = vx * rho;
+			U[sy_i][i] = vy * rho;
 			const auto K = 4.0 * M_PI * opts.G * alpha * alpha / (n + 1);
 			U[egas_i][i] = std::max(1.0e-6, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
+			U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());
 			abort();

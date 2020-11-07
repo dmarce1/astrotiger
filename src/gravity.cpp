@@ -279,7 +279,7 @@ void gravity::relax() {
 			for (int dim = 0; dim < NDIM; dim++) {
 				r += c0 * (x[i + s[dim]] + x[i - s[dim]]);
 			}
-			x[i] += 1.5 * r;
+			x[i] += r;
 		}
 	}
 	for (const auto i : blacki) {

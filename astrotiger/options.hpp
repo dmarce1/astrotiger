@@ -19,6 +19,7 @@ public:
 	int min_box;
 	int hbw;
 	int gbw;
+	int pbw;
 	int max_bw;
 	int window;
 	int max_level;
@@ -48,6 +49,7 @@ public:
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
+		arc & pbw;
 		arc & self_gravity;
 		arc & gravity;
 		arc & hydro;

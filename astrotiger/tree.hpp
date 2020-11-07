@@ -20,6 +20,20 @@
 #define GRAVITY_FINAL_PASS 1000000
 
 
+struct statistics {
+	std::vector<double> u;
+	int min_level;
+	int max_level;
+
+	template<class A>
+	void serialize(A &&arc, unsigned) {
+		arc & u;
+		arc & min_level;
+		arc & max_level;
+	}
+};
+
+
 struct sibling {
 	tree_client client;
 	vect<int> shift;
@@ -151,7 +165,7 @@ public:
 	void get_hydro_boundaries(double);
 	void get_energy_boundaries(double);
 	void sanity() const;
-	statistics get_statistics() const;
+	statistics get_statistics(int lev) const;
 	std::vector<double> restrict_all();
 	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
 	double compute_error();

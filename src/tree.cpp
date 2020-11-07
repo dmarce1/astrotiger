@@ -71,19 +71,43 @@ double tree::compute_error() {
 
 }
 
-statistics tree::get_statistics() const {
+statistics tree::get_statistics(int lev) const {
+	statistics stats;
+	if (children.size() == 0) {
+		stats.min_level = level;
+		stats.max_level = level;
+	} else {
+		stats.min_level = opts.max_level;
+		stats.max_level = 0;
+	}
 	std::vector<multi_range> cranges;
 	std::vector<hpx::future<statistics>> futs;
+	int volume = 0;
 	for (const auto &c : children) {
-		futs.push_back(c.get_statistics());
-		cranges.push_back(c.get_box().half());
+		futs.push_back(c.get_statistics(lev));
+		const auto this_box = c.get_box().half();
+		volume += this_box.volume();
+		if (level < lev) {
+			cranges.push_back(box);
+		}
 	}
-	auto stats = hydro.get_statistics(cranges);
+	if (level <= lev) {
+		stats = hydro.get_statistics(cranges);
+	}
+//	printf("%i %i %i\n", level, lev, stats.u.size());
 	for (auto &f : futs) {
 		auto tmp = f.get();
-		for (int field = 0; field < opts.nhydro; field++) {
-			stats.u[field] += tmp.u[field];
+		if (level < lev) {
+			for (int field = 0; field < opts.nhydro; field++) {
+				stats.u[field] += tmp.u[field];
+			}
 		}
+		if (volume == box.volume()) {
+			stats.min_level = std::min(stats.min_level, tmp.min_level);
+		} else {
+			stats.min_level = level;
+		}
+		stats.max_level = std::max(stats.max_level, tmp.max_level);
 	}
 	return stats;
 }

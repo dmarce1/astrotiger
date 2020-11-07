@@ -15,7 +15,7 @@ void output_silo(const std::string &filename) {
 	DBAddOption(options, DBOPT_MMESH_NAME, main_mesh);
 	std::vector<std::string> tmp_mnames;
 	std::vector<char*> mesh_names;
-	for (int l = 0; l <= opts.max_level; l++) {
+	for (int l = 0; l <= 0; l++) {
 		auto tmp = levels_output_silo(l, filename);
 		tmp_mnames.insert(tmp_mnames.end(), tmp.begin(), tmp.end());
 	}

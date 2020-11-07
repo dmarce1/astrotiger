@@ -103,6 +103,7 @@ bool options::process_options(int argc, char *argv[]) {
 	gbw = 2;
 	max_bw = std::max(hbw, window);
 	max_bw = std::max(max_bw, gbw);
+	pbw = 1;
 	nrk = order;
 	alpha.resize(nrk);
 	beta.resize(nrk);

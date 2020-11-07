@@ -22,14 +22,7 @@
 #define sy_i 4
 #define sz_i 5
 
-struct statistics {
-	std::vector<double> u;
-
-	template<class A>
-	void serialize(A &&arc, unsigned) {
-		arc & u;
-	}
-};
+struct statistics;
 
 class hydro_grid {
 	multi_range box;
