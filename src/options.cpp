@@ -32,6 +32,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("config_file", po::value < std::string > (&config_file)->default_value(""), "configuration file") //
 	("problem", po::value < std::string > (&problem)->default_value("blast"), "Problem 1 - sod 2 - blast\n") //
 	("hydro", po::value<bool>(&hydro)->default_value(true), "use hydro") //
+	("self_gravity", po::value<bool>(&self_gravity)->default_value(false), "use self gravity") //
 	("gravity", po::value<bool>(&gravity)->default_value(false), "use gravity") //
 	("nmulti", po::value<int>(&nmulti)->default_value(8), "multigrid solver iterations)") //
 	("max_box", po::value<int>(&max_box)->default_value(32), "maximum (box volume)^(1/3)") //
@@ -92,6 +93,8 @@ bool options::process_options(int argc, char *argv[]) {
 		gravity = true;
 	} else if (problem == "sod") {
 		gamma = 7.0 / 5.0;
+	} else if (problem == "polytrope") {
+		gravity = self_gravity = true;
 	}
 
 	nhydro = 3 + NDIM;

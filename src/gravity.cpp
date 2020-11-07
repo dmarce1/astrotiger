@@ -90,7 +90,7 @@ void gravity::set_outflow_boundaries() {
 	multi_array<hpx::future<double>> futs(box);
 	for (multi_iterator i(box); !i.end(); i++) {
 		if (!box.pad(-1).contains(i)) {
-			futs[i] = hpx::async([i,this]() {
+			futs[i] = hpx::async([i, this]() {
 				double sum = 0.0;
 				for (multi_iterator j(box); !j.end(); j++) {
 					if (box.pad(-1).contains(j)) {
@@ -161,21 +161,21 @@ std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 	}
 	if (type | PACK_POTENTIAL_REDBLACK) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			if (i.index().sum() % 2 == 1) {
+			if ((i.index().sum() + opts.hbw * NDIM) % 2 == 1) {
 				data.push_back(X[i]);
 			}
 		}
 	}
 	if (type | PACK_ACTIVE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			if (i.index().sum() % 2 == 0) {
+			if ((i.index().sum() + opts.hbw * NDIM) % 2 == 0) {
 				data.push_back(active[i]);
 			}
 		}
 	}
 	if (type | PACK_SOURCE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			if (i.index().sum() % 2 == 0) {
+			if ((i.index().sum() + opts.hbw * NDIM) % 2 % 2 == 0) {
 				data.push_back(R[i]);
 			}
 		}
@@ -204,7 +204,7 @@ void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, i
 	}
 	if (type | PACK_POTENTIAL_REDBLACK) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			if (i.index().sum() % 2 == 1) {
+			if ((i.index().sum() + opts.hbw * NDIM) % 2 == 1) {
 				assert(k < data.size());
 				X[i] = data[k];
 				k++;
@@ -213,7 +213,7 @@ void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, i
 	}
 	if (type | PACK_ACTIVE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			if (i.index().sum() % 2 == 0) {
+			if ((i.index().sum() + opts.hbw * NDIM) % 2 == 0) {
 				assert(k < data.size());
 				active[i] = data[k];
 				k++;
@@ -222,7 +222,7 @@ void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, i
 	}
 	if (type | PACK_SOURCE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			if (i.index().sum() % 2 == 0) {
+			if ((i.index().sum() + opts.hbw * NDIM) % 2 % 2 == 0) {
 				assert(k < data.size());
 				R[i] = data[k];
 				k++;

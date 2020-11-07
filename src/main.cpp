@@ -56,7 +56,7 @@ void master(int level, double tmax) {
 	if (level > opts.max_level) {
 		return;
 	}
-	int oi = 1;
+	int oi = 0;
 	double nstep = -1;
 	const int refine_freq = opts.window / opts.cfl;
 	do {
@@ -67,8 +67,8 @@ void master(int level, double tmax) {
 		if (refine) {
 			printf("Refining on level %i\n", level);
 		}
-		std::string fname = "X." + std::to_string(oi++) + ".silo";
-		output_silo(fname);
+//		std::string fname = "X." + std::to_string(oi++) + ".silo";
+//		output_silo(fname);
 
 		printf( "Hydro pre-step\n");
 		dt[level] = levels_hydro_initialize(level, refine);
@@ -161,19 +161,19 @@ int hpx_main(int argc, char *argv[]) {
 	root.restrict_all().get();
 //	master(0, 1.0e-100);
 	levels_show();
-//	solve_gravity();
+	solve_gravity();
 	output_silo("X.0.silo");
-	int i = 0;
-	const auto dt = 0.1;
-	levels_show();
-	for (double t = 0.0; t < opts.tmax; t += dt) {
-		i++;
-		master(0, std::min(t + dt, opts.tmax));
-		std::string fname = "X." + std::to_string(i) + ".silo";
-		output_silo(fname);
-	}
-	std::string fname = "X." + std::to_string(i) + ".silo";
-	output_silo(fname);
+//	int i = 0;
+//	const auto dt = 0.1;
+//	levels_show();
+//	for (double t = 0.0; t < opts.tmax; t += dt) {
+//		i++;
+//		master(0, std::min(t + dt, opts.tmax));
+//		std::string fname = "X." + std::to_string(i) + ".silo";
+//		output_silo(fname);
+//	}
+//	std::string fname = "X." + std::to_string(i) + ".silo";
+//	output_silo(fname);
 	return hpx::finalize();
 }
 

@@ -25,6 +25,7 @@ public:
 	int order;
 	int nrk;
 	int nmulti;
+	bool self_gravity;
 	bool gravity;
 	bool hydro;
 	std::string problem;
@@ -47,6 +48,7 @@ public:
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
+		arc & self_gravity;
 		arc & gravity;
 		arc & hydro;
 		arc & bnd;
