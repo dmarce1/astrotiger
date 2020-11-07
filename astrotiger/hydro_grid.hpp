@@ -38,6 +38,7 @@ class hydro_grid {
 	std::vector<multi_array<double>> U0;
 	std::vector<multi_array<double>> U;
 	std::vector<multi_array<double>> S;
+	std::array<std::vector<multi_array<double>>, NDIM> F0;
 	std::array<std::vector<multi_array<double>>, NDIM> F;
 	std::array<std::vector<multi_array<double>>, NDIM> Fc;
 	multi_array<std::uint8_t> R;
@@ -64,6 +65,8 @@ public:
 	const multi_array<double>& get_density() const {
 		return U[rho_i];
 	}
+	void store();
+	void store_flux();
 	void enforce_physical_bc(int);
 	void reset_flux_registers();
 	void reset_coarse_flux_registers();
@@ -95,6 +98,8 @@ public:
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {
+		arc & F;
+		arc & F0;
 		arc & fbox;
 		arc & box;
 		arc & U0;

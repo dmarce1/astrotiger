@@ -52,6 +52,7 @@ class tree: public hpx::components::managed_component_base<tree> {
 	double t0;
 	double t;
 	double dt;
+	double last_dt;
 public:
 
 	static hpx::future<tree_client> allocate(int, multi_range box);
@@ -73,11 +74,13 @@ public:
 		t = std::move(other.t);
 		auto tmp = (int) other.refine_step;
 		refine_step = tmp;
+		last_dt = std::move(other.last_dt);
 //		printf("Adding entry %i\n", level);
 	}
 	tree(const tree &other) :
 			refine_step(0), energy_step(0), gravity_step(0),hydro_step(0) {
 		dt = other.dt;
+		last_dt = other.last_dt;
 		box = other.box;
 		hydro = other.hydro;
 		grav = other.grav;
@@ -99,6 +102,7 @@ public:
 	template<class A>
 	void serialize(A &&arc, unsigned) {
 		arc & dt;
+		arc & last_dt;
 		arc & box;
 		arc & hydro;
 		arc & grav;

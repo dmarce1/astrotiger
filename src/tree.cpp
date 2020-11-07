@@ -338,14 +338,19 @@ double tree::hydro_initialize(bool refine) {
 	for (int i = 0; i < children.size(); i++) {
 		futs.push_back(children[i].get_hydro_restrict());
 	}
+	std::vector<std::pair<std::vector<double>,std::vector<double>>> u;
 	for (int i = 0; i < children.size(); i++) {
-		const auto tmp = futs[i].get();
 		const auto cbox = children[i].get_box().half();
+		u.push_back(futs[i].get());
 		if (dt != 0.0) {
-			hydro.unpack_coarse_correction(tmp.second, cbox, dt);
+			hydro.unpack_coarse_correction(u[i].second, cbox, last_dt);
 		}
-		hydro.unpack(tmp.first, cbox);
 	}
+	for (int i = 0; i < children.size(); i++) {
+		const auto cbox = children[i].get_box().half();
+		hydro.unpack(u[i].first, cbox);
+	}
+	hydro.store();
 	get_hydro_boundaries(t);
 	if (refine && level < opts.max_level) {
 		std::vector<std::vector<tree_client>> grandchildren;
@@ -818,11 +823,12 @@ void tree::hydro_substep(int rk, double this_dt) {
 		hydro.update_energy();
 		t0 = t;
 		t += dt;
-
+		last_dt = dt;
 	}
-	const double next_t = ((rk == 0) ? (t + opts.alpha[rk] * this_dt) : t);
+	const double next_t = ((rk != opts.nrk - 1) ? (t + opts.alpha[rk + 1] * this_dt) : t);
 	get_hydro_boundaries(next_t);
-	hydro.compute_flux(rk);
+	hydro.store_flux();
+	hydro.compute_flux(rk == opts.nrk - 1 ? 0 : rk + 1);
 }
 
 double tree::initialize(int this_level) {
