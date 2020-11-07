@@ -9,7 +9,7 @@ std::vector<double> dt;
 std::vector<double> tm;
 std::vector<int> super_step;
 
-statistics solve_gravity(int l) {
+statistics solve_gravity(int l, double t) {
 	const double toler = 5.0e-4;
 	statistics stats;
 	stats = root.get_statistics().get();
@@ -18,14 +18,14 @@ statistics solve_gravity(int l) {
 	double r;
 	printf("Solving gravity on level %i\n", l);
 	do {
-		auto tmp = root.gravity_solve(pass, l, std::vector<double>(), 0.0, mtot).get();
+		auto tmp = root.gravity_solve(pass, l, std::vector<double>(), t, mtot).get();
 		r = tmp.resid;
-		printf("%i %e\n", pass, r);
+	//	printf("%i %e\n", pass, r);
 		pass++;
 	} while (r > toler);
-	auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), 0.0, mtot).get();
+	auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), t, mtot).get();
 	r = tmp.resid / mtot;
-	printf("%i %e\n", pass, tmp.resid);
+	//printf("%i %e\n", pass, tmp.resid);
 	return stats;
 }
 
@@ -55,18 +55,14 @@ void master(int level, double tmax) {
 			return;
 		}
 		levels_show();
+		solve_gravity(level, tm[level]);
 		dt[level] = opts.cfl * dx[level] / dt[level];
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
 		dt[level] = (tmax - tm[level]) / nstep;
 		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
-//		printf( "%e %e %e %e\n", nstep, tm[level], tmax, dt[level]);
-		printf("Hydro step 1\n");
 		levels_hydro_substep(level, 0, dt[level]);
-//		printf("...\n");
-		for (int rk = 1; rk < opts.nrk; rk++) {
-			printf("Hydro step 2\n");
-			levels_hydro_substep(level, rk, dt[level]);
-		}
+		solve_gravity(level, tm[level] + dt[level]);
+		levels_hydro_substep(level, 1, dt[level]);
 		tm[level] += dt[level];
 		master(level + 1, tm[level]);
 	} while (nstep != 1.0);
@@ -140,21 +136,21 @@ int hpx_main(int argc, char *argv[]) {
 	levels_show();
 	if (opts.self_gravity) {
 		for (int l = 0; l <= opts.max_level; l++) {
-			solve_gravity(l);
+			solve_gravity(l, 0.0);
 		}
 	}
 	output_silo("X.0.silo");
-//	int i = 0;
-//	const auto dt = 0.1;
-//	levels_show();
-//	for (double t = 0.0; t < opts.tmax; t += dt) {
-//		i++;
-//		master(0, std::min(t + dt, opts.tmax));
-//		std::string fname = "X." + std::to_string(i) + ".silo";
-//		output_silo(fname);
-//	}
-//	std::string fname = "X." + std::to_string(i) + ".silo";
-//	output_silo(fname);
+	int i = 0;
+	const auto dt = 0.01;
+	levels_show();
+	for (double t = 0.0; t < opts.tmax; t += dt) {
+		i++;
+		master(0, std::min(t + dt, opts.tmax));
+		std::string fname = "X." + std::to_string(i) + ".silo";
+		output_silo(fname);
+	}
+	std::string fname = "X." + std::to_string(i) + ".silo";
+	output_silo(fname);
 	return hpx::finalize();
 }
 

@@ -95,6 +95,7 @@ bool options::process_options(int argc, char *argv[]) {
 		gamma = 7.0 / 5.0;
 	} else if (problem == "polytrope") {
 		gravity = self_gravity = true;
+		gamma = 5.0 / 3.0;
 	}
 
 	nhydro = 3 + NDIM;

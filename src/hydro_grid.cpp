@@ -115,8 +115,8 @@ void hydro_grid::substep_update(int rk, double dt) {
 				multi_index ip1 = i;
 				ip1[dim]++;
 				u -= (F[dim][f][ip1] - F[dim][f][i]) * lambda;
-				u += S[f][i] * dt;
 			}
+			u += S[f][i] * dt;
 		}
 	}
 	if (rk == opts.nrk - 1) {
@@ -371,10 +371,11 @@ void hydro_grid::initialize() {
 			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
 		} else if (opts.problem == "polytrope") {
 			const auto n = 1.5;
-			const auto unit = 10.0;
-			const auto theta = lane_emden(r * unit, dx * unit / 2.0, n);
+			const auto alpha = 0.05;
+			const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
 			U[rho_i][i] = std::max(1.0e-6, std::pow(theta, n));
-			U[egas_i][i] = std::max(1.0e-6, std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)) / (unit * unit);
+			const auto K = 4.0 * M_PI * opts.G * alpha * alpha / (n + 1);
+			U[egas_i][i] = std::max(1.0e-6, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());

@@ -187,6 +187,8 @@ std::vector<double> gravity::pack(const multi_range &bbox, double w) const {
 	assert(box.contains(bbox));
 	std::vector<double> data;
 	data.reserve(bbox.volume());
+	assert(w>=0.0);
+	assert(w<=1.0);
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		data.push_back(w * phi[i] + (1.0 - w) * phi0[i]);
 	}

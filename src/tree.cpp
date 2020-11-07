@@ -92,14 +92,6 @@ std::atomic<int> counter(0);
 
 gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse_from_parent, double this_t, double mtot) {
 	gravity_step = 0;
-	double w;
-	if (t0 != t) {
-		w = (this_t - t0) / (t - t0);
-		assert(this_t >= t0);
-		assert(this_t <= t);
-	} else {
-		w = 1.0;
-	}
 	if (level == fine_level) {
 		if (pass == 0) {
 			if (level != 0) {
@@ -136,6 +128,14 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	if (level < fine_level) {
 		std::vector<hpx::future<gravity_return>> futs;
 		futs.reserve(children.size());
+		double w;
+		if (t0 != t) {
+			w = (this_t - t0) / (t - t0);
+			assert(this_t >= t0);
+			assert(this_t <= t);
+		} else {
+			w = 1.0;
+		}
 		for (int i = 0; i < children.size(); i++) {
 			const auto &c = children[i];
 			if (pass == 0) {
@@ -160,8 +160,10 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 	} else if (level == fine_level) {
 		get_gravity_boundaries(PACK_POTENTIAL);
-		grav.finish_fine();
-		hydro.set_phi(grav.get_phi());
+		if (pass == GRAVITY_FINAL_PASS) {
+			grav.finish_fine();
+			hydro.set_phi(grav.get_phi());
+		}
 	}
 	if (level == 0 && fine_level == 0 && opts.problem != "sphere") {
 		grav.set_avg_zero();
@@ -338,7 +340,7 @@ double tree::hydro_initialize(bool refine) {
 	for (int i = 0; i < children.size(); i++) {
 		futs.push_back(children[i].get_hydro_restrict());
 	}
-	std::vector<std::pair<std::vector<double>,std::vector<double>>> u;
+	std::vector<std::pair<std::vector<double>, std::vector<double>>> u;
 	for (int i = 0; i < children.size(); i++) {
 		const auto cbox = children[i].get_box().half();
 		u.push_back(futs[i].get());
@@ -350,8 +352,8 @@ double tree::hydro_initialize(bool refine) {
 		const auto cbox = children[i].get_box().half();
 		hydro.unpack(u[i].first, cbox);
 	}
-	hydro.store();
 	get_hydro_boundaries(t);
+	hydro.store();
 	if (refine && level < opts.max_level) {
 		std::vector<std::vector<tree_client>> grandchildren;
 		std::vector<hpx::future<std::vector<tree_client>>> cfuts;
