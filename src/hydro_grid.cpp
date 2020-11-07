@@ -371,7 +371,7 @@ void hydro_grid::initialize() {
 			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
 		} else if (opts.problem == "polytrope") {
 			const auto n = 1.5;
-			const auto alpha = 0.05;
+			const auto alpha = 0.005;
 			const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
 			U[rho_i][i] = std::max(1.0e-6, std::pow(theta, n));
 			const auto K = 4.0 * M_PI * opts.G * alpha * alpha / (n + 1);

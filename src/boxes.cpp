@@ -59,9 +59,7 @@ struct entry_t {
 static std::unordered_map<vect<index_type>, entry_t, dim_hash> table[TABLE_SIZE];
 static mutex_type mtx[TABLE_SIZE];
 
-static const entry_t& get_entry(const multi_index &dims) {
-	const auto index = table_index(dims);
-	std::lock_guard<mutex_type> lock(mtx[index]);
+static const entry_t& get_entry(const multi_index &dims, int index) {
 	auto &this_table = table[index];
 	auto iter = this_table.find(dims);
 	if (iter == this_table.end()) {
@@ -73,10 +71,14 @@ static const entry_t& get_entry(const multi_index &dims) {
 }
 
 std::shared_ptr<std::vector<int>> get_red_indices(const multi_range &box) {
-	return get_entry(box.dims()).red;
+	const auto index = table_index(box.dims());
+	std::lock_guard<mutex_type> lock(mtx[index]);
+	return get_entry(box.dims(), index).red;
 }
 
 std::shared_ptr<std::vector<int>> get_black_indices(const multi_range &box) {
-	return get_entry(box.dims()).black;
+	const auto index = table_index(box.dims());
+	std::lock_guard<mutex_type> lock(mtx[index]);
+	return get_entry(box.dims(), index).black;
 }
 
