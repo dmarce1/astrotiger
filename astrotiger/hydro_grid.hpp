@@ -31,7 +31,6 @@ class hydro_grid {
 	std::vector<multi_array<double>> U0;
 	std::vector<multi_array<double>> U;
 	std::vector<multi_array<double>> S;
-	multi_array<double> drho_dt;
 	std::array<std::vector<multi_array<double>>, NDIM> F0;
 	std::array<std::vector<multi_array<double>>, NDIM> F;
 	std::array<std::vector<multi_array<double>>, NDIM> Fc;
@@ -59,7 +58,7 @@ public:
 	const multi_array<double>& get_density() const {
 		return U[rho_i];
 	}
-	void compute_drho_dt();
+	multi_array<double> get_gravity_source(double dt) const;
 	void store();
 	void store_flux();
 	void enforce_physical_bc(int);

@@ -42,8 +42,8 @@ double hydro_grid::compute_flux(int rk) {
 		V[i].resize(box);
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
-		if( U[rho_i][i] < 0.0 )
-		printf( "%e %i %i %s\n", U[rho_i][i], i.index()[0], i.index()[1], box.to_string().c_str());
+		if (U[rho_i][i] < 0.0)
+			printf("%e %i %i %s\n", U[rho_i][i], i.index()[0], i.index()[1], box.to_string().c_str());
 		assert(U[rho_i][i] > 0.0);
 		assert(U[tau_i][i] >= 0.0);
 		const auto rhoinv = 1.0 / U[rho_i][i];
@@ -137,17 +137,24 @@ void hydro_grid::substep_update(int rk, double dt) {
 	}
 }
 
-void hydro_grid::compute_drho_dt() {
+multi_array<double> hydro_grid::get_gravity_source(double dt) const {
+	multi_array<double> src(box);
 	const double lambda = 1.0 / dx;
-	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
-		auto& drho = drho_dt[i];
-		drho = 0.0;
-		for (int dim = 0; dim < NDIM; dim++) {
-			multi_index ip1 = i;
-			ip1[dim]++;
-			drho -= (F[dim][rho_i][ip1] - F[dim][rho_i][i]) * lambda;
-		}
+	for (multi_iterator i(box); !i.end(); i++) {
+		src[i] = 0.0;
 	}
+	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+		double drho = 0.0;
+		if (dt != 0.0) {
+			for (int dim = 0; dim < NDIM; dim++) {
+				multi_index ip1 = i;
+				ip1[dim]++;
+				drho -= (F[dim][rho_i][ip1] - F[dim][rho_i][i]) * lambda;
+			}
+		}
+		src[i] = U[rho_i][i] + drho * dt;
+	}
+	return src;
 }
 
 void hydro_grid::store_flux() {
@@ -162,7 +169,6 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 	double *u1 = new double[sz];
 	int j = 0;
 	U0.resize(opts.nhydro);
-	drho_dt.resize(box);
 	U.resize(opts.nhydro);
 	S.resize(opts.nhydro);
 	phi.resize(box_.pad(opts.hbw));

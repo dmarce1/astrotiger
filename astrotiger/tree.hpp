@@ -148,7 +148,7 @@ public:
 	void delist();
 	void list();
 	void set_child_family();
-	void set_gravity_boundary(boundary&&, const multi_range&, int);
+	multi_array<double> set_gravity_boundary(boundary&&, const multi_range&, int);
 	void set_boundary(std::vector<double>&&, const multi_range&, int);
 	std::vector<double> get_energy_boundary(multi_range, int);
 	std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> get_refinement_boundary(multi_range, int);
@@ -167,12 +167,14 @@ public:
 	void sanity() const;
 	statistics get_statistics(int lev) const;
 	std::vector<double> restrict_all();
-	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
+	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double m);
 	double compute_error();
+	std::pair<multi_array<double>,bool> set_gravity_source(int, double dt);
 //	std::vector<double> get_fine_flux();
 
 
 //	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_fine_flux);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_gravity_source);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,restrict_all);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_statistics);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);

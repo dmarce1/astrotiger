@@ -5,7 +5,7 @@
 
 #include <array>
 
-#define OUTPUT_RESID
+//#define OUTPUT_RESID
 
 #define PACK_POTENTIAL_REDBLACK 1
 #define PACK_POTENTIAL 8
@@ -26,7 +26,6 @@ struct gravity_return {
 };
 
 class gravity {
-	multi_array<double> phi0;
 	multi_array<double> phi;
 	multi_array<double> R;
 	multi_array<double> X;
@@ -52,7 +51,6 @@ public:
 	template<class A>
 	void serialize(A &&arc, unsigned) {
 		arc & red;
-		arc & phi0;
 		arc & phi;
 		arc & X;
 		arc & R;
@@ -66,7 +64,7 @@ public:
 	void set_avg_zero();
 	void store();
 	void initialize_fine(const multi_array<double>&, double mtot, int level);
-	void initialize_coarse(double w);
+	void initialize_coarse();
 	void finish_fine();
 	void set_amr_zones(const std::vector<multi_range>&, const std::vector<double>&);
 	void zero() {
@@ -75,9 +73,10 @@ public:
 		}
 	}
 	double coord(index_type i) const;
+	void set_source(const multi_array<double>&);
 	void set_outflow_boundaries();
 	multi_array<double> get_phi() const;
-	std::vector<double> pack(const multi_range&, double) const;
+	std::vector<double> pack(const multi_range&) const;
 	std::vector<double> pack(const multi_range&, int) const;
 	std::vector<double> pack_phi(const multi_range&) const;
 	void unpack(const std::vector<double>&, const multi_range &bbox, int);

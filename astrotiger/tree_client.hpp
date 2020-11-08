@@ -87,10 +87,12 @@ public:
 	hpx::future<std::pair<std::vector<double>, std::vector<double>>> get_hydro_restrict() const;
 	hpx::future<std::shared_ptr<tree>> get_ptr() const;
 	hpx::future<std::pair<std::vector<std::uint8_t>, std::vector<multi_range>>> get_refinement_boundary(multi_range, int) const;
-	hpx::future<gravity_return> gravity_solve(int pass, int level, std::vector<double> &&coarse, double t, double m) const;
+	hpx::future<gravity_return> gravity_solve(int pass, int level, std::vector<double> &&coarse,  double m) const;
 	hpx::future<statistics> get_statistics(int) const;
 	hpx::future<std::vector<double>> restrict_all() const;
 	hpx::future<double> compute_error() const;
+	hpx::future<multi_array<double>> get_gravity_source(double) const;
+	hpx::future<std::pair<multi_array<double>,bool>> set_gravity_source(int,double) const;
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

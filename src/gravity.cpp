@@ -8,7 +8,6 @@
 void gravity::resize(double dx_, const multi_range &box_) {
 	dx = dx_;
 	box = box_.pad(opts.gbw);
-	phi0.resize(box);
 	phi.resize(box);
 	X.resize(box);
 	R.resize(box);
@@ -67,15 +66,22 @@ void gravity::initialize_fine(const multi_array<double> &rho, double mtot, int l
 	}
 	const auto rho0 = mtot;
 	for (multi_iterator i(box.pad(std::min(opts.gbw - opts.hbw, 0))); !i.end(); i++) {
-		R[i] = 4.0 * M_PI * opts.G * (rho[i] - (opts.problem == "sphere" ? 0.0 : rho0));
+		R[i] += 4.0 * M_PI * opts.G * (/*rho[i]*/ - (opts.problem == "sphere" ? 0.0 : rho0));
+	//	printf( "%e\n", R[i]);
 	}
 //	X = phi;
 }
 
-void gravity::initialize_coarse(double w) {
+void gravity::set_source(const multi_array<double> &src) {
+	for (multi_iterator i(box.pad(std::min(opts.gbw - opts.hbw, 0))); !i.end(); i++) {
+		R[i] = 4.0 * M_PI * opts.G * src[i];
+	}
+}
+
+void gravity::initialize_coarse() {
 	for (multi_iterator i(box); !i.end(); i++) {
 		X[i] = 0.0;
-		R[i] = 0.0;
+//		R[i] = 0.0;
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
 		active[i] = false;
@@ -184,14 +190,12 @@ std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 	return data;
 }
 
-std::vector<double> gravity::pack(const multi_range &bbox, double w) const {
+std::vector<double> gravity::pack(const multi_range &bbox) const {
 	assert(box.contains(bbox));
 	std::vector<double> data;
 	data.reserve(bbox.volume());
-	assert(w >= 0.0);
-	assert(w <= 1.0);
 	for (multi_iterator i(bbox); !i.end(); i++) {
-		data.push_back(w * phi[i] + (1.0 - w) * phi0[i]);
+		data.push_back(phi[i]);
 	}
 	return data;
 }
@@ -259,7 +263,6 @@ multi_array<double> gravity::get_phi() const {
 }
 
 void gravity::finish_fine() {
-	phi0 = phi;
 	phi = X;
 }
 

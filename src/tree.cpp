@@ -27,9 +27,11 @@ using get_statistics_action_type = tree::get_statistics_action;
 using restrict_all_action_type = tree::restrict_all_action;
 using set_boundary_action_type = tree::set_boundary_action;
 using compute_error_action_type = tree::compute_error_action;
+using set_gravity_source_action_type = tree::set_gravity_source_action;
+HPX_REGISTER_ACTION (set_gravity_source_action_type);
+HPX_REGISTER_ACTION (compute_error_action_type);
 //using get_fine_flux_action_type = tree::get_fine_flux_action;
 //HPX_REGISTER_ACTION (get_fine_flux_action_type);
-HPX_REGISTER_ACTION (compute_error_action_type);
 HPX_REGISTER_ACTION (set_boundary_action_type);
 HPX_REGISTER_ACTION (restrict_all_action_type);
 HPX_REGISTER_ACTION (get_statistics_action_type);
@@ -113,7 +115,7 @@ statistics tree::get_statistics(int lev) const {
 
 std::atomic<int> counter(0);
 
-gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse_from_parent, double this_t, double mtot) {
+gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse_from_parent, double mtot) {
 	gravity_step = 0;
 	if (level == fine_level) {
 		if (pass == 0) {
@@ -121,7 +123,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 				grav.initialize_fine(hydro.get_density(), mtot, level);
 				grav.set_amr_zones(get_amr_boxes(), coarse_from_parent);
 			} else {
-				grav.initialize_coarse(t);
+				grav.initialize_coarse();
 				grav.initialize_fine(hydro.get_density(), mtot, level);
 				if (opts.problem == "sphere") {
 					grav.set_outflow_boundaries();
@@ -133,7 +135,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			}
 		}
 	} else if (pass == 0) {
-		grav.initialize_coarse(t);
+		grav.initialize_coarse();
 	} else {
 		if (level != 0) {
 			grav.apply_prolong(coarse_from_parent);
@@ -151,21 +153,13 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	if (level < fine_level) {
 		std::vector<hpx::future<gravity_return>> futs;
 		futs.reserve(children.size());
-		double w;
-		if (t0 != t) {
-			w = (this_t - t0) / (t - t0);
-			assert(this_t >= t0);
-			assert(this_t <= t);
-		} else {
-			w = 1.0;
-		}
 		for (int i = 0; i < children.size(); i++) {
 			const auto &c = children[i];
 			if (pass == 0) {
 				const auto this_box = c.get_box().half().pad(opts.gbw);
-				futs.push_back(c.gravity_solve(pass, fine_level, grav.pack(this_box, w), this_t, mtot));
+				futs.push_back(c.gravity_solve(pass, fine_level, grav.pack(this_box), mtot));
 			} else {
-				futs.push_back(c.gravity_solve(pass, fine_level, grav.get_prolong(c.get_box().half()), this_t, mtot));
+				futs.push_back(c.gravity_solve(pass, fine_level, grav.get_prolong(c.get_box().half()), mtot));
 			}
 		}
 		for (auto &f : futs) {
@@ -184,8 +178,8 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	} else if (level == fine_level) {
 		get_gravity_boundaries(PACK_POTENTIAL);
 //		if (pass == GRAVITY_FINAL_PASS) {
-			grav.finish_fine();
-			hydro.set_phi(grav.get_phi());
+		grav.finish_fine();
+		hydro.set_phi(grav.get_phi());
 //		}
 	}
 	if (level == 0 && fine_level == 0 && opts.problem != "sphere") {
@@ -585,7 +579,7 @@ void tree::get_gravity_boundaries(int type) {
 	if (opts.problem == "sphere" && level == 0) {
 		return;
 	}
-	if( level == 1 ) {
+	if (level == 1) {
 //		printf( "%i\n", siblings.size());
 	}
 //	assert( !((type & PACK_POTENTIAL) && (type != PACK_POTENTIAL)));
@@ -946,5 +940,37 @@ std::string tree::output(DBfile *db) const {
 	}
 	DBFreeOptlist(options);
 	return mesh_name;
+}
+
+std::pair<multi_array<double>, bool> tree::set_gravity_source(int fine_level, double dt) {
+	double sum = 0.0;
+	std::pair<multi_array<double>, bool> rc;
+	multi_array<double> hydro_src;
+	if (level < fine_level) {
+		std::vector<hpx::future<std::pair<multi_array<double>,bool>>> futs;
+		for (const auto &c : children) {
+			futs.push_back(c.set_gravity_source(fine_level, dt));
+		}
+		hydro_src = hydro.get_gravity_source(dt);
+		int cvol = 0.0;
+		rc.second = true;
+		for (int ci = 0; ci < children.size(); ci++) {
+			const auto cbox = children[ci].get_box().half();
+			cvol += cbox.volume();
+			auto tmp1 = futs[ci].get();
+			auto tmp2 = tmp1.first.restrict_(cbox);
+			rc.second = rc.second && tmp1.second;
+			for (multi_iterator i(cbox); !i.end(); i++) {
+				hydro_src[i] = tmp2[i];
+			}
+		}
+		rc.second = rc.second && (cvol == box.volume());
+	} else if (level == fine_level) {
+		hydro_src = hydro.get_gravity_source(dt);
+		rc.second = true;
+		grav.set_source(hydro_src);
+	}
+	rc.first = hydro_src;
+	return rc;
 }
 
