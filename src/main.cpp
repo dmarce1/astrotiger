@@ -19,9 +19,9 @@ void solve_gravity(int l, double t, double mtot) {
 	do {
 		auto tmp = root.gravity_solve(pass, l, std::vector<double>(), t, mtot).get();
 		r = tmp.resid;
-		printf("%i %e\n", pass, r);
-		std::string fname = "X." + std::to_string(oi++) + ".silo";
-		output_silo(fname);
+//		printf("%i %e\n", pass, r);
+//		std::string fname = "X." + std::to_string(oi++) + ".silo";
+//		output_silo(fname);
 		if (pass > 200) {
 			printf("Gravity solver failed to converged\n");
 			//		abort();
@@ -32,7 +32,7 @@ void solve_gravity(int l, double t, double mtot) {
 	} while (r > toler);
 	auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), t, mtot).get();
 	std::string fname = "X." + std::to_string(oi++) + ".silo";
-	output_silo(fname);
+//	output_silo(fname);
 	r = tmp.resid / mtot;
 	if (kill) {
 		abort();
@@ -81,11 +81,13 @@ void master(int level, double tmax) {
 			const auto mtot = tmp.u[rho_i];
 			solve_gravity(level, tm[level], mtot);
 		}
+		printf( "Rk1\n");
 		levels_hydro_substep(level, 0, dt[level]);
 		if (opts.self_gravity) {
 			const auto mtot = root.get_statistics(std::min(level, max_refined)).get().u[rho_i];
 			solve_gravity(level, tm[level] + dt[level], mtot);
 		}
+		printf( "Rk2\n");
 		levels_hydro_substep(level, 1, dt[level]);
 		tm[level] += dt[level];
 		master(level + 1, tm[level]);
@@ -165,12 +167,13 @@ int hpx_main(int argc, char *argv[]) {
 			const auto tmp = root.get_statistics(std::min(l, max_refined)).get();
 			assert(tmp.u.size());
 			const auto mtot = tmp.u[rho_i];
+//			printf( "%.14e\n", mtot);
 			solve_gravity(l, 0.0, mtot);
 		}
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	const auto dt = 0.001;
+	const auto dt = 0.1;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

@@ -177,7 +177,7 @@ public:
 			}
 			double sum = (*this)[j];
 			for (int dim = 0; dim < NDIM; dim++) {
-				sum += c0[dim] * grad[dim][j];
+//				sum += c0[dim] * grad[dim][j];
 			}
 			pro[i] = sum;
 		}

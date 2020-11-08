@@ -31,6 +31,7 @@ class hydro_grid {
 	std::vector<multi_array<double>> U0;
 	std::vector<multi_array<double>> U;
 	std::vector<multi_array<double>> S;
+	multi_array<double> drho_dt;
 	std::array<std::vector<multi_array<double>>, NDIM> F0;
 	std::array<std::vector<multi_array<double>>, NDIM> F;
 	std::array<std::vector<multi_array<double>>, NDIM> Fc;
@@ -58,6 +59,7 @@ public:
 	const multi_array<double>& get_density() const {
 		return U[rho_i];
 	}
+	void compute_drho_dt();
 	void store();
 	void store_flux();
 	void enforce_physical_bc(int);
@@ -86,8 +88,8 @@ public:
 	double compare_analytic(const std::vector<multi_range> &cboxes, multi_array<double> &results) const;
 	static std::vector<std::string> field_names();
 	void to_array(multi_array<double>&, const multi_range &bbox, int, double) const;
-	std::vector<double> pack_coarse_flux();
-	double unpack_fine_flux(const std::vector<double>&, const multi_range&);
+//	std::vector<double> pack_coarse_flux();
+//	double unpack_fine_flux(const std::vector<double>&, const multi_range&);
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

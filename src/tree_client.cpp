@@ -45,11 +45,11 @@ hpx::future<std::vector<tree_client>> tree_client::get_children() const {
 hpx::future<std::vector<double>> tree_client::restrict_all() const {
 	return hpx::async<tree::restrict_all_action>(gid);
 }
-
-hpx::future<std::vector<double>> tree_client::get_fine_flux() const {
-	return hpx::async<tree::get_fine_flux_action>(gid);
-}
-
+//
+//hpx::future<std::vector<double>> tree_client::get_fine_flux() const {
+//	return hpx::async<tree::get_fine_flux_action>(gid);
+//}
+//
 
 
 hpx::future<void> tree_client::set_boundary(std::vector<double>&& data, const multi_range& id, int step) const {

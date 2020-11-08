@@ -27,8 +27,8 @@ using get_statistics_action_type = tree::get_statistics_action;
 using restrict_all_action_type = tree::restrict_all_action;
 using set_boundary_action_type = tree::set_boundary_action;
 using compute_error_action_type = tree::compute_error_action;
-using get_fine_flux_action_type = tree::get_fine_flux_action;
-HPX_REGISTER_ACTION (get_fine_flux_action_type);
+//using get_fine_flux_action_type = tree::get_fine_flux_action;
+//HPX_REGISTER_ACTION (get_fine_flux_action_type);
 HPX_REGISTER_ACTION (compute_error_action_type);
 HPX_REGISTER_ACTION (set_boundary_action_type);
 HPX_REGISTER_ACTION (restrict_all_action_type);
@@ -349,10 +349,10 @@ std::vector<double> tree::restrict_all() {
 	}
 	return hydro.pack_restrict(box.half());
 }
-
-std::vector<double> tree::get_fine_flux() {
-	return hydro.pack_coarse_flux();
-}
+//
+//std::vector<double> tree::get_fine_flux() {
+//	return hydro.pack_coarse_flux();
+//}
 
 double tree::hydro_initialize(bool refine) {
 	hydro_step = 0;
@@ -485,13 +485,13 @@ double tree::hydro_initialize(bool refine) {
 		hpx::wait_all(void_futs.begin(), void_futs.end());
 	}
 	auto amax = hydro.compute_flux(0);
-	std::vector<hpx::future<std::vector<double>>> cfuts;
-	for (const auto &c : children) {
-		cfuts.push_back(c.get_fine_flux());
-	}
-	for (int i = 0; i < children.size(); i++) {
-		amax = std::max(amax, hydro.unpack_fine_flux(cfuts[i].get(), children[i].get_box().half()));
-	}
+//	std::vector<hpx::future<std::vector<double>>> cfuts;
+//	for (const auto &c : children) {
+//		cfuts.push_back(c.get_fine_flux());
+//	}
+//	for (int i = 0; i < children.size(); i++) {
+//		amax = std::max(amax, hydro.unpack_fine_flux(cfuts[i].get(), children[i].get_box().half()));
+//	}
 	return amax;
 }
 
@@ -894,6 +894,8 @@ double tree::initialize(int this_level) {
 			amax = std::max(amax, futs[i].get());
 		}
 	}
+//	hydro_step = 0;
+//	get_hydro_boundaries(0.0);
 	return amax;
 }
 
@@ -908,14 +910,14 @@ std::string tree::output(DBfile *db) const {
 	std::vector<std::vector<double>> vars;
 	vars.resize(opts.nhydro + 2);
 	for (int dim = 0; dim < NDIM; dim++) {
-		dims1[dim] = box.dims()[dim] + 2 * opts.hbw;
+		dims1[dim] = box.dims()[dim]/* + 2 * opts.hbw*/;
 		dims2[dim] = dims1[dim] + 1;
 		coordnames[dim] = new char[2];
 		coordnames[dim][0] = 'x' + dim;
 		coordnames[dim][1] = '\0';
 		coords[dim] = new double[dims2[dim]];
-		for (int i = box.min[dim] - opts.hbw; i <= box.max[dim] + opts.hbw; i++) {
-			coords[dim][i - box.min[dim] + opts.hbw] = hydro.coord(i) - 0.5 * dx;
+		for (int i = box.min[dim] /*- opts.hbw*/; i <= box.max[dim]/* + opts.hbw*/; i++) {
+			coords[dim][i - box.min[dim]/* + opts.hbw*/] = hydro.coord(i) - 0.5 * dx;
 		}
 	}
 	vars = hydro.pack_output();
