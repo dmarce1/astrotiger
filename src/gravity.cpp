@@ -182,7 +182,7 @@ std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 	}
 	if (type | PACK_SOURCE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			if ((i.index().sum() + opts.hbw * NDIM) % 2 % 2 == 0) {
+			if ((i.index().sum() + opts.hbw * NDIM) % 2 == 0) {
 				data.push_back(R[i]);
 			}
 		}
@@ -229,7 +229,7 @@ void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, i
 	}
 	if (type | PACK_SOURCE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			if ((i.index().sum() + opts.hbw * NDIM) % 2 % 2 == 0) {
+			if ((i.index().sum() + opts.hbw * NDIM) %  2 == 0) {
 				assert(k < data.size());
 				R[i] = data[k];
 				k++;
