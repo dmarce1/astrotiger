@@ -26,7 +26,6 @@ struct gravity_return {
 };
 
 class gravity {
-
 	multi_array<double> phi0;
 	multi_array<double> phi;
 	multi_array<double> R;

@@ -183,10 +183,10 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 	} else if (level == fine_level) {
 		get_gravity_boundaries(PACK_POTENTIAL);
-		if (pass == GRAVITY_FINAL_PASS) {
+//		if (pass == GRAVITY_FINAL_PASS) {
 			grav.finish_fine();
 			hydro.set_phi(grav.get_phi());
-		}
+//		}
 	}
 	if (level == 0 && fine_level == 0 && opts.problem != "sphere") {
 		grav.set_avg_zero();

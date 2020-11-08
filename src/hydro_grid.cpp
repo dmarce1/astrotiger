@@ -707,8 +707,8 @@ double hydro_grid::compare_analytic(const std::vector<multi_range> &cboxes, mult
 
 std::vector<std::vector<double>> hydro_grid::pack_output() const {
 	std::vector<std::vector<double>> data;
-	auto bbox = box.pad(-opts.hbw);
-//	auto bbox = box;
+//	auto bbox = box.pad(-opts.hbw);
+	auto bbox = box;
 	data.resize(opts.nhydro + 2);
 	if ( NDIM > 1) {
 		std::swap(bbox.min[0], bbox.min[NDIM - 1]);
