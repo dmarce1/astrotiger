@@ -109,9 +109,9 @@ bool options::process_options(int argc, char *argv[]) {
 	beta.resize(nrk);
 	if (order == 1) {
 		alpha[0] = beta[0] = 1.0;
-		opts.cfl = 0.9 / NDIM;
+		cfl = 0.9 / NDIM;
 	} else if (order == 2) {
-		opts.cfl = 0.9 * (2.0 / 3.0) / NDIM;
+		cfl = 0.9 * (2.0 / 3.0) / NDIM;
 		beta[0] = 1.0;
 		beta[1] = 0.5;
 		alpha[0] = 0.0;

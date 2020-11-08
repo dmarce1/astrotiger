@@ -43,7 +43,7 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 	const auto to_dir = [](multi_index i) {
 		vect<index_type> j(0);
 		for (int dim = 0; dim < NDIM; dim++) {
-			if (i[dim] % 2 == 0) {
+			if ((i[dim] + opts.gbw * NDIM) % 2 == 0) {
 				j[dim]--;
 			} else {
 				j[dim]++;
@@ -175,7 +175,7 @@ std::vector<double> gravity::pack(const multi_range &bbox, int type) const {
 	}
 	if (type | PACK_SOURCE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			if ((i.index().sum() + opts.hbw * NDIM) % 2 % 2 == 0) {
+			if ((i.index().sum() + opts.hbw * NDIM) % 2 == 0) {
 				data.push_back(R[i]);
 			}
 		}
@@ -187,8 +187,8 @@ std::vector<double> gravity::pack(const multi_range &bbox, double w) const {
 	assert(box.contains(bbox));
 	std::vector<double> data;
 	data.reserve(bbox.volume());
-	assert(w>=0.0);
-	assert(w<=1.0);
+	assert(w >= 0.0);
+	assert(w <= 1.0);
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		data.push_back(w * phi[i] + (1.0 - w) * phi0[i]);
 	}
@@ -224,7 +224,7 @@ void gravity::unpack(const std::vector<double> &data, const multi_range &bbox, i
 	}
 	if (type | PACK_SOURCE) {
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			if ((i.index().sum() + opts.hbw * NDIM) % 2 % 2 == 0) {
+			if ((i.index().sum() + opts.hbw * NDIM) % 2 == 0) {
 				assert(k < data.size());
 				R[i] = data[k];
 				k++;

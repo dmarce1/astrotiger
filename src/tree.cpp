@@ -73,13 +73,6 @@ double tree::compute_error() {
 
 statistics tree::get_statistics(int lev) const {
 	statistics stats;
-	if (children.size() == 0) {
-		stats.min_level = level;
-		stats.max_level = level;
-	} else {
-		stats.min_level = opts.max_level;
-		stats.max_level = 0;
-	}
 	std::vector<multi_range> cranges;
 	std::vector<hpx::future<statistics>> futs;
 	int volume = 0;
@@ -94,7 +87,13 @@ statistics tree::get_statistics(int lev) const {
 	if (level <= lev) {
 		stats = hydro.get_statistics(cranges);
 	}
-//	printf("%i %i %i\n", level, lev, stats.u.size());
+	if (children.size() == 0) {
+		stats.min_level = level;
+		stats.max_level = level;
+	} else {
+		stats.min_level = opts.max_level;
+		stats.max_level = 0;
+	}
 	for (auto &f : futs) {
 		auto tmp = f.get();
 		if (level < lev) {
@@ -351,7 +350,7 @@ std::vector<double> tree::restrict_all() {
 	return hydro.pack_restrict(box.half());
 }
 
-std::vector<double> tree::get_fine_flux() const {
+std::vector<double> tree::get_fine_flux() {
 	return hydro.pack_coarse_flux();
 }
 
@@ -450,7 +449,7 @@ double tree::hydro_initialize(bool refine) {
 			np->grav.resize(np->dx, b);
 			np->t = np->t0 = t;
 			np->refine_step = 1;
-			np->hydro.unpack(hydro.pack_prolong(b, 1.0), b);
+			np->hydro.unpack(hydro.pack_prolong(b.pad(opts.hbw), 1.0), b.pad(opts.hbw));
 			for (const auto &op : old_ptrs) {
 				const auto inter = np->box.intersection(op->box);
 				if (!inter.empty()) {
@@ -485,13 +484,13 @@ double tree::hydro_initialize(bool refine) {
 		}
 		hpx::wait_all(void_futs.begin(), void_futs.end());
 	}
-	const auto amax = hydro.compute_flux(0);
+	auto amax = hydro.compute_flux(0);
 	std::vector<hpx::future<std::vector<double>>> cfuts;
 	for (const auto &c : children) {
 		cfuts.push_back(c.get_fine_flux());
 	}
 	for (int i = 0; i < children.size(); i++) {
-		hydro.unpack_fine_flux(cfuts[i].get(), children[i].get_box().half());
+		amax = std::max(amax, hydro.unpack_fine_flux(cfuts[i].get(), children[i].get_box().half()));
 	}
 	return amax;
 }
@@ -585,6 +584,9 @@ void tree::get_hydro_boundaries(double this_time) {
 void tree::get_gravity_boundaries(int type) {
 	if (opts.problem == "sphere" && level == 0) {
 		return;
+	}
+	if( level == 1 ) {
+//		printf( "%i\n", siblings.size());
 	}
 //	assert( !((type & PACK_POTENTIAL) && (type != PACK_POTENTIAL)));
 	for (const auto &sib : siblings) {
@@ -906,14 +908,14 @@ std::string tree::output(DBfile *db) const {
 	std::vector<std::vector<double>> vars;
 	vars.resize(opts.nhydro + 2);
 	for (int dim = 0; dim < NDIM; dim++) {
-		dims1[dim] = box.dims()[dim]/* + 2 * opts.hbw*/;
+		dims1[dim] = box.dims()[dim] + 2 * opts.hbw;
 		dims2[dim] = dims1[dim] + 1;
 		coordnames[dim] = new char[2];
 		coordnames[dim][0] = 'x' + dim;
 		coordnames[dim][1] = '\0';
 		coords[dim] = new double[dims2[dim]];
-		for (int i = box.min[dim]/* - opts.hbw*/; i <= box.max[dim]/* + opts.hbw*/; i++) {
-			coords[dim][i - box.min[dim]/* + opts.hbw*/] = hydro.coord(i) - 0.5 * dx;
+		for (int i = box.min[dim] - opts.hbw; i <= box.max[dim] + opts.hbw; i++) {
+			coords[dim][i - box.min[dim] + opts.hbw] = hydro.coord(i) - 0.5 * dx;
 		}
 	}
 	vars = hydro.pack_output();

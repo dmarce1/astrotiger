@@ -86,8 +86,8 @@ public:
 	double compare_analytic(const std::vector<multi_range> &cboxes, multi_array<double> &results) const;
 	static std::vector<std::string> field_names();
 	void to_array(multi_array<double>&, const multi_range &bbox, int, double) const;
-	std::vector<double> pack_coarse_flux() const;
-	void unpack_fine_flux(const std::vector<double>&, const multi_range&);
+	std::vector<double> pack_coarse_flux();
+	double unpack_fine_flux(const std::vector<double>&, const multi_range&);
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

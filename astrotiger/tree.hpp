@@ -169,7 +169,7 @@ public:
 	std::vector<double> restrict_all();
 	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
 	double compute_error();
-	std::vector<double> get_fine_flux() const;
+	std::vector<double> get_fine_flux();
 
 
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_fine_flux);

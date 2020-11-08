@@ -151,8 +151,8 @@ public:
 	multi_array prolong(const multi_range &pro_box, bool smooth = false) const {
 		multi_range grad_box;
 		for (int dim = 0; dim < NDIM; dim++) {
-			grad_box.min[dim] = (pro_box.min[dim] - std::abs(pro_box.min[dim] % 2)) / 2;
-			grad_box.max[dim] = (pro_box.max[dim] + std::abs(pro_box.max[dim] % 2)) / 2;
+			grad_box.min[dim] = (pro_box.min[dim] - (std::abs(pro_box.min[dim]) % 2)) / 2;
+			grad_box.max[dim] = (pro_box.max[dim] + (std::abs(pro_box.max[dim]) % 2)) / 2;
 		}
 		multi_array grad[NDIM];
 		for (int dim = 0; dim < NDIM; dim++) {

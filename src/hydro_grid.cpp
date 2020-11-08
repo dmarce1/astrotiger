@@ -371,17 +371,29 @@ void hydro_grid::initialize() {
 			U[egas_i][i] = ein + ek;
 			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
 		} else if (opts.problem == "polytrope") {
+			double r = 0.0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				auto x = coord(i[dim]);
+				if (dim == 0) {
+					if (x > 0.5) {
+						x -= 1.0;
+					}
+				} else {
+					x -= 0.5;
+				}
+				r += std::pow(x, 2);
+			}
 			const auto n = 1.5;
 			const auto alpha = 0.005;
 			const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
 			auto &rho = U[rho_i][i];
-			rho = std::max(1.0e-6, std::pow(theta, n));
-			const auto vx = 0.1;
-			const auto vy = 0.05;
+			rho = std::max(1.0e-10, std::pow(theta, n));
+			const auto vx = 1.0;
+			const auto vy = 0.00;
 			U[sx_i][i] = vx * rho;
 			U[sy_i][i] = vy * rho;
 			const auto K = 4.0 * M_PI * opts.G * alpha * alpha / (n + 1);
-			U[egas_i][i] = std::max(1.0e-6, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
+			U[egas_i][i] = std::max(1.0e-20, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 			U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
 		} else {
@@ -756,7 +768,8 @@ std::vector<double> hydro_grid::pack_restrict(multi_range bbox) const {
 	return data;
 }
 
-std::vector<double> hydro_grid::pack_coarse_flux() const {
+std::vector<double> hydro_grid::pack_coarse_flux() {
+	const double a = compute_flux(0);
 	const auto inv = 1.0 / (1 << (NDIM - 1));
 	std::vector<double> data;
 	int size = 0;
@@ -781,23 +794,31 @@ std::vector<double> hydro_grid::pack_coarse_flux() const {
 			}
 		}
 	}
+	data.push_back(a);
 	return data;
 }
 
-void hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi_range &bbox) {
+double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi_range &bbox) {
 	int k = 0;
+	double a;
 	for (int dim = 0; dim < NDIM; dim++) {
 		auto this_box = bbox;
 		this_box.max[dim]++;
 		for (int f = 0; f < opts.nhydro; f++) {
 			for (multi_iterator i(this_box); !i.end(); i++) {
 				assert(k < data.size());
+//				if (f == rho_i) {
+//					printf("%e %e\n", F[dim][f][i], data[k]);
+//				}
 				F[dim][f][i] = data[k];
 				k++;
 			}
 		}
 	}
+	a = data[k];
+	k++;
 	assert(k == data.size());
+	return a;
 }
 
 void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const multi_range &bbox, double dt) {
