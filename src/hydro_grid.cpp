@@ -42,6 +42,9 @@ double hydro_grid::compute_flux(int rk) {
 		V[i].resize(box);
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
+		if( U[rho_i][i] < 0.0 ) {
+			printf( "%e %i %i\n", U[rho_i][i], i.index()[0], i.index()[1]);
+		}
 		assert(U[rho_i][i] > 0.0);
 		assert(U[tau_i][i] >= 0.0);
 		const auto rhoinv = 1.0 / U[rho_i][i];
@@ -383,6 +386,7 @@ void hydro_grid::initialize() {
 				}
 				r += std::pow(x, 2);
 			}
+			r = std::sqrt(r);
 			const auto n = 1.5;
 			const auto alpha = 0.005;
 			const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
@@ -707,8 +711,8 @@ double hydro_grid::compare_analytic(const std::vector<multi_range> &cboxes, mult
 
 std::vector<std::vector<double>> hydro_grid::pack_output() const {
 	std::vector<std::vector<double>> data;
-//	auto bbox = box.pad(-opts.hbw);
-	auto bbox = box;
+	auto bbox = box.pad(-opts.hbw);
+//	auto bbox = box;
 	data.resize(opts.nhydro + 2);
 	if ( NDIM > 1) {
 		std::swap(bbox.min[0], bbox.min[NDIM - 1]);
@@ -875,6 +879,7 @@ void hydro_grid::unpack(const std::vector<double> &data, multi_range bbox) {
 			k++;
 		}
 	}
+	assert(k==data.size());
 }
 
 void hydro_grid::unpack_field(int f, const std::vector<double> &data, multi_range bbox) {

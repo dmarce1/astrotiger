@@ -54,7 +54,7 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 	for (multi_iterator I(box); !I.end(); I++) {
 		const auto i = I.index();
 		const auto d = to_dir(i);
-		const auto ic = i / 2;
+		const auto ic = (i + multi_index(2 * opts.gbw)) / 2 - opts.gbw;
 		const auto icp = ic + d;
 		const auto icm = ic - d;
 		X[i] = (-(3.0 / 32.0) * phi_c[icm] + (15.0 / 16.0) * phi_c[ic] + (5.0 / 32.0) * phi_c[icp]);
@@ -188,8 +188,8 @@ std::vector<double> gravity::pack(const multi_range &bbox, double w) const {
 	assert(box.contains(bbox));
 	std::vector<double> data;
 	data.reserve(bbox.volume());
-	assert(w>=0.0);
-	assert(w<=1.0);
+	assert(w >= 0.0);
+	assert(w <= 1.0);
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		data.push_back(w * phi[i] + (1.0 - w) * phi0[i]);
 	}

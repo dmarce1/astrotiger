@@ -21,7 +21,7 @@ void solve_gravity(int l, double t, double mtot) {
 		r = tmp.resid;
 		printf("%i %e\n", pass, r);
 		std::string fname = "X." + std::to_string(oi++) + ".silo";
-		output_silo(fname);
+//		output_silo(fname);
 		if (pass > 200) {
 			printf("Gravity solver failed to converged\n");
 			//		abort();
@@ -32,7 +32,7 @@ void solve_gravity(int l, double t, double mtot) {
 	} while (r > toler);
 	auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), t, mtot).get();
 	std::string fname = "X." + std::to_string(oi++) + ".silo";
-	output_silo(fname);
+//	output_silo(fname);
 	r = tmp.resid / mtot;
 	if (kill) {
 		abort();
@@ -53,9 +53,9 @@ void master(int level, double tmax) {
 	}
 	const int max_refined = stats.min_level;
 	do {
-		if (level > 0 && nstep == -1) {
-			levels_set_child_families(level - 1);
-		}
+//		if (level > 0 && nstep == -1) {
+//			levels_set_child_families(level - 1);
+//		}
 		bool refine = (nstep == -1) && (super_step[level] % refine_freq == 0);
 		if (refine) {
 			printf("Refining on level %i\n", level);
@@ -65,6 +65,10 @@ void master(int level, double tmax) {
 
 		printf("Hydro pre-step\n");
 		dt[level] = levels_hydro_initialize(level, refine);
+		if (refine) {
+			levels_set_child_families(level);
+		}
+		dt[level] = std::max(dt[level], levels_fine_fluxes(level));
 		if (dt[level] == 0.0) {
 			tm[level] = tm[level - 1];
 			master(level + 1, tm[level]);
@@ -155,7 +159,7 @@ int hpx_main(int argc, char *argv[]) {
 		}
 		printf("Done\n");
 	}
-	root.restrict_all().get();
+//	root.restrict_all().get();
 //	master(0, 1.0e-100);
 	levels_show();
 	if (opts.self_gravity) {
@@ -170,7 +174,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	const auto dt = 0.001;
+	const auto dt = 0.1;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

@@ -278,6 +278,8 @@ std::vector<std::vector<double>> tree::get_energy_prolong(std::vector<multi_rang
 std::pair<std::vector<double>, std::vector<double>> tree::get_hydro_restrict() {
 	std::pair<std::vector<double>, std::vector<double>> rc;
 	const auto bbox = box.half();
+//	printf( "1 %s\n", box.to_string().c_str());
+//	printf( "2 %s\n", bbox.to_string().c_str());
 	rc.first = hydro.pack_restrict(bbox);
 	rc.second = hydro.pack_coarse_correction();
 	return rc;
@@ -347,10 +349,14 @@ std::vector<double> tree::restrict_all() {
 		const auto cbox = children[i].get_box().half();
 		hydro.unpack(tmp, cbox);
 	}
+	hydro_step = 0;
+	get_hydro_boundaries(0);
 	return hydro.pack_restrict(box.half());
 }
 
 std::vector<double> tree::get_fine_flux() {
+	hydro_step = 0;
+	get_hydro_boundaries(0);
 	return hydro.pack_coarse_flux();
 }
 
@@ -485,6 +491,14 @@ double tree::hydro_initialize(bool refine) {
 		hpx::wait_all(void_futs.begin(), void_futs.end());
 	}
 	auto amax = hydro.compute_flux(0);
+	return amax;
+}
+
+
+double tree::apply_fine_fluxes() {
+	hydro_step = 0;
+	get_hydro_boundaries(0);
+	double amax = 0.0;
 	std::vector<hpx::future<std::vector<double>>> cfuts;
 	for (const auto &c : children) {
 		cfuts.push_back(c.get_fine_flux());
@@ -494,6 +508,8 @@ double tree::hydro_initialize(bool refine) {
 	}
 	return amax;
 }
+
+
 
 void tree::get_hydro_boundaries(double this_time) {
 	for (const auto &sib : siblings) {
@@ -908,14 +924,14 @@ std::string tree::output(DBfile *db) const {
 	std::vector<std::vector<double>> vars;
 	vars.resize(opts.nhydro + 2);
 	for (int dim = 0; dim < NDIM; dim++) {
-		dims1[dim] = box.dims()[dim] + 2 * opts.hbw;
+		dims1[dim] = box.dims()[dim];// + 2 * opts.hbw;
 		dims2[dim] = dims1[dim] + 1;
 		coordnames[dim] = new char[2];
 		coordnames[dim][0] = 'x' + dim;
 		coordnames[dim][1] = '\0';
 		coords[dim] = new double[dims2[dim]];
-		for (int i = box.min[dim] - opts.hbw; i <= box.max[dim] + opts.hbw; i++) {
-			coords[dim][i - box.min[dim] + opts.hbw] = hydro.coord(i) - 0.5 * dx;
+		for (int i = box.min[dim];/* - opts.hbw*/ i <= box.max[dim] /*+ opts.hbw*/; i++) {
+			coords[dim][i - box.min[dim]/* + opts.hbw */] = hydro.coord(i) - 0.5 * dx;
 		}
 	}
 	vars = hydro.pack_output();
