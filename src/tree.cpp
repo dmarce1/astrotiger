@@ -7,6 +7,8 @@
 
 #include <astrotiger/tree.hpp>
 
+#include <unordered_map>
+
 HPX_REGISTER_COMPONENT(hpx::components::managed_component<tree>, tree);
 
 using get_hydro_prolong_action_type = tree::get_hydro_prolong_action;
@@ -184,8 +186,8 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	} else if (level == fine_level) {
 		get_gravity_boundaries(PACK_POTENTIAL);
 //		if (pass == GRAVITY_FINAL_PASS) {
-			grav.finish_fine();
-			hydro.set_phi(grav.get_phi());
+		grav.finish_fine();
+		hydro.set_phi(grav.get_phi());
 //		}
 	}
 	if (level == 0 && fine_level == 0 && opts.problem != "sphere") {
@@ -245,6 +247,7 @@ std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> tree::get_refinem
 
 std::vector<std::vector<double>> tree::get_hydro_prolong(std::vector<multi_range> ranges, double this_t) {
 	double w;
+//	printf("%.14e %.14e %.14e\n", t0, this_t, t);
 	if (t0 != t) {
 		w = (this_t - t0) / (t - t0);
 		assert(this_t >= t0);
@@ -350,13 +353,13 @@ std::vector<double> tree::restrict_all() {
 		hydro.unpack(tmp, cbox);
 	}
 	hydro_step = 0;
-	get_hydro_boundaries(0);
+	get_hydro_boundaries(t);
 	return hydro.pack_restrict(box.half());
 }
 
 std::vector<double> tree::get_fine_flux() {
 	hydro_step = 0;
-	get_hydro_boundaries(0);
+	get_hydro_boundaries(t);
 	return hydro.pack_coarse_flux();
 }
 
@@ -494,10 +497,9 @@ double tree::hydro_initialize(bool refine) {
 	return amax;
 }
 
-
 double tree::apply_fine_fluxes() {
 	hydro_step = 0;
-	get_hydro_boundaries(0);
+//	get_hydro_boundaries(t);
 	double amax = 0.0;
 	std::vector<hpx::future<std::vector<double>>> cfuts;
 	for (const auto &c : children) {
@@ -508,8 +510,6 @@ double tree::apply_fine_fluxes() {
 	}
 	return amax;
 }
-
-
 
 void tree::get_hydro_boundaries(double this_time) {
 	for (const auto &sib : siblings) {
@@ -601,7 +601,7 @@ void tree::get_gravity_boundaries(int type) {
 	if (opts.problem == "sphere" && level == 0) {
 		return;
 	}
-	if( level == 1 ) {
+	if (level == 1) {
 //		printf( "%i\n", siblings.size());
 	}
 //	assert( !((type & PACK_POTENTIAL) && (type != PACK_POTENTIAL)));
@@ -913,52 +913,77 @@ double tree::initialize(int this_level) {
 	return amax;
 }
 
-std::string tree::output(DBfile *db) const {
-	auto options = DBMakeOptlist(1);
-	int one = 1;
-	DBAddOption(options, DBOPT_HIDE_FROM_GUI, &one);
-	std::array<double*, NDIM> coords;
-	std::array<int, NDIM> dims1;
-	std::array<int, NDIM> dims2;
-	char *coordnames[NDIM];
-	std::vector<std::vector<double>> vars;
-	vars.resize(opts.nhydro + 2);
-	for (int dim = 0; dim < NDIM; dim++) {
-		dims1[dim] = box.dims()[dim];// + 2 * opts.hbw;
-		dims2[dim] = dims1[dim] + 1;
-		coordnames[dim] = new char[2];
-		coordnames[dim][0] = 'x' + dim;
-		coordnames[dim][1] = '\0';
-		coords[dim] = new double[dims2[dim]];
-		for (int i = box.min[dim];/* - opts.hbw*/ i <= box.max[dim] /*+ opts.hbw*/; i++) {
-			coords[dim][i - box.min[dim]/* + opts.hbw */] = hydro.coord(i) - 0.5 * dx;
+struct node_hash {
+	std::size_t operator()(const vect<double> &node) const {
+		std::hash<double> f;
+		std::size_t hash = 0;
+		for (int dim = 0; dim < NDIM; dim++) {
+			hash ^= f(std::exp(node[dim]));
+		}
+		return hash;
+	}
+};
+
+output_return tree::output(DBfile *db, int node_index) const {
+	int offset = node_index;
+	output_return rc;
+	std::unordered_map<vect<double>, int, node_hash> nodes;
+	std::vector<int> zones;
+	multi_array<std::uint8_t> mask(box);
+	for (multi_iterator i(box); !i.end(); i++) {
+		mask[i] = 1;
+	}
+	for (const auto &c : children) {
+		const auto cbox = c.get_box().half();
+		for (multi_iterator i(cbox); !i.end(); i++) {
+			mask[i] = 0;
 		}
 	}
-	vars = hydro.pack_output();
-	std::string mesh_name;
-	for (int dim = 0; dim < NDIM; dim++) {
-		mesh_name += std::to_string(level) + std::string("_") + std::string(coordnames[dim]) + "_";
-		mesh_name += std::to_string(box.min[dim]) + "_" + std::to_string(box.max[dim]);
-		if (dim != NDIM - 1) {
-			mesh_name += std::string("_");
+#if NDIM == 1
+	constexpr int order[2] = {0,1};
+#elif NDIM == 2
+	constexpr int order[4] = { 0, 1, 3, 2 };
+#else
+	constexpr int order[8] = {0,1,3,2,4,5,7,6};
+#endif
+
+	for (multi_iterator i(box); !i.end(); i++) {
+		if (mask[i]) {
+			std::vector<int> these_zones(1 << NDIM);
+			vect<double> node;
+			for (int ci = 0; ci < (1 << NDIM); ci++) {
+				for (int dim = 0; dim < NDIM; dim++) {
+					if ((ci >> dim) & 1) {
+						node[dim] = (i.index()[dim] + 1) * dx;
+					} else {
+						node[dim] = (i.index()[dim]) * dx;
+					}
+				}
+				int this_index;
+				if (nodes.find(node) == nodes.end()) {
+					this_index = node_index;
+					nodes[node] = this_index;
+					node_index++;
+				} else {
+					this_index = nodes[node];
+				}
+				these_zones[order[ci]] = this_index;
+			}
+			zones.insert(zones.end(), these_zones.begin(), these_zones.end());
 		}
 	}
-	SILO_CHECK(DBPutQuadmesh(db, mesh_name.c_str(), coordnames, coords.data(), dims2.data(), NDIM, DB_DOUBLE, DB_COLLINEAR, options));
-
-	auto var_names = hydro_grid::field_names();
-	for (int f = 0; f < vars.size(); f++) {
-		var_names[f] += "_" + mesh_name;
-	}
-
-	for (int f = 0; f < vars.size(); f++) {
-		SILO_CHECK(DBPutQuadvar1(db, var_names[f].c_str(), mesh_name.c_str(), vars[f].data(), dims1.data(), NDIM, NULL, 0, DB_DOUBLE, DB_ZONECENT,options));
-	}
-
+	rc.zones = std::move(zones);
+	rc.coords.resize(NDIM);
 	for (int dim = 0; dim < NDIM; dim++) {
-		delete[] coordnames[dim];
-		delete[] coords[dim];
+		rc.coords[dim].resize(nodes.size());
 	}
-	DBFreeOptlist(options);
-	return mesh_name;
+	for (const auto &entry : nodes) {
+		for (int dim = 0; dim < NDIM; dim++) {
+			rc.coords[dim][entry.second - offset] = entry.first[dim];
+		}
+	}
+	rc.data = hydro.pack_output(mask);
+	return rc;
+
 }
 

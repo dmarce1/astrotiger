@@ -34,7 +34,7 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 		active[i] = true;
 	}
 	for (const auto &b : boxes) {
-		for (multi_iterator i(b); !i.end(); i++) {
+		for (multi_iterator i(b.intersection(box)); !i.end(); i++) {
 			active[i] = false;
 		}
 	}

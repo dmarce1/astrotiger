@@ -42,8 +42,8 @@ double hydro_grid::compute_flux(int rk) {
 		V[i].resize(box);
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
-		if( U[rho_i][i] < 0.0 ) {
-			printf( "%e %i %i\n", U[rho_i][i], i.index()[0], i.index()[1]);
+		if (U[rho_i][i] < 0.0) {
+			printf("%e %i %i\n", U[rho_i][i], i.index()[0], i.index()[1]);
 		}
 		assert(U[rho_i][i] > 0.0);
 		assert(U[tau_i][i] >= 0.0);
@@ -709,23 +709,17 @@ double hydro_grid::compare_analytic(const std::vector<multi_range> &cboxes, mult
 	return err_rms;
 }
 
-std::vector<std::vector<double>> hydro_grid::pack_output() const {
+std::vector<std::vector<double>> hydro_grid::pack_output(const multi_array<std::uint8_t> &mask) const {
 	std::vector<std::vector<double>> data;
 	auto bbox = box.pad(-opts.hbw);
 //	auto bbox = box;
 	data.resize(opts.nhydro + 2);
-	if ( NDIM > 1) {
-		std::swap(bbox.min[0], bbox.min[NDIM - 1]);
-		std::swap(bbox.max[0], bbox.max[NDIM - 1]);
-	}
 	for (int f = 0; f <= opts.nhydro + 1; f++) {
 		const auto &u = f == opts.nhydro ? phi : (f == opts.nhydro + 1 ? error : U[f]);
 		for (multi_iterator i(bbox); !i.end(); i++) {
-			multi_index j = i.index();
-			if ( NDIM > 1) {
-				std::swap(j[0], j[NDIM - 1]);
+			if (mask[i]) {
+				data[f].push_back(u[i]);
 			}
-			data[f].push_back(u[j]);
 		}
 	}
 	return data;
@@ -879,7 +873,7 @@ void hydro_grid::unpack(const std::vector<double> &data, multi_range bbox) {
 			k++;
 		}
 	}
-	assert(k==data.size());
+	assert(k == data.size());
 }
 
 void hydro_grid::unpack_field(int f, const std::vector<double> &data, multi_range bbox) {

@@ -68,7 +68,7 @@ public:
 	void compute_refinement_criteria();
 	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&, const std::vector<multi_range> &forced) const;
 	double coord(index_type i) const;
-	std::vector<std::vector<double>> pack_output() const;
+	std::vector<std::vector<double>> pack_output(const multi_array<std::uint8_t>&) const;
 	std::vector<double> pack_field(int f, multi_range) const;
 	std::vector<double> pack(multi_range bbox) const;
 	std::vector<std::uint8_t> pack_refinement(multi_range bbox) const;

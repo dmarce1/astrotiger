@@ -123,28 +123,54 @@ double levels_fine_fluxes(int level) {
 	return a;
 }
 
-std::vector<std::string> levels_output_silo(int level, const std::string filename) {
-	DBfile *db;
-	auto these_levels = levels;
-	std::vector<std::string> mnames;
-	if (level == 0 && hpx::get_locality_id() == 0) {
-		db = DBCreateReal(filename.c_str(), DB_CLOBBER, DB_LOCAL, "Astro-Tiger", DB_PDB);
-	} else {
-		db = DBOpenReal(filename.c_str(), DB_PDB, DB_APPEND);
-	}
+void levels_output_silo(const std::string filename) {
+	DBfile *db = DBCreateReal(filename.c_str(), DB_CLOBBER, DB_LOCAL, "Astro-Tiger", DB_PDB);
 	if (db == nullptr) {
 		printf("Unable to open %s for writing\n", filename.c_str());
 	} else {
-		for (auto *ptr : these_levels[level]) {
-			mnames.push_back(ptr->output(db));
+		auto these_levels = levels;
+		output_return output;
+		output.coords.resize(NDIM);
+		output.data.resize(opts.nhydro + 2);
+		int node_index = 0;
+		for (int level = 0; level <= opts.max_level; level++) {
+			for (auto *ptr : these_levels[level]) {
+				const output_return this_output = ptr->output(db, node_index);
+				for (int dim = 0; dim < NDIM; dim++) {
+					output.coords[dim].insert(output.coords[dim].end(), this_output.coords[dim].begin(), this_output.coords[dim].end());
+				}
+				node_index += this_output.coords[0].size();
+				for (int f = 0; f < opts.nhydro + 2; f++) {
+					output.data[f].insert(output.data[f].end(), this_output.data[f].begin(), this_output.data[f].end());
+				}
+				output.zones.insert(output.zones.end(), this_output.zones.begin(), this_output.zones.end());
+			}
 		}
+#if NDIM==1
+		const int shape = DB_ZONETYPE_BEAM;
+#elif NDIM==2
+		const int shape = DB_ZONETYPE_QUAD;
+#else
+		const int shape = DB_ZONETYPE_HEX;
+#endif
+		const std::vector<int> shapes(1, shape);
+		const std::vector<int> shapesizes(1, 1 << NDIM);
+		const std::vector<int> shapecnts(1, output.zones.size() / (1 << NDIM));
+		const char *coordnames[] = { "x", "y", "z" };
+		const double *coords[NDIM];
+		for (int dim = 0; dim < NDIM; dim++) {
+			coords[dim] = output.coords[dim].data();
+		}
+		const auto nnodes = output.coords[0].size();
+		const auto nzones = output.zones.size() / (1 << NDIM);
+		SILO_CHECK(DBPutZonelist2(db, "zones", nzones, NDIM, output.zones.data(), nzones * (1<<NDIM), 0, 0, 0, shapes.data(), shapesizes.data(), shapecnts.data(), 1, NULL));
+		SILO_CHECK(DBPutUcdmesh (db, "mesh", NDIM, coordnames, coords, nnodes, nzones, "zones", NULL, DB_DOUBLE, NULL));
+		const auto names = hydro_grid::field_names();
+		for (int f = 0; f < opts.nhydro + 2; f++) {
+			SILO_CHECK(DBPutUcdvar1 (db, names[f].c_str(),"mesh", output.data[f].data(),output.data[f].size(),NULL,0,DB_DOUBLE, DB_ZONECENT, NULL));
+		}
+
 		SILO_CHECK(DBClose(db));
-		auto localities = hpx::find_all_localities();
-		if (hpx::get_locality_id() != localities.size() - 1) {
-			auto other_names = levels_output_silo_action()(localities[hpx::get_locality_id() + 1], level, filename);
-			mnames.insert(mnames.end(), other_names.begin(), other_names.end());
-		}
 	}
-	return mnames;
 }
 

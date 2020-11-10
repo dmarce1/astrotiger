@@ -19,7 +19,7 @@ void solve_gravity(int l, double t, double mtot) {
 	do {
 		auto tmp = root.gravity_solve(pass, l, std::vector<double>(), t, mtot).get();
 		r = tmp.resid;
-		printf("%i %e\n", pass, r);
+//		printf("%i %e\n", pass, r);
 		std::string fname = "X." + std::to_string(oi++) + ".silo";
 //		output_silo(fname);
 		if (pass > 200) {
@@ -46,7 +46,7 @@ void master(int level, double tmax) {
 	}
 	int oi = 0;
 	double nstep = -1;
-	const int refine_freq = opts.window / opts.cfl;
+	const int refine_freq = 2;
 	statistics stats;
 	if (opts.self_gravity) {
 		stats = root.get_statistics(opts.max_level).get();
@@ -83,11 +83,13 @@ void master(int level, double tmax) {
 			auto tmp = root.get_statistics(std::min(level, max_refined)).get();
 			assert(tmp.u.size());
 			const auto mtot = tmp.u[rho_i];
+			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			solve_gravity(level, tm[level], mtot);
 		}
 		levels_hydro_substep(level, 0, dt[level]);
 		if (opts.self_gravity) {
 			const auto mtot = root.get_statistics(std::min(level, max_refined)).get().u[rho_i];
+			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			solve_gravity(level, tm[level] + dt[level], mtot);
 		}
 		levels_hydro_substep(level, 1, dt[level]);
@@ -159,7 +161,7 @@ int hpx_main(int argc, char *argv[]) {
 		}
 		printf("Done\n");
 	}
-//	root.restrict_all().get();
+	root.restrict_all().get();
 //	master(0, 1.0e-100);
 	levels_show();
 	if (opts.self_gravity) {
@@ -174,7 +176,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	const auto dt = 0.1;
+	const auto dt = 0.001;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

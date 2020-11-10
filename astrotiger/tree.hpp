@@ -47,6 +47,12 @@ struct sibling {
 	}
 };
 
+struct output_return {
+	std::vector<std::vector<double>> coords;
+	std::vector<std::vector<double>> data;
+	std::vector<int> zones;
+};
+
 class tree: public hpx::components::managed_component_base<tree> {
 	multi_range box;
 	hydro_grid hydro;
@@ -157,7 +163,7 @@ public:
 	std::pair<std::vector<double>, std::vector<double>> get_hydro_restrict();
 	void hydro_substep(int, double);
 	double hydro_initialize(bool);
-	std::string output(DBfile *db) const;
+	output_return output(DBfile *db, int) const;
 	multi_range get_box() const;
 	tree_client truncate(tree_client, multi_range box);
 	std::vector<multi_range> get_refinement_boundaries();
