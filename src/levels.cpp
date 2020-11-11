@@ -186,7 +186,7 @@ void levels_output_silo(const std::string filename) {
 			for (int dim = 0; dim < NDIM; dim++) {
 				coords[dim] = output.pcoords[dim].data();
 			}
-			SILO_CHECK(DBPutPointmesh(db, "point_mesh", NDIM, output.pcoords.data(), output.pcoords[0].size(), DB_DOUBLE, NULL));
+			SILO_CHECK(DBPutPointmesh(db, "point_mesh", NDIM, coords, output.pcoords[0].size(), DB_DOUBLE, NULL));
 			const auto names = particles::field_names();
 			for (int f = 0; f < NDIM + 1; f++) {
 				SILO_CHECK(DBPutPointvar1(db,names[f].c_str(), "point_mesh", output.pdata[f].data(), output.pdata[f].size(), DB_DOUBLE, NULL));

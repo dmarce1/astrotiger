@@ -42,7 +42,7 @@ public:
 	std::vector<std::vector<double>> pack_coords() const;
 	static std::vector<std::string> field_names();
 	std::vector<particle> drift(double dt);
-	void add_parts(const std::vector<particle> &parts);
+	void add_parts(std::vector<particle> &parts);
 	void initialize();
 	double max_velocity() const;
 	void resize(double dx, const multi_range&);

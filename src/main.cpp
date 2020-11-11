@@ -40,9 +40,9 @@ void solve_gravity(int l, double t, double mtot) {
 	//printf("%i %e\n", pass, tmp.resid);
 }
 
-void master(int level, double tmax) {
+bool master(int level, double tmax) {
 	if (level > opts.max_level) {
-		return;
+		return false;
 	}
 	int oi = 0;
 	double nstep = -1;
@@ -72,7 +72,7 @@ void master(int level, double tmax) {
 		if (dt[level] == 0.0) {
 			tm[level] = tm[level - 1];
 			master(level + 1, tm[level]);
-			return;
+			return false;
 		}
 		levels_show();
 		dt[level] = opts.cfl * dx[level] / dt[level];
@@ -93,11 +93,15 @@ void master(int level, double tmax) {
 			solve_gravity(level, tm[level] + dt[level], mtot);
 		}
 		levels_hydro_substep(level, 1, dt[level]);
+		if( opts.particles ) {
+			root.drift(dt[level]).get();
+			root.finish_drift(std::vector<particle>()).get();
+		}
 		tm[level] += dt[level];
 		master(level + 1, tm[level]);
 	} while (nstep != 1.0);
 	super_step[level]++;
-
+	return true;
 }
 
 int hpx_main(int argc, char *argv[]) {

@@ -28,7 +28,17 @@ multi_array<double> particles::cloud_in_cell() const {
 	return cic;
 }
 
-void particles::add_parts(const std::vector<particle> &new_parts) {
+void particles::add_parts(std::vector<particle> &new_parts) {
+	for (auto &p : new_parts) {
+		for (int dim = 0; dim < NDIM; dim++) {
+			while (p.x[dim] >= 1.0) {
+				p.x[dim] -= 1.0;
+			}
+			while (p.x[dim] < 0.0) {
+				p.x[dim] += 1.0;
+			}
+		}
+	}
 	parts.insert(parts.end(), new_parts.begin(), new_parts.end());
 }
 

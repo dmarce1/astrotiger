@@ -113,8 +113,9 @@ void tree::finish_drift(std::vector<particle> parent_parts) {
 		}
 		futs.push_back(c.finish_drift(std::move(cparts)));
 	}
-	parts.add_parts(std::move(parent_parts));
-	parts.add_parts(std::move(new_parts));
+	parts.add_parts(parent_parts);
+	parts.add_parts(new_parts);
+	new_parts = std::vector<particle>();
 
 	hpx::wait_all(futs.begin(), futs.end());
 }
@@ -572,6 +573,9 @@ double tree::hydro_initialize(bool refine) {
 		hpx::wait_all(void_futs.begin(), void_futs.end());
 	}
 	auto amax = hydro.compute_flux(0);
+	if( opts.particles) {
+		amax = std::max(amax, parts.max_velocity());
+	}
 	return amax;
 }
 
@@ -1068,7 +1072,6 @@ output_return tree::output(DBfile *db, int node_index) const {
 	if( opts.particles) {
 		rc.pdata = parts.pack_output();
 		rc.pcoords = parts.pack_coords();
-		printf( "--%i\n", rc.pcoords[1].size());
 	}
 	return rc;
 
