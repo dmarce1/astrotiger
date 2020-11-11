@@ -44,13 +44,12 @@ void particles::add_parts(std::vector<particle> &new_parts) {
 
 void particles::initialize() {
 	if (opts.problem == "part_test") {
-		for (int i = 0; i < 1; i++) {
+		for (int i = 0; i < 100; i++) {
 			particle p;
 			for (int dim = 0; dim < NDIM; dim++) {
-				p.x[dim] = 0.5;
-				p.v[dim] = 0.0;
+				p.x[dim] = (double) rand() / RAND_MAX;
+				p.v[dim] = 2.0 * (double) rand() / RAND_MAX - 1.0;
 			}
-			p.v[0] = 1.0;
 			p.rung = 0;
 			parts.push_back(p);
 		}
@@ -108,11 +107,10 @@ std::vector<particle> particles::drift(double dt) {
 	int i = 0;
 	while (i < parts.size()) {
 		auto &part = parts[i];
-		vect<double> x;
 		for (int dim = 0; dim < NDIM; dim++) {
 			part.x[dim] += part.v[dim] * dt;
 		}
-		if (!rbox.contains(x)) {
+		if (!rbox.contains(part.x)) {
 			escaped.push_back(part);
 			const auto sz = parts.size() - 1;
 			parts[i] = parts[sz];

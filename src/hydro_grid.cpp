@@ -401,7 +401,8 @@ void hydro_grid::initialize() {
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 			U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
 		} else if (opts.problem == "part_test") {
-			U[rho_i][i] = U[egas_i][i] = 1.0;
+			U[rho_i][i] =  1.0;
+			U[egas_i][i] = 1.0e-3;
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());

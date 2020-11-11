@@ -574,7 +574,7 @@ double tree::hydro_initialize(bool refine) {
 	}
 	auto amax = hydro.compute_flux(0);
 	if( opts.particles) {
-		amax = std::max(amax, parts.max_velocity());
+		amax = std::max(amax, opts.cfl * parts.max_velocity());
 	}
 	return amax;
 }
