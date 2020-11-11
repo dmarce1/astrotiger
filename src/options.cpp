@@ -98,6 +98,7 @@ bool options::process_options(int argc, char *argv[]) {
 		gravity = self_gravity = true;
 		gamma = 5.0 / 3.0;
 	} else if( problem == "part_test") {
+		hydro = false;
 		particles = true;
 		gravity = self_gravity = false;
 	}

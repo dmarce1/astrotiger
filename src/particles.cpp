@@ -84,21 +84,23 @@ void particles::initialize() {
 			}
 			r = std::sqrt(r);
 			if (r < 0.1) {
-				particle p;
-				double r1 = 0.0;
-				for (int dim = 0; dim < NDIM; dim++) {
-					p.x[dim] = i.index()[dim] * dx + dx * rand() / RAND_MAX;
-					r1 += (p.x[dim] - 0.5) * (p.x[dim] - 0.5);
-				}
-				r1 = std::sqrt(r1);
-				if (r1 == 0.0) {
-					p.v = 0.0;
-				} else {
+				for (int iter = 0; iter < (NDIM << 1); iter++) {
+					particle p;
+					double r1 = 0.0;
 					for (int dim = 0; dim < NDIM; dim++) {
-						p.v[dim] = p.x[dim] / r1;
+						p.x[dim] = i.index()[dim] * dx + dx * rand() / RAND_MAX;
+						r1 += (p.x[dim] - 0.5) * (p.x[dim] - 0.5);
 					}
+					r1 = std::sqrt(r1);
+					if (r1 == 0.0) {
+						p.v = 0.0;
+					} else {
+						for (int dim = 0; dim < NDIM; dim++) {
+							p.v[dim] = (p.x[dim] - 0.5) / r1;
+						}
+					}
+					parts.push_back(p);
 				}
-				parts.push_back(p);
 			}
 		}
 	}
@@ -111,7 +113,7 @@ double particles::max_velocity() const {
 	}
 	for (const auto &p : parts) {
 		for (int dim = 0; dim < NDIM; dim++) {
-			max[dim] = std::max(max[dim], (double) p.v[dim]);
+			max[dim] = std::max(max[dim], std::abs((double) p.v[dim]));
 		}
 	}
 	for (int dim = 1; dim < NDIM; dim++) {

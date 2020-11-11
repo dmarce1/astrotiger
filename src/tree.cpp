@@ -79,6 +79,12 @@ void tree::recv_parts(std::vector<particle> these_parts) {
 			futs.push_back(siblings[i].client.send_parts(std::move(sibparts)));
 		}
 	}
+#ifndef NDEBUG
+	const auto rbox = range_int_to_double(box);
+	for( const auto& p : these_parts) {
+		assert(rbox.contains(p.x));
+	}
+#endif
 	{
 		for (auto &p : these_parts) {
 			for (int dim = 0; dim < NDIM; dim++) {

@@ -225,54 +225,56 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 			R[i] = pcount[i] > ((1 << NDIM) - 1);
 		}
 	}
-	multi_range dirs(multi_range(index_type(0)).pad(1));
-	int dirmax = (std::pow(3, NDIM) - 1) / 2;
-	int cnt = 0;
-	for (multi_iterator i(dirs); !i.end(); i++) {
-		if (cnt >= dirmax) {
-			break;
-		}
-		cnt++;
-		bool all_zero = true;
-		const auto j = i.index();
-		int n_one = 0;
-		for (int dim = 0; dim < NDIM; dim++) {
-			if (j[dim] != 0) {
-				n_one++;
+	if (opts.hydro) {
+		multi_range dirs(multi_range(index_type(0)).pad(1));
+		int dirmax = (std::pow(3, NDIM) - 1) / 2;
+		int cnt = 0;
+		for (multi_iterator i(dirs); !i.end(); i++) {
+			if (cnt >= dirmax) {
+				break;
 			}
-		}
-		if (n_one == 0) {
-			continue;
-		}
-		for (multi_iterator k(box.pad(-opts.hbw)); !k.end(); k++) {
-			if (!R[k]) {
-				constexpr double eps = 0.1;
-				for (int f = 0; f < opts.nhydro; f++) {
-					const auto up = U[f][k.index() + j];
-					const auto u0 = U[f][k];
-					const auto um = U[f][k.index() - j];
-					double c0;
-					if (f < sx_i || f >= sx_i + NDIM) {
-						c0 = eps * (std::abs(up) + std::abs(um) + 2.0 * std::abs(u0));
-					} else {
-						double vp = 0.0;
-						double v0 = 0.0;
-						double vm = 0.0;
-						for (int dim = 0; dim < NDIM; dim++) {
-							vm += std::max(0.0, U[egas_i][k.index() - j] / U[rho_i][k.index() - 1]);
-							v0 += std::max(0.0, U[egas_i][k] / U[rho_i][k]);
-							vp += std::max(0.0, U[egas_i][k.index() + j] / U[rho_i][k.index() + 1]);
+			cnt++;
+			bool all_zero = true;
+			const auto j = i.index();
+			int n_one = 0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				if (j[dim] != 0) {
+					n_one++;
+				}
+			}
+			if (n_one == 0) {
+				continue;
+			}
+			for (multi_iterator k(box.pad(-opts.hbw)); !k.end(); k++) {
+				if (!R[k]) {
+					constexpr double eps = 0.1;
+					for (int f = 0; f < opts.nhydro; f++) {
+						const auto up = U[f][k.index() + j];
+						const auto u0 = U[f][k];
+						const auto um = U[f][k.index() - j];
+						double c0;
+						if (f < sx_i || f >= sx_i + NDIM) {
+							c0 = eps * (std::abs(up) + std::abs(um) + 2.0 * std::abs(u0));
+						} else {
+							double vp = 0.0;
+							double v0 = 0.0;
+							double vm = 0.0;
+							for (int dim = 0; dim < NDIM; dim++) {
+								vm += std::max(0.0, U[egas_i][k.index() - j] / U[rho_i][k.index() - 1]);
+								v0 += std::max(0.0, U[egas_i][k] / U[rho_i][k]);
+								vp += std::max(0.0, U[egas_i][k.index() + j] / U[rho_i][k.index() + 1]);
+							}
+							c0 = eps * (std::sqrt(vp) + std::sqrt(vm) + 2.0 * std::sqrt(v0));
 						}
-						c0 = eps * (std::sqrt(vp) + std::sqrt(vm) + 2.0 * std::sqrt(v0));
-					}
-					const auto num = std::abs(up + um - 2.0 * u0) / std::sqrt(n_one);
-					const auto den = std::abs(up - u0) + std::abs(u0 - um) + c0;
-					if (den > 0.0) {
-						if (num / den > opts.refine_slope) {
-							R[k] = true;
+						const auto num = std::abs(up + um - 2.0 * u0) / std::sqrt(n_one);
+						const auto den = std::abs(up - u0) + std::abs(u0 - um) + c0;
+						if (den > 0.0) {
+							if (num / den > opts.refine_slope) {
+								R[k] = true;
+							}
 						}
-					}
 //					R[k] = true;
+					}
 				}
 			}
 		}
@@ -524,7 +526,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 		for (const auto &amr : amr_boxes) {
 			tmp.resize(0);
 			for (const auto &b : boxes) {
-				const auto amrbox = amr.pad(opts.window);
+				const auto amrbox = amr.pad(1);
 				if (amrbox.intersection(b).volume()) {
 					auto tmp2 = b.subtract(amrbox);
 					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());

@@ -95,12 +95,12 @@ bool master(int level, double tmax) {
 			solve_gravity(level, tm[level] + dt[level], mtot);
 		}
 		levels_hydro_substep(level, 1, dt[level]);
-		if (opts.particles) {
+		tm[level] += dt[level];
+		const bool has_next_level = master(level + 1, tm[level]);
+		if (opts.particles && !has_next_level) {
 			root.drift(dt[level]).get();
 			root.finish_drift(std::vector<particle>()).get();
 		}
-		tm[level] += dt[level];
-		master(level + 1, tm[level]);
 	} while (nstep != 1.0);
 	super_step[level]++;
 	return true;
