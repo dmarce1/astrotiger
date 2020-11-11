@@ -30,6 +30,12 @@ using restrict_all_action_type = tree::restrict_all_action;
 using set_boundary_action_type = tree::set_boundary_action;
 using compute_error_action_type = tree::compute_error_action;
 using get_fine_flux_action_type = tree::get_fine_flux_action;
+using drift_action_type = tree::drift_action;
+using recv_parts_action_type = tree::recv_parts_action;
+using finish_drift_action_type = tree::finish_drift_action;
+HPX_REGISTER_ACTION (finish_drift_action_type);
+HPX_REGISTER_ACTION (recv_parts_action_type);
+HPX_REGISTER_ACTION (drift_action_type);
 HPX_REGISTER_ACTION (get_fine_flux_action_type);
 HPX_REGISTER_ACTION (compute_error_action_type);
 HPX_REGISTER_ACTION (set_boundary_action_type);
@@ -49,6 +55,11 @@ HPX_REGISTER_ACTION (set_family_action_type);
 HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
+
+void tree::recv_parts(const std::vector<particle> &parts) {
+	std::lock_guard<mutex_type> lock(mtx);
+	new_parts.insert(new_parts.end(), parts.begin(), parts.end());
+}
 
 double tree::compute_error() {
 
@@ -71,6 +82,71 @@ double tree::compute_error() {
 	}
 	return error;
 
+}
+
+range<double> tree::range_int_to_double( const multi_range& box ) {
+	range<double> rbox;
+	for (int dim = 0; dim < NDIM; dim++) {
+		rbox.min[dim] = box.min[dim] * dx;
+		rbox.max[dim] = box.max[dim] * dx;
+	}
+	return rbox;
+}
+
+void tree::finish_drift(std::vector<particle> parent_parts) {
+	std::vector<hpx::future<void>> futs;
+	for( int ci = 0; ci < children.size(); ci++) {
+		std::vector<particle> cparts;
+		const auto& c = children[ci];
+		const auto rbox = range_int_to_double(c.get_box());
+		int i = 0;
+		while( i < parent_parts.size()) {
+			const auto& part = parent_parts[i];
+			if( rbox.contains(part.x)) {
+				cparts.push_back(part);
+				const int sz = parent_parts.size() - 1;
+				parent_parts[i] = parent_parts[sz];
+				parent_parts.resize(sz);
+			} else {
+				i++;
+			}
+		}
+		futs.push_back(c.finish_drift(std::move(cparts)));
+	}
+	parts.add_parts(std::move(parent_parts));
+	parts.add_parts(std::move(new_parts));
+
+	hpx::wait_all(futs.begin(), futs.end());
+}
+
+void tree::drift(double dt) {
+	std::vector<hpx::future<void>> futs;
+	for (const auto &c : children) {
+		futs.push_back(c.drift(dt));
+	}
+	auto escaped = parts.drift(dt);
+	for (int i = 0; i < siblings.size(); i++) {
+		std::vector<particle> sibparts;
+		const auto rbox = range_int_to_double(siblings[i].box());
+		int j = 0;
+		while (j < escaped.size()) {
+			const auto &part = escaped[j];
+			if (rbox.contains(part.x)) {
+				sibparts.push_back(part);
+				const int sz = escaped.size() - 1;
+				escaped[j] = escaped[sz];
+				escaped.resize(sz);
+			} else {
+				 j++;
+			}
+		}
+		futs.push_back(siblings[i].client.send_parts(std::move(sibparts)));
+	}
+	if (escaped.size()) {
+		assert(parent != tree_client());
+		futs.push_back(parent.send_parts(std::move(escaped)));
+	}
+	hpx::wait_all(futs.begin(), futs.end());
 }
 
 statistics tree::get_statistics(int lev) const {
@@ -317,6 +393,7 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 	} else {
 		tree new_tree(level, new_box);
 		new_tree.hydro.resize(new_tree.dx, new_box.pad(opts.hbw));
+		new_tree.parts.resize(new_tree.dx, new_box);
 		new_tree.grav.resize(new_tree.dx, new_box);
 		new_tree.t = new_tree.t0 = t;
 		new_tree.refine_step = 1;
@@ -455,6 +532,7 @@ double tree::hydro_initialize(bool refine) {
 			const auto &b = new_boxes[i];
 			auto np = std::make_shared<tree>(level + 1, b);
 			np->hydro.resize(np->dx, b.pad(opts.hbw));
+			np->parts.resize(np->dx, b);
 			np->grav.resize(np->dx, b);
 			np->t = np->t0 = t;
 			np->refine_step = 1;
@@ -880,8 +958,12 @@ double tree::initialize(int this_level) {
 	if (this_level == level) {
 		levels_add_entry(level, this);
 		hydro.resize(dx, box.pad(opts.hbw));
+		parts.resize(dx, box);
 		grav.resize(dx, box);
 		hydro.initialize();
+		if( opts.particles) {
+			parts.initialize();
+		}
 		hydro.reset_flux_registers();
 		hydro.reset_coarse_flux_registers();
 		amax = hydro.compute_flux(0);
@@ -983,6 +1065,11 @@ output_return tree::output(DBfile *db, int node_index) const {
 		}
 	}
 	rc.data = hydro.pack_output(mask);
+	if( opts.particles) {
+		rc.pdata = parts.pack_output();
+		rc.pcoords = parts.pack_coords();
+		printf( "--%i\n", rc.pcoords[1].size());
+	}
 	return rc;
 
 }

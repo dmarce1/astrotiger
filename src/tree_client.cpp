@@ -12,9 +12,19 @@ hpx::future<void> tree_client::delist() const {
 	return hpx::async<tree::delist_action>(gid);
 }
 
+hpx::future<void> tree_client::send_parts(std::vector<particle> &&parts) const {
+	return hpx::async<tree::recv_parts_action>(gid, std::move(parts));
+}
 
+hpx::future<void> tree_client::drift(double dt) const {
+	return hpx::async<tree::drift_action>(gid, dt);
+}
 
-hpx::future<gravity_return> tree_client::gravity_solve(int pass, int level, std::vector<double>&& coarse, double t, double m) const {
+hpx::future<void> tree_client::finish_drift(std::vector<particle>&& parts) const {
+	return hpx::async<tree::finish_drift_action>(gid, std::move(parts));
+}
+
+hpx::future<gravity_return> tree_client::gravity_solve(int pass, int level, std::vector<double> &&coarse, double t, double m) const {
 	return hpx::async<tree::gravity_solve_action>(gid, pass, level, std::move(coarse), t, m);
 }
 
@@ -50,9 +60,7 @@ hpx::future<std::vector<double>> tree_client::get_fine_flux() const {
 	return hpx::async<tree::get_fine_flux_action>(gid);
 }
 
-
-
-hpx::future<void> tree_client::set_boundary(std::vector<double>&& data, const multi_range& id, int step) const {
+hpx::future<void> tree_client::set_boundary(std::vector<double> &&data, const multi_range &id, int step) const {
 	assert(gid != hpx::invalid_id);
 	return hpx::async<tree::set_boundary_action>(gid, std::move(data), id, step);
 }
@@ -65,8 +73,6 @@ hpx::future<std::vector<double>> tree_client::get_energy_boundary(multi_range b,
 hpx::future<double> tree_client::compute_error() const {
 	return hpx::async<tree::compute_error_action>(gid);
 }
-
-
 
 hpx::future<std::pair<std::vector<std::uint8_t>, std::vector<multi_range>>> tree_client::get_refinement_boundary(multi_range b, int step) const {
 	assert(gid != hpx::invalid_id);

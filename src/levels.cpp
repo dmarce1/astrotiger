@@ -132,6 +132,10 @@ void levels_output_silo(const std::string filename) {
 		output_return output;
 		output.coords.resize(NDIM);
 		output.data.resize(opts.nhydro + 2);
+		if (opts.particles) {
+			output.pcoords.resize(NDIM);
+			output.pdata.resize(NDIM + 1);
+		}
 		int node_index = 0;
 		for (int level = 0; level <= opts.max_level; level++) {
 			for (auto *ptr : these_levels[level]) {
@@ -144,6 +148,14 @@ void levels_output_silo(const std::string filename) {
 					output.data[f].insert(output.data[f].end(), this_output.data[f].begin(), this_output.data[f].end());
 				}
 				output.zones.insert(output.zones.end(), this_output.zones.begin(), this_output.zones.end());
+				if (opts.particles) {
+					for (int dim = 0; dim < NDIM; dim++) {
+						output.pcoords[dim].insert(output.pcoords[dim].end(), this_output.pcoords[dim].begin(), this_output.pcoords[dim].end());
+					}
+					for (int f = 0; f < NDIM + 1; f++) {
+						output.pdata[f].insert(output.pdata[f].end(), this_output.pdata[f].begin(), this_output.pdata[f].end());
+					}
+				}
 			}
 		}
 #if NDIM==1
@@ -163,13 +175,23 @@ void levels_output_silo(const std::string filename) {
 		}
 		const auto nnodes = output.coords[0].size();
 		const auto nzones = output.zones.size() / (1 << NDIM);
-		SILO_CHECK(DBPutZonelist2(db, "zones", nzones, NDIM, output.zones.data(), nzones * (1<<NDIM), 0, 0, 0, shapes.data(), shapesizes.data(), shapecnts.data(), 1, NULL));
-		SILO_CHECK(DBPutUcdmesh (db, "mesh", NDIM, coordnames, coords, nnodes, nzones, "zones", NULL, DB_DOUBLE, NULL));
+		SILO_CHECK(
+				DBPutZonelist2(db, "zones", nzones, NDIM, output.zones.data(), nzones * (1<<NDIM), 0, 0, 0, shapes.data(), shapesizes.data(), shapecnts.data(), 1, NULL));
+		SILO_CHECK(DBPutUcdmesh (db, "amr_mesh", NDIM, coordnames, coords, nnodes, nzones, "zones", NULL, DB_DOUBLE, NULL));
 		const auto names = hydro_grid::field_names();
 		for (int f = 0; f < opts.nhydro + 2; f++) {
-			SILO_CHECK(DBPutUcdvar1 (db, names[f].c_str(),"mesh", output.data[f].data(),output.data[f].size(),NULL,0,DB_DOUBLE, DB_ZONECENT, NULL));
+			SILO_CHECK(DBPutUcdvar1 (db, names[f].c_str(),"amr_mesh", output.data[f].data(),output.data[f].size(),NULL,0,DB_DOUBLE, DB_ZONECENT, NULL));
 		}
-
+		if (opts.particles) {
+			for (int dim = 0; dim < NDIM; dim++) {
+				coords[dim] = output.pcoords[dim].data();
+			}
+			SILO_CHECK(DBPutPointmesh(db, "point_mesh", NDIM, output.pcoords.data(), output.pcoords[0].size(), DB_DOUBLE, NULL));
+			const auto names = particles::field_names();
+			for (int f = 0; f < NDIM + 1; f++) {
+				SILO_CHECK(DBPutPointvar1(db,names[f].c_str(), "point_mesh", output.pdata[f].data(), output.pdata[f].size(), DB_DOUBLE, NULL));
+			}
+		}
 		SILO_CHECK(DBClose(db));
 	}
 }

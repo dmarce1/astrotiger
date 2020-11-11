@@ -19,7 +19,6 @@ public:
 	int min_box;
 	int hbw;
 	int gbw;
-	int pbw;
 	int max_bw;
 	int window;
 	int max_level;
@@ -29,6 +28,7 @@ public:
 	bool self_gravity;
 	bool gravity;
 	bool hydro;
+	bool particles;
 	std::string problem;
 	double refine_slope;
 	double gamma;
@@ -49,7 +49,7 @@ public:
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
-		arc & pbw;
+		arc & particles;
 		arc & self_gravity;
 		arc & gravity;
 		arc & hydro;

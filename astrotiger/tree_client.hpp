@@ -12,6 +12,8 @@
 #include <astrotiger/multi_array.hpp>
 #include <astrotiger/hydro_grid.hpp>
 #include <astrotiger/channel.hpp>
+#include <astrotiger/particles.hpp>
+
 
 class tree;
 class sibling;
@@ -73,6 +75,9 @@ public:
 		box = box_;
 	}
 
+	hpx::future<void> send_parts(std::vector<particle>&&) const;
+	hpx::future<void> drift(double dt) const;
+	hpx::future<void> finish_drift(std::vector<particle>&&) const;
 	hpx::future<std::vector<double>> get_fine_flux() const;
 	hpx::future<tree_client> truncate(multi_range box) const;
 	hpx::future<void> delist() const;

@@ -33,6 +33,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("problem", po::value < std::string > (&problem)->default_value("blast"), "Problem 1 - sod 2 - blast\n") //
 	("hydro", po::value<bool>(&hydro)->default_value(true), "use hydro") //
 	("self_gravity", po::value<bool>(&self_gravity)->default_value(false), "use self gravity") //
+	("particles", po::value<bool>(&particles)->default_value(false), "use particles") //
 	("gravity", po::value<bool>(&gravity)->default_value(false), "use gravity") //
 	("nmulti", po::value<int>(&nmulti)->default_value(8), "multigrid solver iterations)") //
 	("max_box", po::value<int>(&max_box)->default_value(32), "maximum (box volume)^(1/3)") //
@@ -96,6 +97,9 @@ bool options::process_options(int argc, char *argv[]) {
 	} else if (problem == "polytrope") {
 		gravity = self_gravity = true;
 		gamma = 5.0 / 3.0;
+	} else if( problem == "part_test") {
+		particles = true;
+		gravity = self_gravity = false;
 	}
 
 	nhydro = 3 + NDIM;
@@ -103,7 +107,6 @@ bool options::process_options(int argc, char *argv[]) {
 	gbw = 2;
 	max_bw = std::max(hbw, window);
 	max_bw = std::max(max_bw, gbw);
-	pbw = 1;
 	nrk = order;
 	alpha.resize(nrk);
 	beta.resize(nrk);

@@ -14,6 +14,7 @@
 #include <astrotiger/tree_client.hpp>
 #include <astrotiger/hydro_grid.hpp>
 #include <astrotiger/gravity.hpp>
+#include <astrotiger/particles.hpp>
 
 #include <silo.h>
 
@@ -50,6 +51,8 @@ struct sibling {
 struct output_return {
 	std::vector<std::vector<double>> coords;
 	std::vector<std::vector<double>> data;
+	std::vector<std::vector<double>> pcoords;
+	std::vector<std::vector<double>> pdata;
 	std::vector<int> zones;
 };
 
@@ -57,11 +60,13 @@ class tree: public hpx::components::managed_component_base<tree> {
 	multi_range box;
 	hydro_grid hydro;
 	gravity grav;
+	particles parts;
 	tree_client parent;
 	tree_client self;
 	std::vector<tree_client> children;
 	std::vector<sibling> siblings;
 	int level;
+	std::vector<particle> new_parts;
 	std::atomic<int> refine_step;
 	std::atomic<int> energy_step;
 	std::vector<multi_range> grandchild_boxes;
@@ -95,6 +100,7 @@ public:
 		auto tmp = (int) other.refine_step;
 		refine_step = tmp;
 		last_dt = std::move(other.last_dt);
+		parts = std::move(other.parts);
 //		printf("Adding entry %i\n", level);
 	}
 	tree(const tree &other) :
@@ -117,6 +123,7 @@ public:
 		refine_step = tmp;
 		tmp = (int) other.energy_step;
 		energy_step = tmp;
+		parts = other.parts;
 //		printf("Adding entry %i\n", level);
 	}
 	template<class A>
@@ -141,6 +148,7 @@ public:
 		tmp = (int) energy_step;
 		arc & tmp;
 		energy_step = tmp;
+		arc & parts;
 	}
 
 	tree();
@@ -177,8 +185,16 @@ public:
 	double compute_error();
 	std::vector<double> get_fine_flux();
 	double apply_fine_fluxes();
+	void drift(double);
+	void finish_drift(std::vector<particle>);
+	void recv_parts(const std::vector<particle>&);
+	range<double> range_int_to_double( const multi_range& box );
 
 
+
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,recv_parts);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,finish_drift);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,drift);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_fine_flux);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,restrict_all);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_statistics);
