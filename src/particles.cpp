@@ -28,20 +28,6 @@ multi_array<double> particles::cloud_in_cell() const {
 	return cic;
 }
 
-void particles::add_parts(std::vector<particle> &new_parts) {
-	for (auto &p : new_parts) {
-		for (int dim = 0; dim < NDIM; dim++) {
-			while (p.x[dim] >= 1.0) {
-				p.x[dim] -= 1.0;
-			}
-			while (p.x[dim] < 0.0) {
-				p.x[dim] += 1.0;
-			}
-		}
-	}
-	parts.insert(parts.end(), new_parts.begin(), new_parts.end());
-}
-
 multi_array<int> particles::particle_count() const {
 	multi_array<int> count(box);
 	for (multi_iterator i(box); !i.end(); i++) {
@@ -89,16 +75,29 @@ void particles::set_child_boxes(const std::vector<multi_range> &boxes) {
 
 void particles::initialize() {
 	if (opts.problem == "part_test") {
-		if (rbox.min[0] < 0.5) {
-			for (int i = 0; i < 1000; i++) {
+		for (multi_iterator i(box); !i.end(); i++) {
+			vect<double> x;
+			double r = 0.0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				x[dim] = i.index()[dim] * dx + 0.5 * dx;
+				r += (x[dim] - 0.5) * (x[dim] - 0.5);
+			}
+			r = std::sqrt(r);
+			if (r < 0.1) {
 				particle p;
-				do {
+				double r1 = 0.0;
+				for (int dim = 0; dim < NDIM; dim++) {
+					p.x[dim] = i.index()[dim] * dx + dx * rand() / RAND_MAX;
+					r1 += (p.x[dim] - 0.5) * (p.x[dim] - 0.5);
+				}
+				r1 = std::sqrt(r1);
+				if (r1 == 0.0) {
+					p.v = 0.0;
+				} else {
 					for (int dim = 0; dim < NDIM; dim++) {
-						p.x[dim] = (double) rand() / RAND_MAX;
-						p.v[dim] = 1.0;
+						p.v[dim] = p.x[dim] / r1;
 					}
-				} while (!rbox.contains(p.x));
-				p.rung = 0;
+				}
 				parts.push_back(p);
 			}
 		}
@@ -155,16 +154,26 @@ std::vector<particle> particles::get_particles() {
 	return parts;
 }
 
+void particles::add_parts(const std::vector<particle> &new_parts) {
+#ifndef NDEBUG
+	for (auto &p : new_parts) {
+		assert(rbox.contains(p.x));
+	}
+#endif
+	parts.insert(parts.end(), new_parts.begin(), new_parts.end());
+}
+
 std::vector<particle> particles::get_particles(const multi_range &bbox) {
 	std::vector<particle> rparts;
-	multi_range rbox;
+	range<double> this_rbox;
 	for (int dim = 0; dim < NDIM; dim++) {
-		rbox.min[dim] = bbox.min[dim] * dx;
-		rbox.max[dim] = bbox.max[dim] * dx;
+		this_rbox.min[dim] = bbox.min[dim] * dx;
+		this_rbox.max[dim] = bbox.max[dim] * dx;
 	}
 	int i = 0;
 	while (i < parts.size()) {
-		if (rbox.contains(parts[i].x)) {
+		assert(rbox.contains(parts[i].x));
+		if (this_rbox.contains(parts[i].x)) {
 			rparts.push_back(parts[i]);
 			const int sz = parts.size() - 1;
 			parts[i] = parts[sz];

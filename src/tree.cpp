@@ -58,9 +58,42 @@ HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
 
-void tree::recv_parts(const std::vector<particle> &parts) {
-	std::lock_guard<mutex_type> lock(mtx);
-	new_parts.insert(new_parts.end(), parts.begin(), parts.end());
+void tree::recv_parts(std::vector<particle> these_parts) {
+	std::vector<hpx::future<void>> futs;
+	for (int i = 0; i < siblings.size(); i++) {
+		std::vector<particle> sibparts;
+		const auto rbox = range_int_to_double(siblings[i].box());
+		int j = 0;
+		while (j < these_parts.size()) {
+			const auto &part = these_parts[j];
+			if (rbox.contains(part.x)) {
+				sibparts.push_back(part);
+				const int sz = these_parts.size() - 1;
+				these_parts[j] = these_parts[sz];
+				these_parts.resize(sz);
+			} else {
+				j++;
+			}
+		}
+		if (sibparts.size()) {
+			futs.push_back(siblings[i].client.send_parts(std::move(sibparts)));
+		}
+	}
+	{
+		for (auto &p : these_parts) {
+			for (int dim = 0; dim < NDIM; dim++) {
+				while (p.x[dim] >= 1.0) {
+					p.x[dim] -= 1.0;
+				}
+				while (p.x[dim] < 0.0) {
+					p.x[dim] += 1.0;
+				}
+			}
+		}
+		std::lock_guard<mutex_type> lock(mtx);
+		new_parts.insert(new_parts.end(), these_parts.begin(), these_parts.end());
+	}
+	hpx::wait_all(futs.begin(), futs.end());
 }
 
 multi_array<int> tree::get_particle_count() const {
@@ -113,7 +146,7 @@ range<double> tree::range_int_to_double(const multi_range &box) {
 
 void tree::finish_drift(std::vector<particle> parent_parts) {
 	std::vector<hpx::future<void>> futs;
-	new_parts.insert(new_parts.end(), new_parts.begin(), new_parts.end());
+	new_parts.insert(new_parts.end(), parent_parts.begin(), parent_parts.end());
 	for (int ci = 0; ci < children.size(); ci++) {
 		std::vector<particle> cparts;
 		const auto &c = children[ci];
@@ -164,7 +197,9 @@ void tree::drift(double dt) {
 				j++;
 			}
 		}
-		futs.push_back(siblings[i].client.send_parts(std::move(sibparts)));
+		if (sibparts.size()) {
+			futs.push_back(siblings[i].client.send_parts(std::move(sibparts)));
+		}
 	}
 	for (int i = 0; i < children.size(); i++) {
 		std::vector<particle> cparts;
@@ -181,7 +216,9 @@ void tree::drift(double dt) {
 				j++;
 			}
 		}
-		futs.push_back(children[i].send_parts(std::move(cparts)));
+		if (cparts.size()) {
+			futs.push_back(children[i].send_parts(std::move(cparts)));
+		}
 	}
 	if (escaped.size()) {
 		assert(parent != tree_client());
@@ -521,129 +558,129 @@ double tree::hydro_initialize(bool refine) {
 	get_hydro_boundaries(t);
 	hydro.store();
 	if (refine && level < opts.max_level) {
-//		if (opts.particles) {
-//			pfut = hpx::async([this]() {
-//				return this->get_particle_count();
-//			});
-//		} else {
-//			pfut = hpx::make_ready_future(multi_array<int>());
-//		}
-//		std::vector<std::vector<tree_client>> grandchildren;
-//		std::vector<hpx::future<std::vector<tree_client>>> cfuts;
-//		for (const auto &c : children) {
-//			cfuts.push_back(c.get_children());
-//		}
-//		grandchildren.resize(children.size());
-//		for (int i = 0; i < children.size(); i++) {
-//			auto &f = cfuts[i];
-//			const auto tmp = f.get();
-//			for (const auto &gc : tmp) {
-//				grandchildren[i].push_back(gc);
-//				grandchild_boxes.push_back(gc.get_box());
-//			}
-//		}
-//		hydro.compute_refinement_criteria(pfut.get());
-//		refine_step++;
-//
-//		force_refine_boxes = grandchild_boxes;
-//		for (auto &b : force_refine_boxes) {
-//			for (int dim = 0; dim < NDIM; dim++) {
-//				b.min[dim] = b.min[dim] / 4;
-//				b.max[dim] = (b.max[dim] + 3) / 4;
-//			}
-//		}
-//		auto tmp1 = get_refinement_boundaries();
-//		force_refine_boxes.insert(force_refine_boxes.end(), tmp1.begin(), tmp1.end());
-//		auto new_boxes = hydro.refined_ranges(get_amr_boxes(), force_refine_boxes);
-//		std::vector<std::vector<tree_client>> old_grandchildren;
-//		std::vector<tree_client> old_children;
-//		std::vector<tree_client> new_children;
-//		for (auto &b : new_boxes) {
-//			b = b.double_();
-//		}
-//		std::vector<multi_range> tmp;
-//		std::vector<hpx::future<void>> void_futs;
-//		std::vector < hpx::future < hpx::id_type >> new_children_futs;
-//		for (int i = 0; i < children.size(); i++) {
-//			auto &c = children[i];
-//			bool found = false;
-//			for (int j = 0; j < new_boxes.size(); j++) {
-//				const auto &b = new_boxes[j];
-//				if (b == c.get_box()) {
-//					new_children.push_back(c);
-//					found = true;
-//					new_boxes[j] = new_boxes.back();
-//					new_boxes.pop_back();
-//					break;
-//				}
-//			}
-//			if (!found) {
-//				old_children.push_back(c);
-//				void_futs.push_back(c.delist());
-//				old_grandchildren.push_back(std::move(grandchildren[i]));
-//			}
-//		}
-//		const int unchanged_cnt = new_children.size();
-//		std::vector<hpx::future<std::shared_ptr<tree>>> cpfuts;
-//		std::vector<std::shared_ptr<tree>> old_ptrs;
-//		for (const auto &c : old_children) {
-//			cpfuts.push_back(c.get_ptr());
-//		}
-//		for (auto &f : cpfuts) {
-//			old_ptrs.push_back(f.get());
-//		}
-//		if (opts.particles) {
-//			for (auto &op : old_ptrs) {
-//				auto these_parts = op->parts.get_particles();
-//				parts.add_parts(these_parts);
-//			}
-//		}
-//		for (int i = 0; i < new_boxes.size(); i++) {
-//			const auto &b = new_boxes[i];
-//			auto np = std::make_shared<tree>(level + 1, b);
-//			np->hydro.resize(np->dx, b.pad(opts.hbw));
-//			np->parts.resize(np->dx, b);
-//			np->grav.resize(np->dx, b);
-//			np->t = np->t0 = t;
-//			np->refine_step = 1;
-//			np->hydro.unpack(hydro.pack_prolong(b.pad(opts.hbw), 1.0), b.pad(opts.hbw));
-//			for (const auto &op : old_ptrs) {
-//				const auto inter = np->box.intersection(op->box);
-//				if (!inter.empty()) {
-//					np->hydro.unpack(op->hydro.pack(inter), inter);
-//				}
-//			}
-//			for (int j = 0; j < old_grandchildren.size(); j++) {
-//				for (auto &gc : old_grandchildren[j]) {
-//					if (!gc.get_box().intersection(b.double_()).empty()) {
-//						np->children.push_back(gc);
-//					}
-//				}
-//			}
-//			if (opts.particles) {
-//				auto these_parts = parts.get_particles(b.half());
-//				np->parts.add_parts(these_parts);
-//			}
-//			new_children_futs.push_back(hpx::new_<tree>(hpx::find_here(), std::move(*np)));
-//		}
-//		for (int i = 0; i < new_boxes.size(); i++) {
-//			new_children.push_back(tree_client(new_children_futs[i].get(), new_boxes[i]));
-//		}
-//		hpx::wait_all(void_futs.begin(), void_futs.end());
-//		children = std::move(new_children);
-//		std::vector<hpx::future<tree_client>> tfuts;
-//		for (int i = unchanged_cnt; i < children.size(); i++) {
-//			assert(children[i] != tree_client());
-//			tfuts.push_back(children[i].truncate(children[i].get_box()));
-//		}
-//		int j = 0;
-//		void_futs.resize(0);
-//		for (int i = unchanged_cnt; i < children.size(); i++) {
-//			children[i] = tfuts[j].get();
-//			void_futs.push_back(children[i].list());
-//			j++;
-//		}
-//		hpx::wait_all(void_futs.begin(), void_futs.end());
+		if (opts.particles) {
+			pfut = hpx::async([this]() {
+				return this->get_particle_count();
+			});
+		} else {
+			pfut = hpx::make_ready_future(multi_array<int>());
+		}
+		std::vector<std::vector<tree_client>> grandchildren;
+		std::vector<hpx::future<std::vector<tree_client>>> cfuts;
+		for (const auto &c : children) {
+			cfuts.push_back(c.get_children());
+		}
+		grandchildren.resize(children.size());
+		for (int i = 0; i < children.size(); i++) {
+			auto &f = cfuts[i];
+			const auto tmp = f.get();
+			for (const auto &gc : tmp) {
+				grandchildren[i].push_back(gc);
+				grandchild_boxes.push_back(gc.get_box());
+			}
+		}
+		hydro.compute_refinement_criteria(pfut.get());
+		refine_step++;
+
+		force_refine_boxes = grandchild_boxes;
+		for (auto &b : force_refine_boxes) {
+			for (int dim = 0; dim < NDIM; dim++) {
+				b.min[dim] = b.min[dim] / 4;
+				b.max[dim] = (b.max[dim] + 3) / 4;
+			}
+		}
+		auto tmp1 = get_refinement_boundaries();
+		force_refine_boxes.insert(force_refine_boxes.end(), tmp1.begin(), tmp1.end());
+		auto new_boxes = hydro.refined_ranges(get_amr_boxes(), force_refine_boxes);
+		std::vector<std::vector<tree_client>> old_grandchildren;
+		std::vector<tree_client> old_children;
+		std::vector<tree_client> new_children;
+		for (auto &b : new_boxes) {
+			b = b.double_();
+		}
+		std::vector<multi_range> tmp;
+		std::vector<hpx::future<void>> void_futs;
+		std::vector < hpx::future < hpx::id_type >> new_children_futs;
+		for (int i = 0; i < children.size(); i++) {
+			auto &c = children[i];
+			bool found = false;
+			for (int j = 0; j < new_boxes.size(); j++) {
+				const auto &b = new_boxes[j];
+				if (b == c.get_box()) {
+					new_children.push_back(c);
+					found = true;
+					new_boxes[j] = new_boxes.back();
+					new_boxes.pop_back();
+					break;
+				}
+			}
+			if (!found) {
+				old_children.push_back(c);
+				void_futs.push_back(c.delist());
+				old_grandchildren.push_back(std::move(grandchildren[i]));
+			}
+		}
+		const int unchanged_cnt = new_children.size();
+		std::vector<hpx::future<std::shared_ptr<tree>>> cpfuts;
+		std::vector<std::shared_ptr<tree>> old_ptrs;
+		for (const auto &c : old_children) {
+			cpfuts.push_back(c.get_ptr());
+		}
+		for (auto &f : cpfuts) {
+			old_ptrs.push_back(f.get());
+		}
+		if (opts.particles) {
+			for (auto &op : old_ptrs) {
+				auto these_parts = op->parts.get_particles();
+				parts.add_parts(these_parts);
+			}
+		}
+		for (int i = 0; i < new_boxes.size(); i++) {
+			const auto &b = new_boxes[i];
+			auto np = std::make_shared<tree>(level + 1, b);
+			np->hydro.resize(np->dx, b.pad(opts.hbw));
+			np->parts.resize(np->dx, b);
+			np->grav.resize(np->dx, b);
+			np->t = np->t0 = t;
+			np->refine_step = 1;
+			np->hydro.unpack(hydro.pack_prolong(b.pad(opts.hbw), 1.0), b.pad(opts.hbw));
+			for (const auto &op : old_ptrs) {
+				const auto inter = np->box.intersection(op->box);
+				if (!inter.empty()) {
+					np->hydro.unpack(op->hydro.pack(inter), inter);
+				}
+			}
+			for (int j = 0; j < old_grandchildren.size(); j++) {
+				for (auto &gc : old_grandchildren[j]) {
+					if (!gc.get_box().intersection(b.double_()).empty()) {
+						np->children.push_back(gc);
+					}
+				}
+			}
+			if (opts.particles) {
+				auto these_parts = parts.get_particles(b.half());
+				np->parts.add_parts(these_parts);
+			}
+			new_children_futs.push_back(hpx::new_<tree>(hpx::find_here(), std::move(*np)));
+		}
+		for (int i = 0; i < new_boxes.size(); i++) {
+			new_children.push_back(tree_client(new_children_futs[i].get(), new_boxes[i]));
+		}
+		hpx::wait_all(void_futs.begin(), void_futs.end());
+		children = std::move(new_children);
+		std::vector<hpx::future<tree_client>> tfuts;
+		for (int i = unchanged_cnt; i < children.size(); i++) {
+			assert(children[i] != tree_client());
+			tfuts.push_back(children[i].truncate(children[i].get_box()));
+		}
+		int j = 0;
+		void_futs.resize(0);
+		for (int i = unchanged_cnt; i < children.size(); i++) {
+			children[i] = tfuts[j].get();
+			void_futs.push_back(children[i].list());
+			j++;
+		}
+		hpx::wait_all(void_futs.begin(), void_futs.end());
 	}
 	auto amax = hydro.compute_flux(0);
 	if (opts.particles) {
@@ -1068,14 +1105,6 @@ double tree::initialize(int this_level) {
 			for (int i = 0; i < futs.size(); i++) {
 				children[i] = futs[i].get();
 			}
-			if (opts.particles) {
-				std::vector<multi_range> child_boxes;
-				for (const auto &c : children) {
-					child_boxes.push_back(c.get_box().half());
-				}
-				parts.set_child_boxes(child_boxes);
-				finish_drift(parts.get_child_parts());
-			}
 		}
 		std::vector<hpx::future<double>> futs(children.size());
 		for (int i = 0; i < children.size(); i++) {
@@ -1084,6 +1113,17 @@ double tree::initialize(int this_level) {
 		for (int i = 0; i < children.size(); i++) {
 			amax = std::max(amax, futs[i].get());
 		}
+		if (opts.particles) {
+			std::vector<multi_range> child_boxes;
+			for (const auto &c : children) {
+				child_boxes.push_back(c.get_box().half());
+			}
+			parts.set_child_boxes(child_boxes);
+			finish_drift(parts.get_child_parts());
+		}
+	}
+	if (opts.particles) {
+		amax = std::max(amax, parts.max_velocity());
 	}
 	return amax;
 }

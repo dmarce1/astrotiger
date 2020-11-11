@@ -187,7 +187,7 @@ public:
 	double apply_fine_fluxes();
 	void drift(double);
 	void finish_drift(std::vector<particle>);
-	void recv_parts(const std::vector<particle>&);
+	void recv_parts(std::vector<particle>);
 	range<double> range_int_to_double( const multi_range& box );
 	multi_array<int> get_particle_count() const;
 	hpx::future<void> send_child_particles();

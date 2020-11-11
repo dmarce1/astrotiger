@@ -16,7 +16,6 @@
 #include <vector>
 
 struct particle {
-	double next_kick;
 	vect<double> x;
 	vect<float> v;
 	float m;
@@ -44,7 +43,7 @@ public:
 	std::vector<std::vector<double>> pack_coords() const;
 	static std::vector<std::string> field_names();
 	std::vector<particle> drift(double dt);
-	void add_parts(std::vector<particle> &parts);
+	void add_parts(const std::vector<particle> &parts);
 	void initialize();
 	std::vector<particle> get_particles();
 	std::vector<particle> get_particles(const multi_range&);
