@@ -65,7 +65,7 @@ public:
 	void reset_coarse_flux_registers();
 	double compute_flux(int rk);
 	void initialize();
-	void compute_refinement_criteria();
+	void compute_refinement_criteria(const multi_array<int>& pcount);
 	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&, const std::vector<multi_range> &forced) const;
 	double coord(index_type i) const;
 	std::vector<std::vector<double>> pack_output(const multi_array<std::uint8_t>&) const;

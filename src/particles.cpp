@@ -42,16 +42,65 @@ void particles::add_parts(std::vector<particle> &new_parts) {
 	parts.insert(parts.end(), new_parts.begin(), new_parts.end());
 }
 
+multi_array<int> particles::particle_count() const {
+	multi_array<int> count(box);
+	for (multi_iterator i(box); !i.end(); i++) {
+		count[i] = 0;
+	}
+	for (const auto &p : parts) {
+		multi_index index;
+		for (int dim = 0; dim < NDIM; dim++) {
+			index[dim] = p.x[dim] / dx;
+		}
+		count[index]++;
+	}
+	return count;
+}
+
+std::vector<particle> particles::get_child_parts() {
+	std::vector<particle> cparts;
+	for (const auto &b : child_boxes) {
+		int i = 0;
+		while (i < parts.size()) {
+			if (b.contains(parts[i].x)) {
+				cparts.push_back(parts[i]);
+				const int sz = parts.size() - 1;
+				parts[i] = parts[sz];
+				parts.resize(sz);
+			} else {
+				i++;
+			}
+		}
+	}
+	return cparts;
+}
+
+void particles::set_child_boxes(const std::vector<multi_range> &boxes) {
+	child_boxes.resize(0);
+	for (const auto &b : boxes) {
+		range<double> rbox;
+		for (int dim = 0; dim < NDIM; dim++) {
+			rbox.min[dim] = b.min[dim] * dx;
+			rbox.max[dim] = b.max[dim] * dx;
+		}
+		child_boxes.push_back(rbox);
+	}
+}
+
 void particles::initialize() {
 	if (opts.problem == "part_test") {
-		for (int i = 0; i < 100; i++) {
-			particle p;
-			for (int dim = 0; dim < NDIM; dim++) {
-				p.x[dim] = (double) rand() / RAND_MAX;
-				p.v[dim] = 2.0 * (double) rand() / RAND_MAX - 1.0;
+		if (rbox.min[0] < 0.5) {
+			for (int i = 0; i < 1000; i++) {
+				particle p;
+				do {
+					for (int dim = 0; dim < NDIM; dim++) {
+						p.x[dim] = (double) rand() / RAND_MAX;
+						p.v[dim] = 1.0;
+					}
+				} while (!rbox.contains(p.x));
+				p.rung = 0;
+				parts.push_back(p);
 			}
-			p.rung = 0;
-			parts.push_back(p);
 		}
 	}
 }
@@ -102,6 +151,31 @@ std::vector<std::string> particles::field_names() {
 	return names;
 }
 
+std::vector<particle> particles::get_particles() {
+	return parts;
+}
+
+std::vector<particle> particles::get_particles(const multi_range &bbox) {
+	std::vector<particle> rparts;
+	multi_range rbox;
+	for (int dim = 0; dim < NDIM; dim++) {
+		rbox.min[dim] = bbox.min[dim] * dx;
+		rbox.max[dim] = bbox.max[dim] * dx;
+	}
+	int i = 0;
+	while (i < parts.size()) {
+		if (rbox.contains(parts[i].x)) {
+			rparts.push_back(parts[i]);
+			const int sz = parts.size() - 1;
+			parts[i] = parts[sz];
+			parts.resize(sz);
+		} else {
+			i++;
+		}
+	}
+	return rparts;
+}
+
 std::vector<particle> particles::drift(double dt) {
 	std::vector<particle> escaped;
 	int i = 0;
@@ -110,7 +184,16 @@ std::vector<particle> particles::drift(double dt) {
 		for (int dim = 0; dim < NDIM; dim++) {
 			part.x[dim] += part.v[dim] * dt;
 		}
-		if (!rbox.contains(part.x)) {
+		bool leave_box = !rbox.contains(part.x);
+		if (!leave_box) {
+			for (const auto &cbox : child_boxes) {
+				leave_box = cbox.contains(part.x);
+				if (leave_box) {
+					break;
+				}
+			}
+		}
+		if (leave_box) {
 			escaped.push_back(part);
 			const auto sz = parts.size() - 1;
 			parts[i] = parts[sz];

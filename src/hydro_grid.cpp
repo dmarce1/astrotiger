@@ -215,10 +215,15 @@ void hydro_grid::reset_flux_registers() {
 hydro_grid::~hydro_grid() {
 }
 
-void hydro_grid::compute_refinement_criteria() {
+void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 	const auto ibox = box.pad(-opts.hbw + opts.window);
 	for (multi_iterator i(ibox); !i.end(); i++) {
 		R[i] = false;
+	}
+	if (opts.particles) {
+		for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+			R[i] = pcount[i] > ((1 << NDIM) - 1);
+		}
 	}
 	multi_range dirs(multi_range(index_type(0)).pad(1));
 	int dirmax = (std::pow(3, NDIM) - 1) / 2;
@@ -401,7 +406,7 @@ void hydro_grid::initialize() {
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 			U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
 		} else if (opts.problem == "part_test") {
-			U[rho_i][i] =  1.0;
+			U[rho_i][i] = 1.0;
 			U[egas_i][i] = 1.0e-3;
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		} else {
@@ -529,6 +534,20 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 			}
 			boxes = std::move(tmp);
 		}
+		tmp.resize(0);
+		for (const auto &b : boxes) {
+			bool found = false;
+			for (multi_iterator i(b); !i.end(); i++) {
+				if (Rwin[i]) {
+					found = true;
+					break;
+				}
+			}
+			if (found) {
+				tmp.push_back(b);
+			}
+		}
+		boxes = std::move(tmp);
 		bool change;
 		const auto max_vol = std::pow(opts.max_box / 2, NDIM);
 		const auto min_vol = std::pow(opts.min_box / 2, NDIM);

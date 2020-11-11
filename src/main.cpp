@@ -66,7 +66,9 @@ bool master(int level, double tmax) {
 		printf("Hydro pre-step\n");
 		dt[level] = levels_hydro_initialize(level, refine);
 		if (refine) {
-			levels_set_child_families(level);
+			for (int l = level; l <= opts.max_level; l++) {
+				levels_set_child_families(l);
+			}
 		}
 		dt[level] = std::max(dt[level], levels_fine_fluxes(level));
 		if (dt[level] == 0.0) {
@@ -93,7 +95,7 @@ bool master(int level, double tmax) {
 			solve_gravity(level, tm[level] + dt[level], mtot);
 		}
 		levels_hydro_substep(level, 1, dt[level]);
-		if( opts.particles ) {
+		if (opts.particles) {
 			root.drift(dt[level]).get();
 			root.finish_drift(std::vector<particle>()).get();
 		}
@@ -105,6 +107,7 @@ bool master(int level, double tmax) {
 }
 
 int hpx_main(int argc, char *argv[]) {
+//	srand(1000);
 	options opts;
 	opts.process_options(argc, argv);
 	levels_init();
@@ -180,7 +183,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	const auto dt = 0.03;
+	const auto dt = 0.001;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

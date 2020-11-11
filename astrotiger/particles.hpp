@@ -34,9 +34,11 @@ class particles {
 	std::vector<particle> parts;
 	multi_range box;
 	range<double> rbox;
+	std::vector<range<double>> child_boxes;
 	double dx;
 public:
 
+	multi_array<int> particle_count() const;
 	multi_array<double> cloud_in_cell() const;
 	std::vector<std::vector<double>> pack_output() const;
 	std::vector<std::vector<double>> pack_coords() const;
@@ -44,9 +46,12 @@ public:
 	std::vector<particle> drift(double dt);
 	void add_parts(std::vector<particle> &parts);
 	void initialize();
+	std::vector<particle> get_particles();
+	std::vector<particle> get_particles(const multi_range&);
 	double max_velocity() const;
 	void resize(double dx, const multi_range&);
-
+	void set_child_boxes(const std::vector<multi_range>&);
+	std::vector<particle> get_child_parts();
 	template<class A>
 	void serialize(A &&arc, unsigned) {
 		arc & parts;

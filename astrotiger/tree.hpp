@@ -189,9 +189,12 @@ public:
 	void finish_drift(std::vector<particle>);
 	void recv_parts(const std::vector<particle>&);
 	range<double> range_int_to_double( const multi_range& box );
+	multi_array<int> get_particle_count() const;
+	hpx::future<void> send_child_particles();
 
 
 
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particle_count);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,recv_parts);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,finish_drift);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,drift);

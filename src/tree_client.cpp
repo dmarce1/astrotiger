@@ -7,6 +7,10 @@
 
 #include <astrotiger/tree.hpp>
 
+hpx::future<multi_array<int>> tree_client::get_particle_count() const {
+	return hpx::async<tree::get_particle_count_action>(gid);
+}
+
 hpx::future<void> tree_client::delist() const {
 	assert(gid != hpx::invalid_id);
 	return hpx::async<tree::delist_action>(gid);
@@ -20,7 +24,7 @@ hpx::future<void> tree_client::drift(double dt) const {
 	return hpx::async<tree::drift_action>(gid, dt);
 }
 
-hpx::future<void> tree_client::finish_drift(std::vector<particle>&& parts) const {
+hpx::future<void> tree_client::finish_drift(std::vector<particle> &&parts) const {
 	return hpx::async<tree::finish_drift_action>(gid, std::move(parts));
 }
 
