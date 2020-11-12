@@ -93,8 +93,8 @@ void particles::initialize() {
 					}
 					p.m = 1.0;
 					r1 = std::sqrt(r1);
-					p.v[0] = -(p.x[1]-0.5) / std::pow(r1,1.5);
-					p.v[1] = (p.x[0]-0.5) / std::pow(r1,1.5);
+					p.v[0] = -(p.x[1] - 0.5) / r1 * std::sqrt(2) * 3.906250e-03;
+					p.v[1] = (p.x[0] - 0.5) / r1 * std::sqrt(2) * 3.906250e-03;
 					p.rung = 0;
 					parts.push_back(p);
 				}
@@ -103,13 +103,37 @@ void particles::initialize() {
 	}
 }
 
-void particles::kick(int kick_level, int this_level, const std::vector<double> &dt0, const std::vector<double> &dt1) {
+void particles::kick(int kick_level, int this_level, const std::vector<double> &dt0, const std::vector<double> &dt1,
+		const std::array<multi_array<double>, NDIM> &g) {
 	for (auto &p : parts) {
-		const auto x = (p.x - vect<double>(0.5));
-		const auto r = abs(x);
-		const auto f = -x / (r * r * r);
 		if (p.rung >= kick_level) {
-			p.v += f * (p.m * dt0[p.rung] * 0.5);
+			multi_index i;
+			vect<double> this_g;
+			for (int dim = 0; dim < NDIM; dim++) {
+				i[dim] = (p.x[dim] - 0.5 * dx) / dx;
+			}
+			for (int dim = 0; dim < NDIM; dim++) {
+				this_g[dim] = 0.0;
+				multi_range this_box(i);
+				for (int dim2 = 0; dim2 < NDIM; dim2++) {
+					this_box.max[dim2]++;
+				}
+				for (multi_iterator j(this_box); !j.end(); j++) {
+					double w = 1.0;
+					for (int dim2 = 0; dim2 < NDIM; dim2++) {
+						if (j.index()[dim2] == i[dim2]) {
+							w *= (p.x[dim2] - 0.5 * dx) / dx - i[dim2];
+						} else {
+							w *= 1.0 - (p.x[dim2] - 0.5 * dx) / dx + i[dim2];
+						}
+					}
+					assert(w >= 0.0);
+					assert(w <= 1.0);
+					this_g[dim] += w * g[dim][j];
+				}
+			}
+
+			p.v += this_g * (dt0[p.rung] * 0.5);
 			if (p.rung > this_level) {
 				if (this_level >= kick_level) {
 					p.rung = this_level;
@@ -117,7 +141,7 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 			} else if (p.rung < this_level) {
 				p.rung = this_level;
 			}
-			p.v += f * (p.m * dt1[p.rung] * 0.5);
+			p.v += this_g * (dt1[p.rung] * 0.5);
 		}
 	}
 }

@@ -51,7 +51,7 @@ public:
 	void resize(double dx, const multi_range&);
 	void set_child_boxes(const std::vector<multi_range>&);
 	std::vector<particle> get_child_parts();
-	void kick(int kick_level, int this_level, const std::vector<double>&, const std::vector<double>&);
+	void kick(int kick_level, int this_level, const std::vector<double>&, const std::vector<double>&, const std::array<multi_array<double>,NDIM> &g);
 	template<class A>
 	void serialize(A &&arc, unsigned) {
 		arc & parts;

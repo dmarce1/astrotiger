@@ -19,6 +19,23 @@ void gravity::resize(double dx_, const multi_range &box_) {
 
 }
 
+std::array<multi_array<double>,NDIM> gravity::get_acceleration(double w) const {
+	std::array<multi_array<double>,NDIM> g;
+	const auto bbox = box.pad(-opts.gbw + 1);
+	for (int dim = 0; dim < NDIM; dim++) {
+		g[dim].resize(bbox);
+		for (multi_iterator i(bbox); !i.end(); i++) {
+			auto ip = i.index();
+			auto im = i.index();
+			ip[dim]++;
+			im[dim]--;
+			g[dim][i] = -w * (phi[ip] - phi[im]) / (0.5 * dx);
+			g[dim][i] -= (1.0 - w) * (phi0[ip] - phi0[im]) / (0.5 * dx);
+		}
+	}
+	return g;
+}
+
 void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::vector<double> &data) {
 	const auto cbox = box.pad(-opts.gbw).half().pad(opts.gbw);
 	int k = 0;

@@ -62,12 +62,20 @@ HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
 
-void tree::kick(int rung, std::vector<double> last_dt, std::vector<double> this_dt) {
+void tree::kick(int rung, double tm, std::vector<double> last_dt, std::vector<double> this_dt) {
 	std::vector<hpx::future<void>> futs;
 	for (const auto &c : children) {
-		futs.push_back(c.kick(rung, last_dt, this_dt));
+		futs.push_back(c.kick(rung, tm, last_dt, this_dt));
 	}
-	parts.kick(rung, level, last_dt, this_dt);
+	double w;
+	if (t != 0.0) {
+		w = (tm - t0) / (t - t0);
+	} else {
+		w = 0.0;
+	}
+	assert(w >= 0.0);
+	assert(w <= 1.0);
+	parts.kick(rung, level, last_dt, this_dt, grav.get_acceleration(w));
 	hpx::wait_all(futs.begin(), futs.end());
 }
 
@@ -508,7 +516,8 @@ tree_client tree::truncate(tree_client self, multi_range trunc_box) {
 		new_tree.hydro.resize(new_tree.dx, new_box.pad(opts.hbw));
 		new_tree.parts.resize(new_tree.dx, new_box);
 		new_tree.grav.resize(new_tree.dx, new_box);
-		new_tree.t = new_tree.t0 = t;
+		new_tree.t = t;
+		new_tree.t0 = t0;
 		new_tree.refine_step = 1;
 		new_tree.hydro.unpack(hydro.pack(new_box), new_box);
 		if (opts.particles) {
@@ -677,10 +686,11 @@ double tree::hydro_initialize(bool refine) {
 			np->hydro.resize(np->dx, b.pad(opts.hbw));
 			np->parts.resize(np->dx, b);
 			np->grav.resize(np->dx, b);
-			np->t = np->t0 = t;
 			np->refine_step = 1;
 			np->hydro.unpack(hydro.pack_prolong(b.pad(opts.hbw), 1.0), b.pad(opts.hbw));
 			for (const auto &op : old_ptrs) {
+				np->t = op->t;
+				np->t0 = op->t0;
 				const auto inter = np->box.intersection(op->box);
 				if (!inter.empty()) {
 					np->hydro.unpack(op->hydro.pack(inter), inter);

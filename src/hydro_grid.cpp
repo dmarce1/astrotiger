@@ -380,17 +380,11 @@ void hydro_grid::initialize() {
 			}
 			U[egas_i][i] = ein + ek;
 			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
-		} else if (opts.problem == "polytrope") {
+		} else if (opts.problem == "polytrope" || opts.problem == "part_test") {
 			double r = 0.0;
 			for (int dim = 0; dim < NDIM; dim++) {
 				auto x = coord(i[dim]);
-				if (dim == 0) {
-					if (x > 0.5) {
-						x -= 1.0;
-					}
-				} else {
-					x -= 0.5;
-				}
+				x -= 0.5;
 				r += std::pow(x, 2);
 			}
 			r = std::sqrt(r);
@@ -399,7 +393,7 @@ void hydro_grid::initialize() {
 			const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
 			auto &rho = U[rho_i][i];
 			rho = std::max(1.0e-10, std::pow(theta, n));
-			const auto vx = 1.0;
+			const auto vx = 0.0;
 			const auto vy = 0.00;
 			U[sx_i][i] = vx * rho;
 			U[sy_i][i] = vy * rho;
@@ -407,10 +401,10 @@ void hydro_grid::initialize() {
 			U[egas_i][i] = std::max(1.0e-20, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 			U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
-		} else if (opts.problem == "part_test") {
-			U[rho_i][i] = 1.0;
-			U[egas_i][i] = 1.0e-3;
-			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
+//		} else if (opts.problem == "part_test") {
+//			U[rho_i][i] = 1.0;
+//			U[egas_i][i] = 1.0e-3;
+//			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());
 			abort();

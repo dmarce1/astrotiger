@@ -95,7 +95,7 @@ bool master(int level, int coarse_level, double tmax) {
 			solve_gravity(level, tm[level], mtot);
 		}
 		if( level == opts.max_level) {
-			root.kick(coarse_level, last_dt, dt).get();
+			root.kick(coarse_level, tm[level], last_dt, dt).get();
 		}
 		levels_hydro_substep(level, 0, dt[level]);
 		if (opts.self_gravity) {
@@ -195,7 +195,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	const auto dt = 0.1;
+	const auto dt = 0.01;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

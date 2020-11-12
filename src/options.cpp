@@ -98,9 +98,9 @@ bool options::process_options(int argc, char *argv[]) {
 		gravity = self_gravity = true;
 		gamma = 5.0 / 3.0;
 	} else if( problem == "part_test") {
-		hydro = false;
+		hydro = true;
 		particles = true;
-		gravity = self_gravity = false;
+		gravity = self_gravity = true;
 	}
 
 	nhydro = 3 + NDIM;

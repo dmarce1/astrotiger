@@ -74,6 +74,7 @@ public:
 			X[i] = 0.0;
 		}
 	}
+	std::array<multi_array<double>,NDIM> get_acceleration(double) const;
 	double coord(index_type i) const;
 	void set_outflow_boundaries();
 	multi_array<double> get_phi() const;

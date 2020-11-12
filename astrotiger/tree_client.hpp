@@ -74,7 +74,7 @@ public:
 		gid = id_;
 		box = box_;
 	}
-	hpx::future<void> kick(int, const std::vector<double>&, const std::vector<double>&) const;
+	hpx::future<void> kick(int, double, const std::vector<double>&, const std::vector<double>&) const;
 	hpx::future<double> max_part_velocity() const;
 	hpx::future<multi_array<int>> get_particle_count() const;
 	hpx::future<void> send_parts(std::vector<particle>&&) const;

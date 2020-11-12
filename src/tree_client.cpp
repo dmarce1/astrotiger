@@ -7,8 +7,8 @@
 
 #include <astrotiger/tree.hpp>
 
-hpx::future<void> tree_client::kick(int rung, const std::vector<double> &dt0, const std::vector<double> &dt1) const {
-	return hpx::async<tree::kick_action>(gid, rung, dt0, dt1);
+hpx::future<void> tree_client::kick(int rung, double t, const std::vector<double> &dt0, const std::vector<double> &dt1) const {
+	return hpx::async<tree::kick_action>(gid, rung, t, dt0, dt1);
 }
 
 hpx::future<multi_array<int>> tree_client::get_particle_count() const {
