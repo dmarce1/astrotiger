@@ -35,6 +35,8 @@ using recv_parts_action_type = tree::recv_parts_action;
 using finish_drift_action_type = tree::finish_drift_action;
 using get_particle_count_action_type = tree::get_particle_count_action;
 using max_part_velocity_action_type = tree::max_part_velocity_action;
+using kick_action_type = tree::kick_action;
+HPX_REGISTER_ACTION (kick_action_type);
 HPX_REGISTER_ACTION (max_part_velocity_action_type);
 HPX_REGISTER_ACTION (get_particle_count_action_type);
 HPX_REGISTER_ACTION (finish_drift_action_type);
@@ -59,6 +61,15 @@ HPX_REGISTER_ACTION (set_family_action_type);
 HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
+
+void tree::kick(int rung, std::vector<double> last_dt, std::vector<double> this_dt) {
+	std::vector<hpx::future<void>> futs;
+	for (const auto &c : children) {
+		futs.push_back(c.kick(rung, last_dt, this_dt));
+	}
+	parts.kick(rung, level, last_dt, this_dt);
+	hpx::wait_all(futs.begin(), futs.end());
+}
 
 double tree::max_part_velocity() const {
 	std::vector<hpx::future<double>> futs;

@@ -83,25 +83,41 @@ void particles::initialize() {
 				r += (x[dim] - 0.5) * (x[dim] - 0.5);
 			}
 			r = std::sqrt(r);
-			if (r < 0.1) {
-				for (int iter = 0; iter < (NDIM << 1); iter++) {
+			if (r > 0.25 && r < 0.3) {
+				for (int iter = 0; iter < rand() % 5; iter++) {
 					particle p;
 					double r1 = 0.0;
 					for (int dim = 0; dim < NDIM; dim++) {
 						p.x[dim] = i.index()[dim] * dx + dx * rand() / RAND_MAX;
 						r1 += (p.x[dim] - 0.5) * (p.x[dim] - 0.5);
 					}
+					p.m = 1.0;
 					r1 = std::sqrt(r1);
-					if (r1 == 0.0) {
-						p.v = 0.0;
-					} else {
-						for (int dim = 0; dim < NDIM; dim++) {
-							p.v[dim] = (p.x[dim] - 0.5) / r1;
-						}
-					}
+					p.v[0] = -(p.x[1]-0.5) / std::pow(r1,1.5);
+					p.v[1] = (p.x[0]-0.5) / std::pow(r1,1.5);
+					p.rung = 0;
 					parts.push_back(p);
 				}
 			}
+		}
+	}
+}
+
+void particles::kick(int kick_level, int this_level, const std::vector<double> &dt0, const std::vector<double> &dt1) {
+	for (auto &p : parts) {
+		const auto x = (p.x - vect<double>(0.5));
+		const auto r = abs(x);
+		const auto f = -x / (r * r * r);
+		if (p.rung >= kick_level) {
+			p.v += f * (p.m * dt0[p.rung] * 0.5);
+			if (p.rung > this_level) {
+				if (this_level >= kick_level) {
+					p.rung = this_level;
+				}
+			} else if (p.rung < this_level) {
+				p.rung = this_level;
+			}
+			p.v += f * (p.m * dt1[p.rung] * 0.5);
 		}
 	}
 }

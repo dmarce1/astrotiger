@@ -8,6 +8,7 @@
 #define VECT_HPP_
 
 #include <astrotiger/defs.hpp>
+#include <cmath>
 
 template<class T>
 class vect {

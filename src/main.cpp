@@ -6,6 +6,7 @@ static tree_client root;
 
 std::vector<double> dx;
 std::vector<double> dt;
+std::vector<double> last_dt;
 std::vector<double> tm;
 std::vector<int> super_step;
 
@@ -40,7 +41,7 @@ void solve_gravity(int l, double t, double mtot) {
 	//printf("%i %e\n", pass, tmp.resid);
 }
 
-bool master(int level, double tmax) {
+bool master(int level, int coarse_level, double tmax) {
 	if (level > opts.max_level) {
 		return false;
 	}
@@ -56,14 +57,19 @@ bool master(int level, double tmax) {
 //		if (level > 0 && nstep == -1) {
 //			levels_set_child_families(level - 1);
 //		}
-		bool refine = (nstep == -1) && (super_step[level] % refine_freq == 0);
+		bool refine = (nstep == -1);
 		if (refine) {
-			printf("Refining on level %i\n", level);
+//			printf("Refining on level %i\n", level);
 		}
+		if (nstep != -1) {
+			coarse_level = level;
+		}
+//		printf("%i\n", coarse_level);
 //		std::string fname = "X." + std::to_string(oi++) + ".silo";
 //		output_silo(fname);
 
 //		printf("Hydro pre-step\n");
+		last_dt[level] = dt[level];
 		dt[level] = levels_hydro_initialize(level, refine);
 		if (refine) {
 			for (int l = level; l <= opts.max_level; l++) {
@@ -73,7 +79,7 @@ bool master(int level, double tmax) {
 		dt[level] = std::max(dt[level], levels_fine_fluxes(level));
 		if (dt[level] == 0.0) {
 			tm[level] = tm[level - 1];
-			master(level + 1, tm[level]);
+			master(level + 1, coarse_level, tm[level]);
 			return false;
 		}
 //		levels_show();
@@ -88,6 +94,9 @@ bool master(int level, double tmax) {
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			solve_gravity(level, tm[level], mtot);
 		}
+		if( level == opts.max_level) {
+			root.kick(coarse_level, last_dt, dt).get();
+		}
 		levels_hydro_substep(level, 0, dt[level]);
 		if (opts.self_gravity) {
 			const auto mtot = root.get_statistics(std::min(level, max_refined)).get().u[rho_i];
@@ -96,8 +105,10 @@ bool master(int level, double tmax) {
 		}
 		levels_hydro_substep(level, 1, dt[level]);
 		tm[level] += dt[level];
-		const bool has_next_level = master(level + 1, tm[level]);
+		const bool has_next_level = master(level + 1, coarse_level, tm[level]);
+		///	printf( "-\n");
 		if (opts.particles && !has_next_level) {
+			//		printf( "%i\n", coarse_level);
 			root.drift(dt[level]).get();
 			root.finish_drift(std::vector<particle>()).get();
 		}
@@ -146,6 +157,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	dx.resize(opts.max_level + 1);
 	dt.resize(opts.max_level + 1);
+	last_dt.resize(opts.max_level + 1);
 	tm.resize(opts.max_level + 1);
 	super_step.resize(opts.max_level + 1);
 	for (int l = 0; l <= opts.max_level; l++) {
@@ -161,11 +173,11 @@ int hpx_main(int argc, char *argv[]) {
 		} else {
 			root.set_family(tree_client(), root, sibs).get();
 		}
-		if (amax != 0.0) {
-			dt[l] = opts.cfl * dx[l] / amax;
-		} else {
-			dt[l] = 0.0;
-		}
+//		if (amax != 0.0) {
+//			dt[l] = opts.cfl * dx[l] / amax;
+//		} else {
+		dt[l] = 0.0;
+//		}
 		printf("Done\n");
 	}
 	root.restrict_all().get();
@@ -187,7 +199,7 @@ int hpx_main(int argc, char *argv[]) {
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;
-		master(0, std::min(t + dt, opts.tmax));
+		master(0, 0, std::min(t + dt, opts.tmax));
 		std::string fname = "X." + std::to_string(i) + ".silo";
 		output_silo(fname);
 	}

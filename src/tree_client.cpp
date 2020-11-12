@@ -7,6 +7,10 @@
 
 #include <astrotiger/tree.hpp>
 
+hpx::future<void> tree_client::kick(int rung, const std::vector<double> &dt0, const std::vector<double> &dt1) const {
+	return hpx::async<tree::kick_action>(gid, rung, dt0, dt1);
+}
+
 hpx::future<multi_array<int>> tree_client::get_particle_count() const {
 	return hpx::async<tree::get_particle_count_action>(gid);
 }
@@ -23,7 +27,6 @@ hpx::future<void> tree_client::send_parts(std::vector<particle> &&parts) const {
 hpx::future<double> tree_client::max_part_velocity() const {
 	return hpx::async<tree::max_part_velocity_action>(gid);
 }
-
 
 hpx::future<void> tree_client::drift(double dt) const {
 	return hpx::async<tree::drift_action>(gid, dt);
