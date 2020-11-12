@@ -62,11 +62,11 @@ HPX_REGISTER_ACTION (get_children_action_type);
 
 double tree::max_part_velocity() const {
 	std::vector<hpx::future<double>> futs;
-	for( const auto& c : children) {
+	for (const auto &c : children) {
 		futs.push_back(c.max_part_velocity());
 	}
 	double vmax = parts.max_velocity();
-	for( auto& f : futs) {
+	for (auto &f : futs) {
 		vmax = std::max(vmax, f.get());
 	}
 	return vmax;
@@ -90,12 +90,16 @@ void tree::recv_parts(std::vector<particle> these_parts) {
 			}
 		}
 		if (sibparts.size()) {
-			futs.push_back(siblings[i].client.send_parts(std::move(sibparts)));
+			if (siblings[i].client != self) {
+				futs.push_back(siblings[i].client.send_parts(std::move(sibparts)));
+			} else {
+				these_parts.insert(these_parts.end(), sibparts.begin(), sibparts.end());
+			}
 		}
 	}
 #ifndef NDEBUG
 	const auto rbox = range_int_to_double(box);
-	for( const auto& p : these_parts) {
+	for (const auto &p : these_parts) {
 		assert(rbox.contains(p.x));
 	}
 #endif

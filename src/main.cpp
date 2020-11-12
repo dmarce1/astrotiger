@@ -46,7 +46,7 @@ bool master(int level, double tmax) {
 	}
 	int oi = 0;
 	double nstep = -1;
-	const int refine_freq = 2;
+	const int refine_freq = 1;
 	statistics stats;
 	if (opts.self_gravity) {
 		stats = root.get_statistics(opts.max_level).get();
@@ -80,7 +80,7 @@ bool master(int level, double tmax) {
 		dt[level] = opts.cfl * dx[level] / dt[level];
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
 		dt[level] = (tmax - tm[level]) / nstep;
-//		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
+		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		if (opts.self_gravity) {
 			auto tmp = root.get_statistics(std::min(level, max_refined)).get();
 			assert(tmp.u.size());
