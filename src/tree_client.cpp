@@ -20,6 +20,11 @@ hpx::future<void> tree_client::send_parts(std::vector<particle> &&parts) const {
 	return hpx::async<tree::recv_parts_action>(gid, std::move(parts));
 }
 
+hpx::future<double> tree_client::max_part_velocity() const {
+	return hpx::async<tree::max_part_velocity_action>(gid);
+}
+
+
 hpx::future<void> tree_client::drift(double dt) const {
 	return hpx::async<tree::drift_action>(gid, dt);
 }

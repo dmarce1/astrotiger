@@ -63,7 +63,7 @@ bool master(int level, double tmax) {
 //		std::string fname = "X." + std::to_string(oi++) + ".silo";
 //		output_silo(fname);
 
-		printf("Hydro pre-step\n");
+//		printf("Hydro pre-step\n");
 		dt[level] = levels_hydro_initialize(level, refine);
 		if (refine) {
 			for (int l = level; l <= opts.max_level; l++) {
@@ -76,22 +76,22 @@ bool master(int level, double tmax) {
 			master(level + 1, tm[level]);
 			return false;
 		}
-		levels_show();
+//		levels_show();
 		dt[level] = opts.cfl * dx[level] / dt[level];
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
 		dt[level] = (tmax - tm[level]) / nstep;
-		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
+//		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		if (opts.self_gravity) {
 			auto tmp = root.get_statistics(std::min(level, max_refined)).get();
 			assert(tmp.u.size());
 			const auto mtot = tmp.u[rho_i];
-			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
+//			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			solve_gravity(level, tm[level], mtot);
 		}
 		levels_hydro_substep(level, 0, dt[level]);
 		if (opts.self_gravity) {
 			const auto mtot = root.get_statistics(std::min(level, max_refined)).get().u[rho_i];
-			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
+//			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			solve_gravity(level, tm[level] + dt[level], mtot);
 		}
 		levels_hydro_substep(level, 1, dt[level]);
@@ -183,7 +183,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	const auto dt = 0.01;
+	const auto dt = 0.1;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

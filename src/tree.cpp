@@ -34,6 +34,8 @@ using drift_action_type = tree::drift_action;
 using recv_parts_action_type = tree::recv_parts_action;
 using finish_drift_action_type = tree::finish_drift_action;
 using get_particle_count_action_type = tree::get_particle_count_action;
+using max_part_velocity_action_type = tree::max_part_velocity_action;
+HPX_REGISTER_ACTION (max_part_velocity_action_type);
 HPX_REGISTER_ACTION (get_particle_count_action_type);
 HPX_REGISTER_ACTION (finish_drift_action_type);
 HPX_REGISTER_ACTION (recv_parts_action_type);
@@ -57,6 +59,18 @@ HPX_REGISTER_ACTION (set_family_action_type);
 HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
+
+double tree::max_part_velocity() const {
+	std::vector<hpx::future<double>> futs;
+	for( const auto& c : children) {
+		futs.push_back(c.max_part_velocity());
+	}
+	double vmax = parts.max_velocity();
+	for( auto& f : futs) {
+		vmax = std::max(vmax, f.get());
+	}
+	return vmax;
+}
 
 void tree::recv_parts(std::vector<particle> these_parts) {
 	std::vector<hpx::future<void>> futs;
@@ -577,6 +591,7 @@ double tree::hydro_initialize(bool refine) {
 			cfuts.push_back(c.get_children());
 		}
 		grandchildren.resize(children.size());
+		grandchild_boxes.resize(0);
 		for (int i = 0; i < children.size(); i++) {
 			auto &f = cfuts[i];
 			const auto tmp = f.get();
@@ -690,7 +705,7 @@ double tree::hydro_initialize(bool refine) {
 	}
 	auto amax = hydro.compute_flux(0);
 	if (opts.particles) {
-		amax = std::max(amax, parts.max_velocity());
+		amax = std::max(amax, max_part_velocity());
 	}
 	return amax;
 }
@@ -1129,7 +1144,7 @@ double tree::initialize(int this_level) {
 		}
 	}
 	if (opts.particles) {
-		amax = std::max(amax, parts.max_velocity());
+		amax = std::max(amax, max_part_velocity());
 	}
 	return amax;
 }

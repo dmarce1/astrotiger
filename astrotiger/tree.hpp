@@ -191,9 +191,11 @@ public:
 	range<double> range_int_to_double( const multi_range& box );
 	multi_array<int> get_particle_count() const;
 	hpx::future<void> send_child_particles();
+	double max_part_velocity() const;
 
 
 
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,max_part_velocity);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particle_count);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,recv_parts);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,finish_drift);

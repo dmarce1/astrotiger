@@ -74,6 +74,7 @@ public:
 		gid = id_;
 		box = box_;
 	}
+	hpx::future<double> max_part_velocity() const;
 	hpx::future<multi_array<int>> get_particle_count() const;
 	hpx::future<void> send_parts(std::vector<particle>&&) const;
 	hpx::future<void> drift(double dt) const;

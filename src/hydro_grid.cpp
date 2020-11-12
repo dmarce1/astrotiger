@@ -521,7 +521,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 			}
 		}
 	}
-	if (!range.empty()) {
+	if (range.volume()) {
 		boxes.push_back(range);
 		for (const auto &amr : amr_boxes) {
 			tmp.resize(0);
