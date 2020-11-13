@@ -10,11 +10,8 @@
 #include <astrotiger/multi_array.hpp>
 #include <astrotiger/polytrope.hpp>
 #include <astrotiger/tree.hpp>
+#include <astrotiger/rand.hpp>
 #include <vector>
-
-double rand1() {
-	return (rand() + 0.5) / RAND_MAX;
-}
 
 hydro_grid::hydro_grid() {
 }

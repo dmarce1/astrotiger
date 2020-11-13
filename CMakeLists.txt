@@ -36,6 +36,7 @@ set(astrotiger_source_files
 	src/polytrope.cpp
 	src/output.cpp
 	src/options.cpp
+	src/rand.cpp
 	src/tree.cpp
 	src/tree_client.cpp
 	src/levels.cpp
@@ -57,6 +58,7 @@ set(astrotiger_header_files
  	astrotiger/options.hpp	
  	astrotiger/particles.hpp	
  	astrotiger/polytrope.hpp	
+ 	astrotiger/rand.hpp
  	astrotiger/range.hpp
  	astrotiger/tree.hpp
  	astrotiger/tree_client.hpp

@@ -1,5 +1,6 @@
 #include <astrotiger/options.hpp>
 #include <astrotiger/particles.hpp>
+#include <astrotiger/rand.hpp>
 #include <array>
 
 multi_array<double> particles::cloud_in_cell(double dt) const {
@@ -16,7 +17,8 @@ multi_array<double> particles::cloud_in_cell(double dt) const {
 		vect<double> q;
 		for (int dim = 0; dim < NDIM; dim++) {
 			const double tmp = (p.x[dim] - 0.5 * dx + opts.max_bw * dx) / dx - opts.max_bw;
-			i[dim] = tmp;
+			i[dim] = int((p.x[dim] - 0.5 * dx + opts.max_bw * dx) / dx) - opts.max_bw;
+			;
 			q[dim] = 1.0 - tmp + i[dim];
 		}
 		auto this_box = multi_range(i);
@@ -95,20 +97,34 @@ void particles::set_child_boxes(const std::vector<multi_range> &boxes) {
 }
 
 void particles::initialize() {
+	constexpr int N = 10000;
+	constexpr double a = 0.01;
+	constexpr double c0 = 3.0 * 1.0 / (4.0 * M_PI * a * a * a);
 	if (opts.problem == "part_test") {
-		particle p1, p2;
-		for (int dim = 0; dim < NDIM; dim++) {
-			p1.v[dim] = p2.v[dim] = 0.0;
-			p1.x[dim] = p2.x[dim] = 0.5;
-			p1.m = p2.m = 1.0;
-			p1.rung = p2.rung = 0;
+		for (int i = 0; i < N; i++) {
+			particle p;
+			double r;
+			double prob;
+			double rnd;
+			vect<double> x;
+			do {
+				r = 0.0;
+				for (int dim = 0; dim < NDIM; dim++) {
+					x[dim] = rand1();
+					r += std::pow(x[dim] - 0.5, 2);
+				}
+				r = std::sqrt(r);
+				prob = c0 * std::pow(1.0 + r * r / a / a, -2.5);
+			} while (prob < rand1());
+			p.x = x;
+			const auto sigma = std::sqrt(1.0 / 6.0 / std::sqrt(1.0 + r * r / a / a));
+			for (int dim = 0; dim < NDIM; dim++) {
+				p.v[dim] = (2.0 * rand1() - 1.0) * sigma;
+			}
+			p.m = 1.0 / N;
+			p.rung = 0;
+			parts.push_back(p);
 		}
-		p1.v[1] = std::sqrt(2);
-		p2.v[1] = -std::sqrt(2);
-		p1.x[0] = 0.25 + 0.125;
-		p2.x[0] = 0.75 - 0.125;
-		parts.push_back(p1);
-		parts.push_back(p2);
 	}
 }
 
@@ -119,7 +135,7 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 			multi_index i;
 			vect<double> this_g;
 			for (int dim = 0; dim < NDIM; dim++) {
-				i[dim] = ((p.x[dim] - 0.5 * dx) + opts.max_bw * dx) / dx - opts.max_bw;
+				i[dim] = int(((p.x[dim] - 0.5 * dx) + opts.max_bw * dx) / dx) - opts.max_bw;
 			}
 			for (int dim = 0; dim < NDIM; dim++) {
 				this_g[dim] = 0.0;

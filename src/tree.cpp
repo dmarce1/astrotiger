@@ -325,7 +325,7 @@ statistics tree::get_statistics(int lev) const {
 		}
 		stats.max_level = std::max(stats.max_level, tmp.max_level);
 	}
-	if (opts.particles) {
+	if (opts.particles && level == 0) {
 		double m = 0.0;
 		const auto rho = get_particle_source(t);
 		for (multi_iterator i(box); !i.end(); i++) {
@@ -1240,7 +1240,7 @@ output_return tree::output(DBfile *db, int node_index) const {
 #elif NDIM == 2
 	constexpr int order[4] = { 0, 1, 3, 2 };
 #else
-	constexpr int order[8] = {0,1,3,2,4,5,7,6};
+	constexpr int order[8] = { 0, 1, 3, 2, 4, 5, 7, 6 };
 #endif
 
 	for (multi_iterator i(box); !i.end(); i++) {

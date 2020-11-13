@@ -21,7 +21,7 @@ void solve_gravity(int l, double t, double mtot) {
 	do {
 		auto tmp = root.gravity_solve(pass, l, std::vector<double>(), t, mtot).get();
 		r = tmp.resid;
-//		printf("%i %e\n", pass, r);
+		printf("%i %e\n", pass, r);
 		if (pass > 500) {
 			std::string fname = "X." + std::to_string(oi++) + ".silo";
 			output_silo(fname);
