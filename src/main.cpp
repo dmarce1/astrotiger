@@ -53,7 +53,7 @@ bool master(int level, int coarse_level, double tmax) {
 	const int refine_freq = 1;
 	statistics stats;
 	if (opts.self_gravity) {
-		stats = root.get_statistics(opts.max_level).get();
+		stats = root.get_statistics(opts.max_level, tm[level]).get();
 	}
 	const int max_refined = stats.min_level;
 	do {
@@ -75,6 +75,9 @@ bool master(int level, int coarse_level, double tmax) {
 		last_dt[level] = dt[level];
 		dt[level] = levels_hydro_initialize(level, refine);
 		if (refine) {
+			levels_show();
+		}
+		if (refine) {
 			for (int l = level; l <= opts.max_level; l++) {
 				levels_set_child_families(l);
 			}
@@ -91,7 +94,7 @@ bool master(int level, int coarse_level, double tmax) {
 		dt[level] = (tmax - tm[level]) / nstep;
 		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		if (opts.self_gravity) {
-			auto tmp = root.get_statistics(std::min(level, max_refined)).get();
+			auto tmp = root.get_statistics(std::min(level, max_refined), tm[level]).get();
 			assert(tmp.u.size());
 			const auto mtot = tmp.u[rho_i];
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
@@ -102,7 +105,7 @@ bool master(int level, int coarse_level, double tmax) {
 		}
 		levels_hydro_substep(level, 0, dt[level]);
 		if (opts.self_gravity) {
-			const auto mtot = root.get_statistics(std::min(level, max_refined)).get().u[rho_i];
+			const auto mtot = root.get_statistics(std::min(level, max_refined), tm[level] + dt[level]).get().u[rho_i];
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			solve_gravity(level, tm[level] + dt[level], mtot);
 		}
@@ -187,10 +190,10 @@ int hpx_main(int argc, char *argv[]) {
 //	master(0, 1.0e-100);
 	levels_show();
 	if (opts.self_gravity) {
-		const auto tmp = root.get_statistics(opts.max_level).get();
+		const auto tmp = root.get_statistics(opts.max_level, 0.0).get();
 		const auto max_refined = tmp.min_level;
 		for (int l = 0; l <= opts.max_level; l++) {
-			const auto tmp = root.get_statistics(std::min(l, max_refined)).get();
+			const auto tmp = root.get_statistics(std::min(l, max_refined), 0.0).get();
 			assert(tmp.u.size());
 			const auto mtot = tmp.u[rho_i];
 			solve_gravity(l, 0.0, mtot);

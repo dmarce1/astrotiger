@@ -44,8 +44,9 @@ hpx::future<gravity_return> tree_client::gravity_solve(int pass, int level, std:
 	return hpx::async<tree::gravity_solve_action>(gid, pass, level, std::move(coarse), t, m);
 }
 
-hpx::future<statistics> tree_client::get_statistics(int level) const {
-	return hpx::async<tree::get_statistics_action>(gid, level);
+
+hpx::future<statistics> tree_client::get_statistics(int level, double t) const {
+	return hpx::async<tree::get_statistics_action>(gid, level, t);
 }
 
 hpx::future<void> tree_client::list() const {

@@ -179,7 +179,7 @@ public:
 	void get_hydro_boundaries(double);
 	void get_energy_boundaries(double);
 	void sanity() const;
-	statistics get_statistics(int lev) const;
+	statistics get_statistics(int lev, double t) const;
 	std::vector<double> restrict_all();
 	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
 	double compute_error();

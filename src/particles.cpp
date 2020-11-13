@@ -98,8 +98,10 @@ void particles::set_child_boxes(const std::vector<multi_range> &boxes) {
 
 void particles::initialize() {
 	constexpr int N = 10000;
-	constexpr double a = 0.01;
+	constexpr double a = 0.1;
 	constexpr double c0 = 3.0 * 1.0 / (4.0 * M_PI * a * a * a);
+	double v2 = 0.0;
+	double p1 = 0.0;
 	if (opts.problem == "part_test") {
 		for (int i = 0; i < N; i++) {
 			particle p;
@@ -114,18 +116,21 @@ void particles::initialize() {
 					r += std::pow(x[dim] - 0.5, 2);
 				}
 				r = std::sqrt(r);
-				prob = c0 * std::pow(1.0 + r * r / a / a, -2.5);
+				prob = std::pow(1.0 + r * r / a / a, -2.5);
 			} while (prob < rand1());
 			p.x = x;
-			const auto sigma = std::sqrt(1.0 / 6.0 / std::sqrt(1.0 + r * r / a / a));
+			const auto sigma = std::sqrt(1.0 / 6.0 / std::sqrt(a * a + r * r));
 			for (int dim = 0; dim < NDIM; dim++) {
-				p.v[dim] = (2.0 * rand1() - 1.0) * sigma;
+				p.v[dim] = rand_normal() * sigma;
 			}
 			p.m = 1.0 / N;
 			p.rung = 0;
 			parts.push_back(p);
+	//		v2 += p.m * p.v.dot(p.v);
+	//		p1 += p.m * 1.0 / std::sqrt(a * a + r * r);
 		}
 	}
+	printf("v2 = %e p1 = %e\n", v2, p1);
 }
 
 void particles::kick(int kick_level, int this_level, const std::vector<double> &dt0, const std::vector<double> &dt1,

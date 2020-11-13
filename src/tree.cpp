@@ -64,6 +64,7 @@ HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
 HPX_REGISTER_ACTION (get_particle_source_action_type);
 
+
 multi_array<double> tree::get_particle_source(double this_t) const {
 	std::vector<hpx::future<multi_array<double>>> futs;
 	for (int ci = 0; ci < children.size(); ci++) {
@@ -288,13 +289,13 @@ void tree::drift(double dt) {
 	hpx::wait_all(futs.begin(), futs.end());
 }
 
-statistics tree::get_statistics(int lev) const {
+statistics tree::get_statistics(int lev, double t) const {
 	statistics stats;
 	std::vector<multi_range> cranges;
 	std::vector<hpx::future<statistics>> futs;
 	int volume = 0;
 	for (const auto &c : children) {
-		futs.push_back(c.get_statistics(lev));
+		futs.push_back(c.get_statistics(lev, t));
 		const auto this_box = c.get_box().half();
 		volume += this_box.volume();
 		if (level < lev) {
