@@ -38,7 +38,7 @@ class particles {
 public:
 
 	multi_array<int> particle_count() const;
-	multi_array<double> cloud_in_cell() const;
+	multi_array<double> cloud_in_cell(double dt) const;
 	std::vector<std::vector<double>> pack_output() const;
 	std::vector<std::vector<double>> pack_coords() const;
 	static std::vector<std::string> field_names();

@@ -35,7 +35,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("self_gravity", po::value<bool>(&self_gravity)->default_value(false), "use self gravity") //
 	("particles", po::value<bool>(&particles)->default_value(false), "use particles") //
 	("gravity", po::value<bool>(&gravity)->default_value(false), "use gravity") //
-	("nmulti", po::value<int>(&nmulti)->default_value(8), "multigrid solver iterations)") //
+	("nmulti", po::value<int>(&nmulti)->default_value(16), "multigrid solver iterations)") //
 	("max_box", po::value<int>(&max_box)->default_value(32), "maximum (box volume)^(1/3)") //
 	("order", po::value<int>(&order)->default_value(2), "integration order") //
 	("window", po::value<int>(&window)->default_value(1), "refinement window size") //

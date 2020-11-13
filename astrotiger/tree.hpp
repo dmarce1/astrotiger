@@ -193,7 +193,9 @@ public:
 	hpx::future<void> send_child_particles();
 	double max_part_velocity() const;
 	void kick(int, double, std::vector<double>, std::vector<double>);
+	multi_array<double> get_particle_source(double) const;
 
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particle_source);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,kick);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,max_part_velocity);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particle_count);

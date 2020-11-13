@@ -7,6 +7,10 @@
 
 #include <astrotiger/tree.hpp>
 
+hpx::future<multi_array<double>> tree_client::get_particle_source(double dt) const {
+	return hpx::async<tree::get_particle_source_action>(gid, dt);
+}
+
 hpx::future<void> tree_client::kick(int rung, double t, const std::vector<double> &dt0, const std::vector<double> &dt1) const {
 	return hpx::async<tree::kick_action>(gid, rung, t, dt0, dt1);
 }

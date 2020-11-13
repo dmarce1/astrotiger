@@ -11,6 +11,7 @@ std::vector<double> tm;
 std::vector<int> super_step;
 
 void solve_gravity(int l, double t, double mtot) {
+
 	const double toler = 5.0e-4;
 	int pass = 0;
 	double r;
@@ -21,13 +22,15 @@ void solve_gravity(int l, double t, double mtot) {
 		auto tmp = root.gravity_solve(pass, l, std::vector<double>(), t, mtot).get();
 		r = tmp.resid;
 //		printf("%i %e\n", pass, r);
-		std::string fname = "X." + std::to_string(oi++) + ".silo";
-//		output_silo(fname);
-		if (pass > 200) {
+		if (pass > 500) {
+			std::string fname = "X." + std::to_string(oi++) + ".silo";
+			output_silo(fname);
 			printf("Gravity solver failed to converged\n");
 			//		abort();
-			kill = true;
-			break;
+			if (pass > 1000) {
+				kill = true;
+				break;
+			}
 		}
 		pass++;
 	} while (r > toler);
@@ -94,7 +97,7 @@ bool master(int level, int coarse_level, double tmax) {
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			solve_gravity(level, tm[level], mtot);
 		}
-		if( level == opts.max_level) {
+		if (level == opts.max_level) {
 			root.kick(coarse_level, tm[level], last_dt, dt).get();
 		}
 		levels_hydro_substep(level, 0, dt[level]);

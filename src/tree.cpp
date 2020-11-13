@@ -36,6 +36,7 @@ using finish_drift_action_type = tree::finish_drift_action;
 using get_particle_count_action_type = tree::get_particle_count_action;
 using max_part_velocity_action_type = tree::max_part_velocity_action;
 using kick_action_type = tree::kick_action;
+using get_particle_source_action_type = tree::get_particle_source_action;
 HPX_REGISTER_ACTION (kick_action_type);
 HPX_REGISTER_ACTION (max_part_velocity_action_type);
 HPX_REGISTER_ACTION (get_particle_count_action_type);
@@ -61,6 +62,23 @@ HPX_REGISTER_ACTION (set_family_action_type);
 HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
+HPX_REGISTER_ACTION (get_particle_source_action_type);
+
+multi_array<double> tree::get_particle_source(double this_t) const {
+	std::vector<hpx::future<multi_array<double>>> futs;
+	for (int ci = 0; ci < children.size(); ci++) {
+		futs.push_back(children[ci].get_particle_source(this_t));
+	}
+	auto src = parts.cloud_in_cell(this_t - t);
+	for (int ci = 0; ci < children.size(); ci++) {
+		const auto cbox = children[ci].get_box().half();
+		const auto dsrc = futs[ci].get().restrict_(cbox);
+		for (multi_iterator i(cbox); !i.end(); i++) {
+			src[i] += dsrc[i];
+		}
+	}
+	return src;
+}
 
 void tree::kick(int rung, double tm, std::vector<double> last_dt, std::vector<double> this_dt) {
 	std::vector<hpx::future<void>> futs;
@@ -68,10 +86,10 @@ void tree::kick(int rung, double tm, std::vector<double> last_dt, std::vector<do
 		futs.push_back(c.kick(rung, tm, last_dt, this_dt));
 	}
 	double w;
-	if (t != 0.0) {
+	if (t != t0) {
 		w = (tm - t0) / (t - t0);
 	} else {
-		w = 0.0;
+		w = 1.0;
 	}
 	assert(w >= 0.0);
 	assert(w <= 1.0);
@@ -307,6 +325,14 @@ statistics tree::get_statistics(int lev) const {
 		}
 		stats.max_level = std::max(stats.max_level, tmp.max_level);
 	}
+	if (opts.particles) {
+		double m = 0.0;
+		const auto rho = get_particle_source(t);
+		for (multi_iterator i(box); !i.end(); i++) {
+			m += std::pow(dx, NDIM) * rho[i];
+		}
+		stats.u[rho_i] += m;
+	}
 	return stats;
 }
 
@@ -316,12 +342,20 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	gravity_step = 0;
 	if (level == fine_level) {
 		if (pass == 0) {
+			if (level == 0) {
+				grav.initialize_coarse(t);
+			}
+			auto source = hydro.get_density();
+			if (opts.particles) {
+				const auto psource = get_particle_source(this_t);
+				for (multi_iterator i(box); !i.end(); i++) {
+					source[i] += psource[i];
+				}
+			}
+			grav.initialize_fine(source, mtot, level);
 			if (level != 0) {
-				grav.initialize_fine(hydro.get_density(), mtot, level);
 				grav.set_amr_zones(get_amr_boxes(), coarse_from_parent);
 			} else {
-				grav.initialize_coarse(t);
-				grav.initialize_fine(hydro.get_density(), mtot, level);
 				if (opts.problem == "sphere") {
 					grav.set_outflow_boundaries();
 				}
@@ -688,6 +722,7 @@ double tree::hydro_initialize(bool refine) {
 			np->grav.resize(np->dx, b);
 			np->refine_step = 1;
 			np->hydro.unpack(hydro.pack_prolong(b.pad(opts.hbw), 1.0), b.pad(opts.hbw));
+			np->t = np->t0 = t;
 			for (const auto &op : old_ptrs) {
 				np->t = op->t;
 				np->t0 = op->t0;
@@ -1122,7 +1157,7 @@ double tree::initialize(int this_level) {
 		parts.resize(dx, box);
 		grav.resize(dx, box);
 		hydro.initialize();
-		if (opts.particles) {
+		if (opts.particles && level == 0) {
 			parts.initialize();
 		}
 		hydro.reset_flux_registers();

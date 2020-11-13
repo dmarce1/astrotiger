@@ -2,30 +2,51 @@
 #include <astrotiger/particles.hpp>
 #include <array>
 
-multi_array<double> particles::cloud_in_cell() const {
-	multi_array<double> cic;
-	const auto dvinv = std::pow(dx, NDIM);
-	for (multi_iterator i(box); !i.end(); i++) {
-		cic[i] = 0.0;
+multi_array<double> particles::cloud_in_cell(double dt) const {
+	multi_array<double> src(box.pad(1));
+	multi_array<double> rho(box.pad(1));
+	multi_array<double> drho_dt(box.pad(1));
+	const auto dvinv = std::pow(dx, -NDIM);
+	for (multi_iterator i(box.pad(1)); !i.end(); i++) {
+		rho[i] = 0.0;
+		drho_dt[i] = 0.0;
 	}
 	for (const auto &p : parts) {
 		multi_index i;
 		vect<double> q;
 		for (int dim = 0; dim < NDIM; dim++) {
-			i[dim] = p.x[dim] / dx;
-			q[dim] = 1.0 - p.x[dim] / dx + i[dim];
+			const double tmp = (p.x[dim] - 0.5 * dx + opts.max_bw * dx) / dx - opts.max_bw;
+			i[dim] = tmp;
+			q[dim] = 1.0 - tmp + i[dim];
 		}
-		for (multi_iterator j(multi_range(i).pad(1)); !j.end(); j++) {
+		auto this_box = multi_range(i);
+		for (int dim = 0; dim < NDIM; dim++) {
+			this_box.max[dim]++;
+		}
+		for (multi_iterator j(this_box); !j.end(); j++) {
 			if (box.contains(j)) {
 				double wt = 1.0;
+				double sgn;
 				for (int dim = 0; dim < NDIM; dim++) {
-					wt *= q[dim];
+					if (j[dim] == i[dim]) {
+						wt *= q[dim];
+						sgn = -1.0;
+					} else {
+						wt *= 1.0 - q[dim];
+						sgn = +1.0;
+					}
+					drho_dt[j] += p.m * dvinv * sgn * p.v[dim] / dx;
 				}
-				cic[j] += p.m * dvinv * wt;
+				assert(wt >= 0.0);
+				assert(wt <= 1.0);
+				rho[j] += p.m * dvinv * wt;
 			}
 		}
 	}
-	return cic;
+	for (multi_iterator i(box.pad(1)); !i.end(); i++) {
+		rho[i] += dt * drho_dt[i];
+	}
+	return rho;
 }
 
 multi_array<int> particles::particle_count() const {
@@ -75,31 +96,19 @@ void particles::set_child_boxes(const std::vector<multi_range> &boxes) {
 
 void particles::initialize() {
 	if (opts.problem == "part_test") {
-		for (multi_iterator i(box); !i.end(); i++) {
-			vect<double> x;
-			double r = 0.0;
-			for (int dim = 0; dim < NDIM; dim++) {
-				x[dim] = i.index()[dim] * dx + 0.5 * dx;
-				r += (x[dim] - 0.5) * (x[dim] - 0.5);
-			}
-			r = std::sqrt(r);
-			if (r > 0.25 && r < 0.3) {
-				for (int iter = 0; iter < rand() % 5; iter++) {
-					particle p;
-					double r1 = 0.0;
-					for (int dim = 0; dim < NDIM; dim++) {
-						p.x[dim] = i.index()[dim] * dx + dx * rand() / RAND_MAX;
-						r1 += (p.x[dim] - 0.5) * (p.x[dim] - 0.5);
-					}
-					p.m = 1.0;
-					r1 = std::sqrt(r1);
-					p.v[0] = -(p.x[1] - 0.5) / r1 * std::sqrt(2) * 3.906250e-03;
-					p.v[1] = (p.x[0] - 0.5) / r1 * std::sqrt(2) * 3.906250e-03;
-					p.rung = 0;
-					parts.push_back(p);
-				}
-			}
+		particle p1, p2;
+		for (int dim = 0; dim < NDIM; dim++) {
+			p1.v[dim] = p2.v[dim] = 0.0;
+			p1.x[dim] = p2.x[dim] = 0.5;
+			p1.m = p2.m = 1.0;
+			p1.rung = p2.rung = 0;
 		}
+		p1.v[1] = std::sqrt(2);
+		p2.v[1] = -std::sqrt(2);
+		p1.x[0] = 0.25 + 0.125;
+		p2.x[0] = 0.75 - 0.125;
+		parts.push_back(p1);
+		parts.push_back(p2);
 	}
 }
 
@@ -110,7 +119,7 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 			multi_index i;
 			vect<double> this_g;
 			for (int dim = 0; dim < NDIM; dim++) {
-				i[dim] = (p.x[dim] - 0.5 * dx) / dx;
+				i[dim] = ((p.x[dim] - 0.5 * dx) + opts.max_bw * dx) / dx - opts.max_bw;
 			}
 			for (int dim = 0; dim < NDIM; dim++) {
 				this_g[dim] = 0.0;
@@ -121,18 +130,21 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 				for (multi_iterator j(this_box); !j.end(); j++) {
 					double w = 1.0;
 					for (int dim2 = 0; dim2 < NDIM; dim2++) {
-						if (j.index()[dim2] == i[dim2]) {
-							w *= (p.x[dim2] - 0.5 * dx) / dx - i[dim2];
+						const auto tmp = ((p.x[dim2] - 0.5 * dx) + opts.max_bw * dx) / dx - opts.max_bw;
+						if (j.index()[dim2] != i[dim2]) {
+							w *= tmp - i[dim2];
 						} else {
-							w *= 1.0 - (p.x[dim2] - 0.5 * dx) / dx + i[dim2];
+							w *= 1.0 - tmp + i[dim2];
 						}
 					}
+					//		printf("%e %e\n", g[dim][j], w);
 					assert(w >= 0.0);
 					assert(w <= 1.0);
 					this_g[dim] += w * g[dim][j];
 				}
-			}
 
+			}
+//			printf("%e %e\n", this_g[0], this_g[1]);
 			p.v += this_g * (dt0[p.rung] * 0.5);
 			if (p.rung > this_level) {
 				if (this_level >= kick_level) {

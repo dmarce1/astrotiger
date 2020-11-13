@@ -19,6 +19,7 @@ double rand1() {
 hydro_grid::hydro_grid() {
 }
 
+
 void hydro_grid::to_array(multi_array<double> &a, const multi_range &bbox, int f, double w) const {
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		a[i] = w * U[f][i] + (1.0 - w) * U0[f][i];
@@ -95,14 +96,23 @@ double hydro_grid::compute_flux(int rk) {
 				F[dim][f][j] = (1.0 - opts.beta[rk]) * F[dim][f][j] + opts.beta[rk] * flux[f];
 			}
 		}
+	}
+	if (opts.gravity) {
 		for (multi_iterator j(box.pad(-opts.hbw)); !j.end(); j++) {
-			if (opts.gravity) {
+			vect<double> g;
+			double sdotg = 0.0;
+			for (int dim = 0; dim < NDIM; dim++) {
 				auto jp = j.index();
 				auto jm = j.index();
 				jp[dim]++;
 				jm[dim]--;
-				S[sx_i + dim][j] = (1.0 - opts.beta[rk]) * S[sx_i + dim][j] + opts.beta[rk] * 0.5 * U[rho_i][j] * (-phi[jp] + phi[jm]) / dx;
+				g[dim] = 0.5 * (-phi[jp] + phi[jm]) / dx;
+				sdotg += U[sx_i + dim][j] * g[dim];
 			}
+			for (int dim = 0; dim < NDIM; dim++) {
+				S[sx_i + dim][j] = (1.0 - opts.beta[rk]) * S[sx_i + dim][j] + opts.beta[rk] * U[rho_i][j] * g[dim];
+			}
+			S[egas_i][j] = (1.0 - opts.beta[rk]) * S[egas_i][j] + opts.beta[rk] * sdotg;
 		}
 	}
 	return amax;
@@ -380,7 +390,7 @@ void hydro_grid::initialize() {
 			}
 			U[egas_i][i] = ein + ek;
 			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
-		} else if (opts.problem == "polytrope" || opts.problem == "part_test") {
+		} else if (opts.problem == "polytrope" ) {
 			double r = 0.0;
 			for (int dim = 0; dim < NDIM; dim++) {
 				auto x = coord(i[dim]);
@@ -389,8 +399,9 @@ void hydro_grid::initialize() {
 			}
 			r = std::sqrt(r);
 			const auto n = 1.5;
-			const auto alpha = 0.005;
+			const auto alpha = 0.02;
 			const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
+			assert(theta <= 1.0);
 			auto &rho = U[rho_i][i];
 			rho = std::max(1.0e-10, std::pow(theta, n));
 			const auto vx = 0.0;
@@ -398,13 +409,13 @@ void hydro_grid::initialize() {
 			U[sx_i][i] = vx * rho;
 			U[sy_i][i] = vy * rho;
 			const auto K = 4.0 * M_PI * opts.G * alpha * alpha / (n + 1);
-			U[egas_i][i] = std::max(1.0e-20, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
+			U[egas_i][i] = std::max(1.0e-12, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 			U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
-//		} else if (opts.problem == "part_test") {
-//			U[rho_i][i] = 1.0;
-//			U[egas_i][i] = 1.0e-3;
-//			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
+		} else if (opts.problem == "part_test") {
+			U[rho_i][i] = 1.0e-10;
+			U[egas_i][i] = 1.0e-20;
+			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());
 			abort();
@@ -520,7 +531,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 		for (const auto &amr : amr_boxes) {
 			tmp.resize(0);
 			for (const auto &b : boxes) {
-				const auto amrbox = amr.pad(1);
+				const auto amrbox = amr.pad(2);
 				if (amrbox.intersection(b).volume()) {
 					auto tmp2 = b.subtract(amrbox);
 					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());

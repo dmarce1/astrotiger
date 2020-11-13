@@ -29,8 +29,8 @@ std::array<multi_array<double>,NDIM> gravity::get_acceleration(double w) const {
 			auto im = i.index();
 			ip[dim]++;
 			im[dim]--;
-			g[dim][i] = -w * (phi[ip] - phi[im]) / (0.5 * dx);
-			g[dim][i] -= (1.0 - w) * (phi0[ip] - phi0[im]) / (0.5 * dx);
+			g[dim][i] = -w * (phi[ip] - phi[im]) / (2.0 * dx);
+			g[dim][i] -= (1.0 - w) * (phi0[ip] - phi0[im]) / (2.0 * dx);
 		}
 	}
 	return g;

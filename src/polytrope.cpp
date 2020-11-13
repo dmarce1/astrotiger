@@ -18,24 +18,25 @@ double lane_emden(double r, double dr0, double n) {
 		double term1 = (r == 0.0 ? 0.0 : (NDIM - 1) * theta_dot / r);
 		return -(term1 + std::pow(theta, n));
 	};
-
+//	printf( "---\n");
 	for (int i = 0; i < N; i++) {
 		double r = i * dr;
 		const double k1 = dtheta_dr(theta, theta_dot, r);
 		const double l1 = dtheta_dot_dr(theta, theta_dot, r);
 		if (theta + k1 * dr < 0.0) {
 			theta = 0.0;
+//			printf( "break\n");
 			break;
 		}
 		const double k2 = dtheta_dr(theta + k1 * dr, theta_dot + l1 * dr, r + dr);
 		const double l2 = dtheta_dot_dr(theta + k1 * dr, theta_dot + l1 * dr, r + dr);
-		theta += 0.5 * (k1 + k1) * dr;
-		theta_dot += 0.5 * (l2 + l2) * dr;
+		theta += 0.5 * (k1 + k2) * dr;
+		theta_dot += 0.5 * (l1 + l2) * dr;
+//		printf("---%e %e %e\n", r, theta, theta_dot);
 		if (theta < 0.0) {
 			theta = 0.0;
 			break;
 		}
-//		printf("%e %e %e\n", r, theta, theta_dot);
 	}
 	return theta;
 
