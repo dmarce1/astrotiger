@@ -7,8 +7,8 @@
 
 #include <astrotiger/tree.hpp>
 
-hpx::future<multi_array<double>> tree_client::get_particle_source(double dt) const {
-	return hpx::async<tree::get_particle_source_action>(gid, dt);
+hpx::future<std::vector<double>> tree_client::compute_cic(const std::vector<double> &data, double t, int lev) const {
+	return hpx::async<tree::compute_cic_action>(gid, data, t, lev);
 }
 
 hpx::future<void> tree_client::kick(int rung, double t, const std::vector<double> &dt0, const std::vector<double> &dt1) const {
@@ -43,7 +43,6 @@ hpx::future<void> tree_client::finish_drift(std::vector<particle> &&parts) const
 hpx::future<gravity_return> tree_client::gravity_solve(int pass, int level, std::vector<double> &&coarse, double t, double m) const {
 	return hpx::async<tree::gravity_solve_action>(gid, pass, level, std::move(coarse), t, m);
 }
-
 
 hpx::future<statistics> tree_client::get_statistics(int level, double t) const {
 	return hpx::async<tree::get_statistics_action>(gid, level, t);

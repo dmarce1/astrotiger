@@ -16,6 +16,9 @@ void solve_gravity(int l, double t, double mtot) {
 	int pass = 0;
 	double r;
 	int oi = 101;
+	if (opts.particles) {
+		root.compute_cic(std::vector<double>(), t, l).get();
+	}
 	printf("Solving gravity on level %i %e\n", l, mtot);
 	bool kill = false;
 	do {

@@ -3,12 +3,57 @@
 #include <astrotiger/rand.hpp>
 #include <array>
 
-multi_array<double> particles::cloud_in_cell(double dt) const {
-	multi_array<double> src(box.pad(1));
-	multi_array<double> rho(box.pad(1));
+std::vector<double> particles::pack_cic_restrict() const {
+	std::vector<double> data;
+	const auto restrict_box = box.pad(2).half();
+	multi_array<double> rho_restrict = rho.restrict_(restrict_box);
+	for (multi_iterator i(restrict_box); !i.end(); i++) {
+		data.push_back(rho_restrict[i]);
+	}
+	return data;
+}
+
+multi_array<double> particles::get_cic() const {
+	return rho;
+}
+
+
+void particles::unpack_cic(const std::vector<double> &data, const multi_range &bbox) {
+	int k;
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		assert(k < data.size());
+		rho[i] += data[k];
+		k++;
+	}
+	assert(k == data.size());
+}
+
+std::vector<double> particles::pack_cic(const multi_range &bbox) const {
+	std::vector<double> data;
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		data.push_back(rho[i]);
+	}
+	return data;
+}
+
+void particles::unpack_cic_prolong(const std::vector<double> &data, const multi_range &bbox) {
+	int k;
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		assert(k < data.size());
+		for (multi_iterator j(multi_range(i).double_()); !j.end(); j++) {
+			rho[j] += data[k];
+		}
+		k++;
+	}
+	assert(k == data.size());
+}
+
+void particles::compute_cloud_in_cell(double dt) {
+	const auto rhobox = box.pad(2);
+	rho.resize(rhobox);
 	multi_array<double> drho_dt(box.pad(1));
 	const auto dvinv = std::pow(dx, -NDIM);
-	for (multi_iterator i(box.pad(1)); !i.end(); i++) {
+	for (multi_iterator i(rhobox); !i.end(); i++) {
 		rho[i] = 0.0;
 		drho_dt[i] = 0.0;
 	}
@@ -48,7 +93,6 @@ multi_array<double> particles::cloud_in_cell(double dt) const {
 	for (multi_iterator i(box.pad(1)); !i.end(); i++) {
 		rho[i] += dt * drho_dt[i];
 	}
-	return rho;
 }
 
 multi_array<int> particles::particle_count() const {
@@ -126,8 +170,8 @@ void particles::initialize() {
 			p.m = 1.0 / N;
 			p.rung = 0;
 			parts.push_back(p);
-	//		v2 += p.m * p.v.dot(p.v);
-	//		p1 += p.m * 1.0 / std::sqrt(a * a + r * r);
+			//		v2 += p.m * p.v.dot(p.v);
+			//		p1 += p.m * 1.0 / std::sqrt(a * a + r * r);
 		}
 	}
 	printf("v2 = %e p1 = %e\n", v2, p1);

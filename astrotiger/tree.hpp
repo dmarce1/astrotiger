@@ -179,7 +179,7 @@ public:
 	void get_hydro_boundaries(double);
 	void get_energy_boundaries(double);
 	void sanity() const;
-	statistics get_statistics(int lev, double t) const;
+	statistics get_statistics(int lev, double t);
 	std::vector<double> restrict_all();
 	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m);
 	double compute_error();
@@ -193,9 +193,10 @@ public:
 	hpx::future<void> send_child_particles();
 	double max_part_velocity() const;
 	void kick(int, double, std::vector<double>, std::vector<double>);
-	multi_array<double> get_particle_source(double) const;
+	std::vector<double> compute_cic(const std::vector<double>&, double t, int );
 
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particle_source);
+
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_cic);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,kick);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,max_part_velocity);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particle_count);

@@ -31,14 +31,20 @@ struct particle {
 
 class particles {
 	std::vector<particle> parts;
+	multi_array<double> rho;
 	multi_range box;
 	range<double> rbox;
 	std::vector<range<double>> child_boxes;
 	double dx;
 public:
 
+	multi_array<double> get_cic() const;
 	multi_array<int> particle_count() const;
-	multi_array<double> cloud_in_cell(double dt) const;
+	std::vector<double> pack_cic_restrict() const;
+	std::vector<double> pack_cic(const multi_range&) const;
+	void unpack_cic(const std::vector<double>&, const multi_range&);
+	void unpack_cic_prolong(const std::vector<double>&, const multi_range&);
+	void compute_cloud_in_cell(double dt);
 	std::vector<std::vector<double>> pack_output() const;
 	std::vector<std::vector<double>> pack_coords() const;
 	static std::vector<std::string> field_names();
@@ -51,7 +57,7 @@ public:
 	void resize(double dx, const multi_range&);
 	void set_child_boxes(const std::vector<multi_range>&);
 	std::vector<particle> get_child_parts();
-	void kick(int kick_level, int this_level, const std::vector<double>&, const std::vector<double>&, const std::array<multi_array<double>,NDIM> &g);
+	void kick(int kick_level, int this_level, const std::vector<double>&, const std::vector<double>&, const std::array<multi_array<double>, NDIM> &g);
 	template<class A>
 	void serialize(A &&arc, unsigned) {
 		arc & parts;

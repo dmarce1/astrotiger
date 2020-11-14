@@ -74,7 +74,7 @@ public:
 		gid = id_;
 		box = box_;
 	}
-	hpx::future<multi_array<double>> get_particle_source(double) const;
+	hpx::future<std::vector<double>> compute_cic(const std::vector<double>&, double t, int lev) const;
 	hpx::future<void> kick(int, double, const std::vector<double>&, const std::vector<double>&) const;
 	hpx::future<double> max_part_velocity() const;
 	hpx::future<multi_array<int>> get_particle_count() const;
