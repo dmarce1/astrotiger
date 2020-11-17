@@ -1,6 +1,7 @@
 #include <astrotiger/tree.hpp>
 #include <astrotiger/levels.hpp>
 #include <astrotiger/output.hpp>
+#include <astrotiger/cosmic.hpp>
 
 static tree_client root;
 
@@ -10,7 +11,7 @@ std::vector<double> last_dt;
 std::vector<double> tm;
 std::vector<int> super_step;
 
-void solve_gravity(int l, double t, double mtot) {
+double solve_gravity(int l, double t, double mtot) {
 
 	const double toler = 5.0e-4;
 	int pass = 0;
@@ -19,23 +20,25 @@ void solve_gravity(int l, double t, double mtot) {
 	if (opts.particles) {
 		root.compute_cic(std::vector<double>(), t, l).get();
 	}
-	printf("Solving gravity on level %i %e\n", l, mtot);
+//	printf("Solving gravity on level %i %e\n", l, mtot);
 	bool kill = false;
-	int iters = 4;
+	int iters = 1;
+	int n = 0;
 	double last_r;
 	r = 0.0;
 	do {
 		auto tmp = root.gravity_solve(pass, l, std::vector<double>(), t, mtot, iters).get();
 		last_r = r;
 		r = tmp.resid;
+//		printf("%3i %3i %e\n", pass, iters, r);
 		if (r > 0.5 * last_r && pass > 0) {
-			iters *= 2;
+			n++;
+			iters = std::pow(std::sqrt(2), n);
 		}
-	//	printf("%3i %3i %e\n", pass, iters, r);
 		if (pass > 500) {
 			std::string fname = "X." + std::to_string(oi++) + ".silo";
 			output_silo(fname);
-			printf("Gravity solver failed to converged\n");
+//			printf("Gravity solver failed to converged\n");
 			//		abort();
 			if (pass > 1000) {
 				kill = true;
@@ -51,10 +54,11 @@ void solve_gravity(int l, double t, double mtot) {
 	if (kill) {
 		abort();
 	}
+	return tmp.vmax;
 //	printf("%3i %3i %e\n", pass, iters, tmp.resid);
 }
 
-bool master(int level, int coarse_level, double tmax) {
+bool master(int level, int coarse_level, double tmax, bool already_refined = false) {
 	if (level > opts.max_level) {
 		levels_apply_coarse_correction(level - 1);
 		return false;
@@ -67,54 +71,48 @@ bool master(int level, int coarse_level, double tmax) {
 		stats = root.get_statistics(opts.max_level, tm[level]).get();
 	}
 	const int max_refined = stats.min_level;
+	int this_step = 0;
 	do {
-//		if (level > 0 && nstep == -1) {
-//			levels_set_child_families(level - 1);
-//		}
-		bool refine = (nstep == -1);
-		if (refine) {
-//			printf("Refining on level %i\n", level);
-		}
+		const auto a = cosmos_a();
+		bool refine = ((nstep == -1) && !already_refined) || (this_step % 2 == 0 && this_step > 0);
 		if (nstep != -1) {
 			coarse_level = level;
 		}
-//		printf("%i\n", coarse_level);
-//		std::string fname = "X." + std::to_string(oi++) + ".silo";
-//		output_silo(fname);
-
-//		printf("Hydro pre-step\n");
 		last_dt[level] = dt[level];
-		for (int l = level; l < opts.max_level; l++) {
-			levels_hydro_initialize(l, refine);
-			if (refine) {
+		if (refine) {
+			for (int l = level; l < opts.max_level; l++) {
+				printf("Refining level %i\n", l);
+				levels_hydro_initialize(l, refine);
+				levels_show();
 				levels_set_child_families(l);
 				levels_get_hydro_boundaries(l + 1, tm[l + 1]);
 			}
 		}
-		if (refine) {
-			levels_show();
-		}
-		dt[level] = levels_fine_fluxes(level);
-		if (dt[level] == 0.0) {
+		double amax;
+		amax = levels_fine_fluxes(level);
+		if (amax == 0.0) {
 			tm[level] = tm[level - 1];
 			master(level + 1, coarse_level, tm[level]);
 			levels_apply_coarse_correction(level - 1);
 			return false;
 		}
 //		levels_show();
-		dt[level] = opts.cfl * dx[level] / dt[level];
-		nstep = std::ceil((tmax - tm[level]) / dt[level]);
-		dt[level] = (tmax - tm[level]) / nstep;
-		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		if (opts.self_gravity) {
 			auto tmp = root.get_statistics(std::min(level, max_refined), tm[level]).get();
 			assert(tmp.u.size());
 			const auto mtot = tmp.u[rho_i];
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
-			solve_gravity(level, tm[level], mtot);
+			const auto gmax = solve_gravity(level, tm[level], mtot);
+			amax = std::max(amax, gmax);
 		}
+		dt[level] = opts.cfl * a * dx[level] / amax;
+		nstep = std::ceil((tmax - tm[level]) / dt[level]);
+		dt[level] = (tmax - tm[level]) / nstep;
+		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
 		if (level == opts.max_level) {
-			root.kick(coarse_level, tm[level], last_dt, dt).get();
+			if (opts.particles()) {
+				root.kick(coarse_level, tm[level], last_dt, dt).get();
+			}
 		}
 		levels_hydro_substep(level, 0, dt[level], false);
 		if (opts.self_gravity) {
@@ -124,13 +122,14 @@ bool master(int level, int coarse_level, double tmax) {
 		}
 		levels_hydro_substep(level, 1, dt[level], nstep == 1.0);
 		tm[level] += dt[level];
-		const bool has_next_level = master(level + 1, coarse_level, tm[level]);
+		const bool has_next_level = master(level + 1, coarse_level, tm[level], refine);
 		///	printf( "-\n");
 		if (opts.particles && !has_next_level) {
 			//		printf( "%i\n", coarse_level);
 			root.drift(dt[level]).get();
 			root.finish_drift(std::vector<particle>()).get();
 		}
+		this_step++;
 	} while (nstep != 1.0);
 	if (level > 0) {
 		levels_apply_coarse_correction(level - 1);

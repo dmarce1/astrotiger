@@ -17,6 +17,7 @@ struct gravity_return {
 	std::vector<std::uint8_t> active;
 	std::vector<double> R;
 	multi_range box;
+	double vmax;
 	template<class A>
 	void serialize(A &&arc, unsigned) {
 		arc & resid;
@@ -67,7 +68,7 @@ public:
 	void store();
 	void initialize_fine(const multi_array<double>&, double mtot, int level);
 	void initialize_coarse(double w);
-	void finish_fine();
+	double finish_fine();
 	void set_amr_zones(const std::vector<multi_range>&, const std::vector<double>&);
 	void zero() {
 		for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {

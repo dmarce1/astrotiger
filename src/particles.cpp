@@ -1,6 +1,7 @@
 #include <astrotiger/options.hpp>
 #include <astrotiger/particles.hpp>
 #include <astrotiger/rand.hpp>
+#include <astrotiger/astrotiger.hpp>
 #include <array>
 
 std::vector<double> particles::pack_cic_restrict() const {
@@ -13,9 +14,8 @@ std::vector<double> particles::pack_cic_restrict() const {
 	return data;
 }
 
-
-void particles::zero_cic(const multi_range&  bbox) {
-	for( multi_iterator i(bbox); !i.end(); i++) {
+void particles::zero_cic(const multi_range &bbox) {
+	for (multi_iterator i(bbox); !i.end(); i++) {
 		rho[i] = 0.0;
 	}
 }
@@ -57,10 +57,11 @@ void particles::unpack_cic_prolong(const std::vector<double> &data, const multi_
 
 void particles::compute_cloud_in_cell(double dt) {
 //	printf( "%i %s\n", parts.size(), box.to_string().c_str());
+	const auto a = cosmos_a();
 	const auto rhobox = box.pad(2);
 	rho.resize(rhobox);
 	multi_array<double> drho_dt(box.pad(2));
-	const auto dvinv = std::pow(dx, -NDIM);
+	const auto dvinv = std::pow(dx * a, -NDIM);
 	for (multi_iterator i(rhobox); !i.end(); i++) {
 		rho[i] = 0.0;
 		drho_dt[i] = 0.0;
@@ -91,7 +92,7 @@ void particles::compute_cloud_in_cell(double dt) {
 					sgn = +1.0;
 				}
 			}
-			assert( rbox.contains(p.x));
+			assert(rbox.contains(p.x));
 			if (rhobox.contains(j)) {
 				double sgn;
 				for (int dim = 0; dim < NDIM; dim++) {
@@ -100,7 +101,7 @@ void particles::compute_cloud_in_cell(double dt) {
 					} else {
 						sgn = +1.0;
 					}
-					drho_dt[j] += p.m * dvinv * sgn * p.v[dim] / dx;
+					drho_dt[j] += p.m * dvinv * sgn * p.v[dim] / (a*dx);
 				}
 				assert(wt >= 0.0);
 				assert(wt <= 1.0);
@@ -206,6 +207,8 @@ void particles::initialize() {
 
 void particles::kick(int kick_level, int this_level, const std::vector<double> &dt0, const std::vector<double> &dt1,
 		const std::array<multi_array<double>, NDIM> &g) {
+	const auto a = cosmos_a();
+	const auto adot = cosmos_adot();
 	for (auto &p : parts) {
 		if (p.rung >= kick_level) {
 			multi_index i;
@@ -237,7 +240,7 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 
 			}
 //			printf("%e %e\n", this_g[0], this_g[1]);
-			p.v += this_g * (dt0[p.rung] * 0.5);
+			p.v += (this_g - p.v * adot / a) * (dt0[p.rung] * 0.5);
 			if (p.rung > this_level) {
 				if (this_level >= kick_level) {
 					p.rung = this_level;
@@ -245,7 +248,7 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 			} else if (p.rung < this_level) {
 				p.rung = this_level;
 			}
-			p.v += this_g * (dt1[p.rung] * 0.5);
+			p.v += (this_g - p.v * adot / a) * (dt1[p.rung] * 0.5);
 		}
 	}
 }
@@ -332,12 +335,13 @@ std::vector<particle> particles::get_particles(const multi_range &bbox) {
 }
 
 std::vector<particle> particles::drift(double dt) {
+	const auto a = cosmos_a();
 	std::vector<particle> escaped;
 	int i = 0;
 	while (i < parts.size()) {
 		auto &part = parts[i];
 		for (int dim = 0; dim < NDIM; dim++) {
-			part.x[dim] += part.v[dim] * dt;
+			part.x[dim] += part.v[dim] * dt / a;
 		}
 		bool leave_box = !rbox.contains(part.x);
 		if (!leave_box) {

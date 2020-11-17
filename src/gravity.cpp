@@ -2,6 +2,7 @@
 #include <astrotiger/options.hpp>
 #include <astrotiger/boxes.hpp>
 #include <astrotiger/hpx.hpp>
+#include <astrotiger/cosmos.cpp>
 
 #include <thread>
 
@@ -19,8 +20,8 @@ void gravity::resize(double dx_, const multi_range &box_) {
 
 }
 
-std::array<multi_array<double>,NDIM> gravity::get_acceleration(double w) const {
-	std::array<multi_array<double>,NDIM> g;
+std::array<multi_array<double>, NDIM> gravity::get_acceleration(double w) const {
+	std::array<multi_array<double>, NDIM> g;
 	const auto bbox = box.pad(-opts.gbw + 1);
 	for (int dim = 0; dim < NDIM; dim++) {
 		g[dim].resize(bbox);
@@ -275,9 +276,23 @@ multi_array<double> gravity::get_phi() const {
 	return rphi;
 }
 
-void gravity::finish_fine() {
+double gravity::finish_fine() {
+	double gmax = 0.0;
 	phi0 = phi;
 	phi = X;
+	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
+		double g2 = 0.0;
+		for (int dim = 0; dim < NDIM; dim++) {
+			auto jp = i.index();
+			auto jm = i.index();
+			jm[dim]--;
+			jp[dim]++;
+			const auto g = 0.5 * (phi[jp] - phi[jm]) / (a * dx);
+			g2 += g * g;
+		}
+		gmax = std::max(gmax, std::sqrt(g2));
+	}
+	return std::sqrt(gmax * a * dx);
 }
 
 void gravity::relax() {
@@ -297,7 +312,7 @@ void gravity::relax() {
 			for (int dim = 0; dim < NDIM; dim++) {
 				r += c0 * (x[i + s[dim]] + x[i - s[dim]]);
 			}
-			x[i] += 1.5 * r;
+			x[i] += 1.75 * r;
 		}
 	}
 	for (const auto i : blacki) {
@@ -306,7 +321,7 @@ void gravity::relax() {
 			for (int dim = 0; dim < NDIM; dim++) {
 				r += c0 * (x[i + s[dim]] + x[i - s[dim]]);
 			}
-			x[i] += 1.5 * r;
+			x[i] += 1.75 * r;
 		}
 	}
 }

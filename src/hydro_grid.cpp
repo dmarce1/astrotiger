@@ -49,6 +49,9 @@ double hydro_grid::positivity_limit() const {
 
 double hydro_grid::compute_flux(int rk) {
 	double amax = 0.0;
+	const double a = cosmos_a();
+	const double adot = cosmos_adot();
+	const double H = adot / a;
 	std::vector<multi_array<double>> VR(opts.nhydro);
 	std::vector<multi_array<double>> VL(opts.nhydro);
 	const auto urlbox = box.pad(2 - opts.hbw);
@@ -128,13 +131,21 @@ double hydro_grid::compute_flux(int rk) {
 				auto jm = j.index();
 				jp[dim]++;
 				jm[dim]--;
-				g[dim] = 0.5 * (-phi[jp] + phi[jm]) / dx;
+				g[dim] = 0.5 * (-phi[jp] + phi[jm]) / dx / a;
 				sdotg += U[sx_i + dim][j] * g[dim];
 			}
+			std::vector<double> this_s(opts.nhydro, 0.0);
 			for (int dim = 0; dim < NDIM; dim++) {
-				S[sx_i + dim][j] = (1.0 - opts.beta[rk]) * S[sx_i + dim][j] + opts.beta[rk] * U[rho_i][j] * g[dim];
+				this_s[sx_i + dim] -= U[rho_i] * g[dim];
+				this_s[sx_i + dim] -= (NDIM + 1) * H * S[sx_i + dim][i];
 			}
-			S[egas_i][j] = (1.0 - opts.beta[rk]) * S[egas_i][j] + opts.beta[rk] * sdotg;
+			this_s[rho_i] -= NDIM * H * U[rho_i][i];
+			this_s[egas_i] -= sdotg;
+			this_s[egas_i] -= H * (NDIM * U[egas_i][i] + U[sx_i][i] * U[sx_i][i] / U[rho_i][i]);
+			this_s[tau_i] -= NDIM * H / opts.gamma * U[tau_i];
+			for (int f = 0; f < opts.nhydro; f++) {
+				S[f][j] = (1.0 - opts.beta[rk]) * S[f][j] + opts.beta[rk] * this_s[f];
+			}
 		}
 	}
 	return amax;
@@ -142,7 +153,7 @@ double hydro_grid::compute_flux(int rk) {
 
 void hydro_grid::substep_update(int rk, double dt) {
 	const double onembeta = 1.0 - opts.beta[rk];
-	const double lambda = dt / dx;
+	const double lambda = dt / dx / a;
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		for (int f = 0; f < opts.nhydro; f++) {
 			auto &u = U[f][i];
@@ -436,7 +447,7 @@ void hydro_grid::initialize() {
 			const auto vy = 0.00;
 			U[sx_i][i] = vx * rho;
 			U[sy_i][i] = vy * rho;
-			const auto K = 4.0 * M_PI * opts.G * alpha * alpha / (n + 1);
+			const auto K = 4.0 * M_PI * alpha * alpha / (n + 1);
 			U[egas_i][i] = std::max(1.0e-12, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 			U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
@@ -876,14 +887,15 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 
 void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const multi_range &bbox, double dt) {
 	int k = 0;
-	const auto lambda = dt / dx;
+	const auto a = cosmos_a();
+	const auto lambda = dt / (a*dx);
 	for (int dim = 0; dim < NDIM; dim++) {
 		auto this_box = bbox;
 		this_box.max[dim]++;
 		for (int f = 0; f < opts.nhydro; f++) {
 			for (multi_iterator i(this_box); !i.end(); i++) {
 				assert(k < data.size());
-				const auto flux = data[k] / dx - lambda * F0[dim][f][i];
+				const auto flux = data[k] / (a*dx) - lambda * F0[dim][f][i];
 
 				auto im = i.index();
 				im[dim]--;
@@ -970,7 +982,7 @@ statistics hydro_grid::get_statistics(const std::vector<multi_range> &child_rang
 		}
 		if (!refined) {
 			for (int f = 0; f < opts.nhydro; f++) {
-				stats.u[f] += std::pow(dx, NDIM) * U[f][i];
+				stats.u[f] += std::pow(a * dx, NDIM) * U[f][i];
 			}
 		}
 	}
