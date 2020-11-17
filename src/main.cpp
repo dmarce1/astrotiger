@@ -21,10 +21,17 @@ void solve_gravity(int l, double t, double mtot) {
 	}
 	printf("Solving gravity on level %i %e\n", l, mtot);
 	bool kill = false;
+	int iters = 4;
+	double last_r;
+	r = 0.0;
 	do {
-		auto tmp = root.gravity_solve(pass, l, std::vector<double>(), t, mtot).get();
+		auto tmp = root.gravity_solve(pass, l, std::vector<double>(), t, mtot, iters).get();
+		last_r = r;
 		r = tmp.resid;
-		printf("%i %e\n", pass, r);
+		if (r > 0.5 * last_r && pass > 0) {
+			iters *= 2;
+		}
+	//	printf("%3i %3i %e\n", pass, iters, r);
 		if (pass > 500) {
 			std::string fname = "X." + std::to_string(oi++) + ".silo";
 			output_silo(fname);
@@ -37,18 +44,19 @@ void solve_gravity(int l, double t, double mtot) {
 		}
 		pass++;
 	} while (r > toler);
-	auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), t, mtot).get();
+	auto tmp = root.gravity_solve(GRAVITY_FINAL_PASS, l, std::vector<double>(), t, mtot, iters).get();
 	std::string fname = "X." + std::to_string(oi++) + ".silo";
 //	output_silo(fname);
 	r = tmp.resid / mtot;
 	if (kill) {
 		abort();
 	}
-	//printf("%i %e\n", pass, tmp.resid);
+//	printf("%3i %3i %e\n", pass, iters, tmp.resid);
 }
 
 bool master(int level, int coarse_level, double tmax) {
 	if (level > opts.max_level) {
+		levels_apply_coarse_correction(level - 1);
 		return false;
 	}
 	int oi = 0;
@@ -76,19 +84,21 @@ bool master(int level, int coarse_level, double tmax) {
 
 //		printf("Hydro pre-step\n");
 		last_dt[level] = dt[level];
-		dt[level] = levels_hydro_initialize(level, refine);
+		for (int l = level; l < opts.max_level; l++) {
+			levels_hydro_initialize(l, refine);
+			if (refine) {
+				levels_set_child_families(l);
+				levels_get_hydro_boundaries(l + 1, tm[l + 1]);
+			}
+		}
 		if (refine) {
 			levels_show();
 		}
-		if (refine) {
-			for (int l = level; l <= opts.max_level; l++) {
-				levels_set_child_families(l);
-			}
-		}
-		dt[level] = std::max(dt[level], levels_fine_fluxes(level));
+		dt[level] = levels_fine_fluxes(level);
 		if (dt[level] == 0.0) {
 			tm[level] = tm[level - 1];
 			master(level + 1, coarse_level, tm[level]);
+			levels_apply_coarse_correction(level - 1);
 			return false;
 		}
 //		levels_show();
@@ -122,7 +132,9 @@ bool master(int level, int coarse_level, double tmax) {
 			root.finish_drift(std::vector<particle>()).get();
 		}
 	} while (nstep != 1.0);
-	levels_apply_coarse_correction(level);
+	if (level > 0) {
+		levels_apply_coarse_correction(level - 1);
+	}
 	super_step[level]++;
 	return true;
 }

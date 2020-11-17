@@ -556,20 +556,20 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 	}
 	if (range.volume()) {
 		boxes.push_back(range);
-		for (const auto &amr : amr_boxes) {
-			tmp.resize(0);
-			for (const auto &b : boxes) {
-				const auto amrbox = amr.pad(2);
-				if (amrbox.intersection(b).volume()) {
-					auto tmp2 = b.subtract(amrbox);
-					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
-				} else {
-					tmp.push_back(b);
-				}
-			}
-			boxes = std::move(tmp);
-		}
-		tmp.resize(0);
+//		for (const auto &amr : amr_boxes) {
+//			tmp.resize(0);
+//			for (const auto &b : boxes) {
+//				const auto amrbox = amr.pad(0);
+//				if (amrbox.intersection(b).volume()) {
+//					auto tmp2 = b.subtract(amrbox);
+//					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
+//				} else {
+//					tmp.push_back(b);
+//				}
+//			}
+//			boxes = std::move(tmp);
+//		}
+//		tmp.resize(0);
 		for (const auto &b : boxes) {
 			bool found = false;
 			for (multi_iterator i(b); !i.end(); i++) {

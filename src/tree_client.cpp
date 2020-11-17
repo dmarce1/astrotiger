@@ -40,8 +40,8 @@ hpx::future<void> tree_client::finish_drift(std::vector<particle> &&parts) const
 	return hpx::async<tree::finish_drift_action>(gid, std::move(parts));
 }
 
-hpx::future<gravity_return> tree_client::gravity_solve(int pass, int level, std::vector<double> &&coarse, double t, double m) const {
-	return hpx::async<tree::gravity_solve_action>(gid, pass, level, std::move(coarse), t, m);
+hpx::future<gravity_return> tree_client::gravity_solve(int pass, int level, std::vector<double> &&coarse, double t, double m, int iters) const {
+	return hpx::async<tree::gravity_solve_action>(gid, pass, level, std::move(coarse), t, m, iters);
 }
 
 hpx::future<statistics> tree_client::get_statistics(int level, double t) const {

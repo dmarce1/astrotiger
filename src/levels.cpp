@@ -6,6 +6,7 @@
 
 #include <unordered_set>
 
+HPX_PLAIN_ACTION (levels_get_hydro_boundaries);
 HPX_PLAIN_ACTION (levels_set_child_families);
 HPX_PLAIN_ACTION (levels_hydro_initialize);
 HPX_PLAIN_ACTION (levels_hydro_substep);
@@ -40,6 +41,21 @@ void levels_remove_entry(int level, tree *ptr) {
 	assert(levels[level].find(ptr) != levels[level].end());
 	levels[level].erase(ptr);
 }
+
+void levels_get_hydro_boundaries(int level, double t) {
+	auto these_levels = levels;
+	std::vector<hpx::future<void>> futs;
+	if (hpx::get_locality_id() == 0 && other_localities.size()) {
+		futs.push_back(hpx::lcos::broadcast < levels_get_hydro_boundaries_action > (other_localities, level, t));
+	}
+	for (auto *ptr : these_levels[level]) {
+		futs.push_back(hpx::async([ptr,t]() {
+			ptr->get_hydro_boundaries(t);
+		}));
+	}
+	hpx::wait_all(futs.begin(), futs.end());
+}
+
 
 void levels_set_child_families(int level) {
 	auto these_levels = levels;
@@ -88,10 +104,10 @@ void levels_show() {
 	}
 }
 
-double levels_hydro_initialize(int level, bool refine) {
+void levels_hydro_initialize(int level, bool refine) {
 	auto these_levels = levels;
-	std::vector<hpx::future<double>> futs;
-	hpx::future<std::vector<double>> fut;
+	std::vector<hpx::future<void>> futs;
+	hpx::future<void> fut;
 	if (hpx::get_locality_id() == 0 && other_localities.size()) {
 		fut = hpx::lcos::broadcast < levels_hydro_initialize_action > (other_localities, level, refine);
 	}
@@ -100,17 +116,12 @@ double levels_hydro_initialize(int level, bool refine) {
 			return ptr->hydro_initialize(refine);
 		}));
 	}
-	double a = 0.0;
 	for (int i = 0; i < futs.size(); i++) {
-		a = std::max(a, futs[i].get());
+		futs[i].get();
 	}
 	if (fut.valid()) {
-		auto others = fut.get();
-		for (int i = 0; i < others.size(); i++) {
-			a = std::max(a, others[i]);
-		}
+		fut.get();
 	}
-	return a;
 }
 
 double levels_fine_fluxes(int level) {

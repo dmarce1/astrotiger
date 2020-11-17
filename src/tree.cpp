@@ -361,7 +361,7 @@ statistics tree::get_statistics(int lev, double t) {
 
 std::atomic<int> counter(0);
 
-gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse_from_parent, double this_t, double mtot) {
+gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<double> coarse_from_parent, double this_t, double mtot, int iters) {
 	gravity_step = 0;
 	if (level == fine_level) {
 		if (pass == 0) {
@@ -395,7 +395,6 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			grav.apply_prolong(coarse_from_parent);
 		}
 	}
-	const auto iters = opts.nmulti;
 	if (pass > 0 || level == fine_level) {
 		for (int i = 0; i < iters; i++) {
 			get_gravity_boundaries(PACK_POTENTIAL_REDBLACK);
@@ -419,9 +418,9 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			const auto &c = children[i];
 			if (pass == 0) {
 				const auto this_box = c.get_box().half().pad(opts.gbw);
-				futs.push_back(c.gravity_solve(pass, fine_level, grav.pack(this_box, w), this_t, mtot));
+				futs.push_back(c.gravity_solve(pass, fine_level, grav.pack(this_box, w), this_t, mtot, iters));
 			} else {
-				futs.push_back(c.gravity_solve(pass, fine_level, grav.get_prolong(c.get_box().half()), this_t, mtot));
+				futs.push_back(c.gravity_solve(pass, fine_level, grav.get_prolong(c.get_box().half()), this_t, mtot, iters));
 			}
 		}
 		for (auto &f : futs) {
@@ -482,7 +481,7 @@ void tree::set_boundary(std::vector<double> &&data, const multi_range &bbox, int
 }
 
 std::vector<double> tree::get_energy_boundary(multi_range b, int this_step) {
-	while (energy_step % (opts.nrk + 1) != this_step % (opts.nrk + 1)) {
+	while (energy_step % 3 != this_step % 3) {
 		hpx::this_thread::yield();
 	}
 	return hydro.pack_field(tau_i, b);
@@ -623,21 +622,16 @@ std::vector<double> tree::restrict_all() {
 		const auto cbox = children[i].get_box().half();
 		hydro.unpack(tmp, cbox);
 	}
-	hydro_step = 0;
 	get_hydro_boundaries(t);
 	return hydro.pack_restrict(box.half());
 }
 
 std::vector<double> tree::get_fine_flux() {
-	hydro_step = 0;
 	get_hydro_boundaries(t);
 	return hydro.pack_coarse_flux();
 }
 
 void tree::apply_coarse_correction() {
-	hydro_step = 0;
-	energy_step = 0;
-	energy_step++;
 	std::vector<hpx::future<std::pair<std::vector<double>, std::vector<double>>>> futs;
 	for (int i = 0; i < children.size(); i++) {
 		futs.push_back(children[i].get_hydro_restrict());
@@ -658,13 +652,15 @@ void tree::apply_coarse_correction() {
 		hydro.unpack(u[i].first, cbox);
 	}
 	get_hydro_boundaries(t);
+	energy_step = 0;
+	hydro_step = 0;
 }
 
-double tree::hydro_initialize(bool refine) {
+void tree::hydro_initialize(bool refine) {
 	std::vector<multi_range> force_refine_boxes;
 	hpx::future<multi_array<int>> pfut;
 	hydro.store();
-	if (refine && level < opts.max_level) {
+	if (level < opts.max_level && refine) {
 		if (opts.particles) {
 			pfut = hpx::async([this]() {
 				return this->get_particle_count();
@@ -792,21 +788,16 @@ double tree::hydro_initialize(bool refine) {
 		}
 		hpx::wait_all(void_futs.begin(), void_futs.end());
 	}
-	auto amax = hydro.compute_flux(0);
-	if (opts.particles) {
-		amax = std::max(amax, max_part_velocity());
-	}
-	return amax;
 }
 
 double tree::apply_fine_fluxes() {
-	hydro_step = 0;
 	get_hydro_boundaries(t);
 	double amax = 0.0;
 	std::vector<hpx::future<std::vector<double>>> cfuts;
 	for (const auto &c : children) {
 		cfuts.push_back(c.get_fine_flux());
 	}
+	amax = hydro.compute_flux(0);
 	for (int i = 0; i < children.size(); i++) {
 		amax = std::max(amax, hydro.unpack_fine_flux(cfuts[i].get(), children[i].get_box().half()));
 	}
@@ -1161,6 +1152,7 @@ std::vector<tree_client> tree::get_children() const {
 void tree::hydro_substep(int rk, double this_dt, bool last) {
 	dt = this_dt;
 	if (rk == 0) {
+		hydro.store();
 		refine_step = 1;
 		energy_step = 0;
 	}
@@ -1178,7 +1170,9 @@ void tree::hydro_substep(int rk, double this_dt, bool last) {
 	const double next_t = ((rk != opts.nrk - 1) ? (t + opts.alpha[rk + 1] * this_dt) : t);
 	get_hydro_boundaries(next_t);
 	hydro.store_flux();
-	hydro.compute_flux(rk == opts.nrk - 1 ? 0 : rk + 1);
+	if (rk == opts.nrk - 1) {
+		hydro.compute_flux(rk == opts.nrk - 1 ? 0 : rk + 1);
+	}
 }
 
 double tree::initialize(int this_level) {
