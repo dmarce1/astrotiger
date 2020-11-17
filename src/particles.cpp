@@ -13,15 +13,22 @@ std::vector<double> particles::pack_cic_restrict() const {
 	return data;
 }
 
+
+void particles::zero_cic(const multi_range&  bbox) {
+	for( multi_iterator i(bbox); !i.end(); i++) {
+		rho[i] = 0.0;
+	}
+}
+
 multi_array<double> particles::get_cic() const {
 	return rho;
 }
 
-
 void particles::unpack_cic(const std::vector<double> &data, const multi_range &bbox) {
-	int k;
+	int k = 0;
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		assert(k < data.size());
+//		assert( data[k] >= 0.0);
 		rho[i] += data[k];
 		k++;
 	}
@@ -49,9 +56,10 @@ void particles::unpack_cic_prolong(const std::vector<double> &data, const multi_
 }
 
 void particles::compute_cloud_in_cell(double dt) {
+//	printf( "%i %s\n", parts.size(), box.to_string().c_str());
 	const auto rhobox = box.pad(2);
 	rho.resize(rhobox);
-	multi_array<double> drho_dt(box.pad(1));
+	multi_array<double> drho_dt(box.pad(2));
 	const auto dvinv = std::pow(dx, -NDIM);
 	for (multi_iterator i(rhobox); !i.end(); i++) {
 		rho[i] = 0.0;
@@ -70,16 +78,26 @@ void particles::compute_cloud_in_cell(double dt) {
 		for (int dim = 0; dim < NDIM; dim++) {
 			this_box.max[dim]++;
 		}
+		double wt_sum = 0.0;
 		for (multi_iterator j(this_box); !j.end(); j++) {
-			if (box.contains(j)) {
-				double wt = 1.0;
+			double wt = 1.0;
+			double sgn;
+			for (int dim = 0; dim < NDIM; dim++) {
+				if (j[dim] == i[dim]) {
+					wt *= q[dim];
+					sgn = -1.0;
+				} else {
+					wt *= 1.0 - q[dim];
+					sgn = +1.0;
+				}
+			}
+			assert( rbox.contains(p.x));
+			if (rhobox.contains(j)) {
 				double sgn;
 				for (int dim = 0; dim < NDIM; dim++) {
 					if (j[dim] == i[dim]) {
-						wt *= q[dim];
 						sgn = -1.0;
 					} else {
-						wt *= 1.0 - q[dim];
 						sgn = +1.0;
 					}
 					drho_dt[j] += p.m * dvinv * sgn * p.v[dim] / dx;
@@ -88,10 +106,19 @@ void particles::compute_cloud_in_cell(double dt) {
 				assert(wt <= 1.0);
 				rho[j] += p.m * dvinv * wt;
 			}
+			wt_sum += wt;
+		}
+		if (std::abs(1.0 - wt_sum) > 1.0e-14) {
+			printf("%e\n", wt_sum - 1.0);
+			abort();
 		}
 	}
+
 	for (multi_iterator i(box.pad(1)); !i.end(); i++) {
 		rho[i] += dt * drho_dt[i];
+//		if( rho[i] < 0.0 ) {
+//			printf( "!! %e %e %e\n", dt, rho[i], dt * drho_dt[i]);
+//		}
 	}
 }
 
@@ -141,7 +168,7 @@ void particles::set_child_boxes(const std::vector<multi_range> &boxes) {
 }
 
 void particles::initialize() {
-	constexpr int N = 10000;
+	constexpr int N = 100000;
 	constexpr double a = 0.1;
 	constexpr double c0 = 3.0 * 1.0 / (4.0 * M_PI * a * a * a);
 	double v2 = 0.0;

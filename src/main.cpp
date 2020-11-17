@@ -106,13 +106,13 @@ bool master(int level, int coarse_level, double tmax) {
 		if (level == opts.max_level) {
 			root.kick(coarse_level, tm[level], last_dt, dt).get();
 		}
-		levels_hydro_substep(level, 0, dt[level]);
+		levels_hydro_substep(level, 0, dt[level], false);
 		if (opts.self_gravity) {
 			const auto mtot = root.get_statistics(std::min(level, max_refined), tm[level] + dt[level]).get().u[rho_i];
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			solve_gravity(level, tm[level] + dt[level], mtot);
 		}
-		levels_hydro_substep(level, 1, dt[level]);
+		levels_hydro_substep(level, 1, dt[level], nstep == 1.0);
 		tm[level] += dt[level];
 		const bool has_next_level = master(level + 1, coarse_level, tm[level]);
 		///	printf( "-\n");
@@ -122,6 +122,7 @@ bool master(int level, int coarse_level, double tmax) {
 			root.finish_drift(std::vector<particle>()).get();
 		}
 	} while (nstep != 1.0);
+	levels_apply_coarse_correction(level);
 	super_step[level]++;
 	return true;
 }

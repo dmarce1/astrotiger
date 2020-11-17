@@ -11,9 +11,11 @@ void levels_remove_entry(int level, tree*);
 
 void levels_set_child_families(int level);
 double levels_hydro_initialize(int, bool);
-void levels_hydro_substep(int,int rk, double dt);
+void levels_hydro_substep(int,int rk, double dt, bool);
+void levels_apply_fine_fluxes(int);
 void levels_output_silo(const std::string filename);
 void levels_show();
+void levels_apply_coarse_correction(int);
 double levels_fine_fluxes(int);
 
 

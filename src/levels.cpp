@@ -11,10 +11,12 @@ HPX_PLAIN_ACTION (levels_hydro_initialize);
 HPX_PLAIN_ACTION (levels_hydro_substep);
 HPX_PLAIN_ACTION (levels_output_silo);
 HPX_PLAIN_ACTION (levels_fine_fluxes);
+HPX_PLAIN_ACTION (levels_apply_coarse_correction);
 
 static std::vector<std::unordered_set<tree*>> levels;
 static mutex_type mtx;
 static std::vector<hpx::id_type> other_localities;
+
 
 void levels_init() {
 	levels.resize(opts.max_level + 1);
@@ -52,16 +54,29 @@ void levels_set_child_families(int level) {
 	}
 	hpx::wait_all(futs.begin(), futs.end());
 }
-
-void levels_hydro_substep(int level, int rk, double dt) {
+void levels_apply_coarse_correction(int level) {
 	auto these_levels = levels;
 	std::vector<hpx::future<void>> futs;
 	if (hpx::get_locality_id() == 0 && other_localities.size()) {
-		futs.push_back(hpx::lcos::broadcast < levels_hydro_substep_action > (other_localities, level, rk, dt));
+		futs.push_back(hpx::lcos::broadcast < levels_apply_coarse_correction_action > (other_localities, level));
 	}
 	for (auto *ptr : these_levels[level]) {
-		futs.push_back(hpx::async([ptr, rk, dt]() {
-			ptr->hydro_substep(rk, dt);
+		futs.push_back(hpx::async([ptr]() {
+			ptr->apply_coarse_correction();
+		}));
+	}
+	hpx::wait_all(futs.begin(), futs.end());
+}
+
+void levels_hydro_substep(int level, int rk, double dt, bool last) {
+	auto these_levels = levels;
+	std::vector<hpx::future<void>> futs;
+	if (hpx::get_locality_id() == 0 && other_localities.size()) {
+		futs.push_back(hpx::lcos::broadcast < levels_hydro_substep_action > (other_localities, level, rk, dt, last));
+	}
+	for (auto *ptr : these_levels[level]) {
+		futs.push_back(hpx::async([ptr, rk, dt, last]() {
+			ptr->hydro_substep(rk, dt, last);
 		}));
 	}
 	hpx::wait_all(futs.begin(), futs.end());

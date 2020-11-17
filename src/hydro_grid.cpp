@@ -16,7 +16,6 @@
 hydro_grid::hydro_grid() {
 }
 
-
 void hydro_grid::to_array(multi_array<double> &a, const multi_range &bbox, int f, double w) const {
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		a[i] = w * U[f][i] + (1.0 - w) * U0[f][i];
@@ -25,6 +24,27 @@ void hydro_grid::to_array(multi_array<double> &a, const multi_range &bbox, int f
 
 void hydro_grid::store() {
 	U0 = U;
+}
+
+void hydro_grid::store_flux() {
+	F0 = F;
+}
+
+double hydro_grid::positivity_limit() const {
+	double amax = 0.0;
+	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+		double df_rho = 0.0;
+		double df_tau = 0.0;
+		for (int dim = 0; dim < NDIM; dim++) {
+			multi_index ip1 = i;
+			ip1[dim]++;
+			df_rho += F[dim][rho_i][ip1] - F[dim][rho_i][i];
+			df_tau += F[dim][tau_i][ip1] - F[dim][tau_i][i];
+		}
+		amax = std::max(amax, std::max(df_rho, 0.0) / U[rho_i][i]);
+		amax = std::max(amax, std::max(df_tau, 0.0) / U[tau_i][i]);
+	}
+	return amax;
 }
 
 double hydro_grid::compute_flux(int rk) {
@@ -41,7 +61,12 @@ double hydro_grid::compute_flux(int rk) {
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
 		if (U[rho_i][i] < 0.0) {
-			printf("%e %i %i\n", U[rho_i][i], i.index()[0], i.index()[1]);
+			printf("compute_flux: rho is less than zero %e\n", U[rho_i][i]);
+			abort();
+		}
+		if (U[tau_i][i] < 0.0) {
+			printf("compute_flux: tau is less than zero %e\n", U[tau_i][i]);
+			abort();
 		}
 		assert(U[rho_i][i] > 0.0);
 		assert(U[tau_i][i] >= 0.0);
@@ -130,6 +155,16 @@ void hydro_grid::substep_update(int rk, double dt) {
 			u += S[f][i] * dt;
 		}
 	}
+	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+		if (U[rho_i][i] <= 0.0) {
+			printf("substep_update: rho is less than zero %e\n", U[rho_i][i]);
+			abort();
+		}
+		if (U[tau_i][i] < 0.0) {
+			printf("substep_update: au is less than zero %e\n", U[tau_i][i]);
+			abort();
+		}
+	}
 	if (rk == opts.nrk - 1) {
 		const auto factor = dt / (1 << (NDIM - 1));
 		for (int dim = 0; dim < NDIM; dim++) {
@@ -143,10 +178,6 @@ void hydro_grid::substep_update(int rk, double dt) {
 			}
 		}
 	}
-}
-
-void hydro_grid::store_flux() {
-	F0 = F;
 }
 
 void hydro_grid::resize(double dx_, multi_range box_) {
@@ -229,7 +260,7 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 	}
 	if (opts.particles) {
 		for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
-			R[i] = pcount[i] > ((1 << NDIM) - 1);
+			R[i] = pcount[i] > 10;
 		}
 	}
 	if (opts.hydro) {
@@ -387,7 +418,7 @@ void hydro_grid::initialize() {
 			}
 			U[egas_i][i] = ein + ek;
 			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
-		} else if (opts.problem == "polytrope" ) {
+		} else if (opts.problem == "polytrope") {
 			double r = 0.0;
 			for (int dim = 0; dim < NDIM; dim++) {
 				auto x = coord(i[dim]);
@@ -476,7 +507,7 @@ void hydro_grid::update_energy() {
 			ekin += 0.5 * std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
 		}
 		const double eint = U[egas_i][i] - ekin;
-		if (eint > U[egas_i][i] * 0.1) {
+		if (eint > max_egas * 0.1) {
 			U[tau_i][i] = std::pow(eint, 1.0 / opts.gamma);
 		}
 	}
@@ -832,9 +863,6 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 		for (int f = 0; f < opts.nhydro; f++) {
 			for (multi_iterator i(this_box); !i.end(); i++) {
 				assert(k < data.size());
-//				if (f == rho_i) {
-//					printf("%e %e\n", F[dim][f][i], data[k]);
-//				}
 				F[dim][f][i] = data[k];
 				k++;
 			}
@@ -856,11 +884,17 @@ void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const
 			for (multi_iterator i(this_box); !i.end(); i++) {
 				assert(k < data.size());
 				const auto flux = data[k] / dx - lambda * F0[dim][f][i];
+
 				auto im = i.index();
 				im[dim]--;
 				U[f][i] += flux;
 				U[f][im] -= flux;
 				k++;
+				const auto factor = 1.0 / (1 << (NDIM - 1));
+				if (i.index()[dim] % 2 == 0) {
+					const auto j = i.index() / 2;
+					Fc[dim][f][j] += flux * factor;
+				}
 			}
 		}
 	}
@@ -898,6 +932,16 @@ void hydro_grid::unpack(const std::vector<double> &data, multi_range bbox) {
 			assert(k < data.size());
 			U[f][i] = data[k];
 			k++;
+		}
+	}
+	for (multi_iterator i(bbox); !i.end(); i++) {
+		if (U[rho_i][i] <= 0.0) {
+			printf("rho is less than zero %e\n", U[rho_i][i]);
+			abort();
+		}
+		if (U[tau_i][i] < 0.0) {
+			printf("tau is less than zero %e\n", U[tau_i][i]);
+			abort();
 		}
 	}
 	assert(k == data.size());

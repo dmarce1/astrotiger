@@ -58,6 +58,7 @@ public:
 	const multi_array<double>& get_density() const {
 		return U[rho_i];
 	}
+	double positivity_limit() const;
 	void store();
 	void store_flux();
 	void enforce_physical_bc(int);

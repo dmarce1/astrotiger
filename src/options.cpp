@@ -44,6 +44,9 @@ bool options::process_options(int argc, char *argv[]) {
 	("tmax", po::value<double>(&tmax)->default_value(0.25), "maximum simulation time") //
 	("cfl", po::value<double>(&cfl)->default_value(0.2), "cfl factor") //
 	("efficiency", po::value<double>(&efficiency)->default_value(0.25), "refinement efficiency") //
+	("code_to_g", po::value<double>(&code_to_g)->default_value(1.988e43), "code to gram conversion") //
+	("code_to_cm", po::value<double>(&code_to_cm)->default_value(1.0e26), "size of domain") //
+	("code_to_cm_per_s", po::value<double>(&code_to_cm_per_s)->default_value(3e10), "code to cm/s") //
 	("gamma", po::value<double>(&gamma)->default_value(5.0 / 3.0), "fluid gamma") //
 	("refine_slope", po::value<double>(&refine_slope)->default_value(0.025), "refinement slope criteria") //
 	("ngroup", po::value<int>(&ngroup)->default_value(1), "number of frequency groups") //
@@ -97,10 +100,21 @@ bool options::process_options(int argc, char *argv[]) {
 	} else if (problem == "polytrope") {
 		gravity = self_gravity = true;
 		gamma = 5.0 / 3.0;
-	} else if( problem == "part_test") {
-		hydro = true;
+	} else if (problem == "part_test") {
+		hydro = false;
 		particles = true;
 		gravity = self_gravity = true;
+	} else if (problem == "cosmos") {
+		const auto Gcgs = 6.67259e-8;
+		const auto ccgs = 2.99792458e+10;
+		const auto Hcgs = 3.2407789e-18;
+		code_to_s = code_to_cm / code_to_cm_per_s;
+		omega_m = 0.3;
+		H0 = Hcgs * code_to_s;
+		G = Gcgs / pow(code_to_cm, 3) * code_to_g * pow(code_to_s, 2);
+		clight = ccgs / code_to_cm * code_to_s;
+		m_tot = omega_m * 3.0 * H0 * H0 / (8 * M_PI * G);
+		hydro = gravity = self_gravity = particles = true;
 	}
 
 	nhydro = 3 + NDIM;
@@ -113,9 +127,9 @@ bool options::process_options(int argc, char *argv[]) {
 	beta.resize(nrk);
 	if (order == 1) {
 		alpha[0] = beta[0] = 1.0;
-		cfl = 0.9 / NDIM;
+		cfl = 0.999 / NDIM;
 	} else if (order == 2) {
-		cfl = 0.9 * (2.0 / 3.0) / NDIM;
+		cfl = 0.999 * (2.0 / 3.0) / NDIM;
 		beta[0] = 1.0;
 		beta[1] = 0.5;
 		alpha[0] = 0.0;

@@ -55,6 +55,7 @@ public:
 	std::vector<particle> get_particles(const multi_range&);
 	double max_velocity() const;
 	void resize(double dx, const multi_range&);
+	void zero_cic(const multi_range&);
 	void set_child_boxes(const std::vector<multi_range>&);
 	std::vector<particle> get_child_parts();
 	void kick(int kick_level, int this_level, const std::vector<double>&, const std::vector<double>&, const std::array<multi_array<double>, NDIM> &g);

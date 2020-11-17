@@ -169,7 +169,7 @@ public:
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
 	std::vector<std::vector<double>> get_energy_prolong(std::vector<multi_range>, double);
 	std::pair<std::vector<double>, std::vector<double>> get_hydro_restrict();
-	void hydro_substep(int, double);
+	void hydro_substep(int, double, bool);
 	double hydro_initialize(bool);
 	output_return output(DBfile *db, int) const;
 	multi_range get_box() const;
@@ -194,6 +194,7 @@ public:
 	double max_part_velocity() const;
 	void kick(int, double, std::vector<double>, std::vector<double>);
 	std::vector<double> compute_cic(const std::vector<double>&, double t, int );
+	void apply_coarse_correction();
 
 
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_cic);

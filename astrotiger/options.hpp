@@ -12,6 +12,14 @@ using bc_type = int;
 
 class options {
 public:
+	double code_to_s;
+	double H0;
+	double clight;
+	double m_tot;
+	double omega_m;
+	double code_to_cm;
+	double code_to_cm_per_s;
+	double code_to_g;
 	std::string config_file;
 	int nhydro;
 	int ngroup;
@@ -49,6 +57,14 @@ public:
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
+		arc & code_to_g;
+		arc & code_to_cm_per_s;
+		arc & code_to_cm;
+		arc & code_to_s;
+		arc & H0;
+		arc & clight;
+		arc & m_tot;
+		arc & omega_m;
 		arc & particles;
 		arc & self_gravity;
 		arc & gravity;
