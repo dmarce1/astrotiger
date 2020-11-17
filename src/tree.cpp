@@ -7,6 +7,8 @@
 
 #include <astrotiger/tree.hpp>
 
+#include <astrotiger/cosmos.hpp>
+
 #include <unordered_map>
 
 HPX_REGISTER_COMPONENT(hpx::components::managed_component<tree>, tree);
@@ -156,6 +158,16 @@ void tree::recv_parts(std::vector<particle> these_parts) {
 			}
 		}
 	}
+	for (auto &p : these_parts) {
+		for (int dim = 0; dim < NDIM; dim++) {
+			while (p.x[dim] >= 1.0) {
+				p.x[dim] -= 1.0;
+			}
+			while (p.x[dim] < 0.0) {
+				p.x[dim] += 1.0;
+			}
+		}
+	}
 #ifndef NDEBUG
 	const auto rbox = range_int_to_double(box);
 	for (const auto &p : these_parts) {
@@ -163,16 +175,6 @@ void tree::recv_parts(std::vector<particle> these_parts) {
 	}
 #endif
 	{
-		for (auto &p : these_parts) {
-			for (int dim = 0; dim < NDIM; dim++) {
-				while (p.x[dim] >= 1.0) {
-					p.x[dim] -= 1.0;
-				}
-				while (p.x[dim] < 0.0) {
-					p.x[dim] += 1.0;
-				}
-			}
-		}
 		std::lock_guard<mutex_type> lock(mtx);
 		new_parts.insert(new_parts.end(), these_parts.begin(), these_parts.end());
 	}
@@ -311,6 +313,7 @@ void tree::drift(double dt) {
 }
 
 statistics tree::get_statistics(int lev, double t) {
+	const auto a = cosmos_a();
 	statistics stats;
 	std::vector<multi_range> cranges;
 	std::vector<hpx::future<statistics>> futs;
@@ -352,7 +355,7 @@ statistics tree::get_statistics(int lev, double t) {
 		double m = 0.0;
 		const auto rho = parts.get_cic();
 		for (multi_iterator i(box); !i.end(); i++) {
-			m += std::pow(dx, NDIM) * rho[i];
+			m += std::pow(dx * a, NDIM) * rho[i];
 		}
 		stats.u[rho_i] += m;
 	}
@@ -438,10 +441,10 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 	} else if (level == fine_level) {
 		get_gravity_boundaries(PACK_POTENTIAL);
-		if (pass == GRAVITY_FINAL_PASS) {
-			rc.vmax = grav.finish_fine();
-			hydro.set_phi(grav.get_phi());
-		}
+//		if (pass == GRAVITY_FINAL_PASS) {
+		rc.vmax = grav.finish_fine();
+		hydro.set_phi(grav.get_phi());
+//		}
 	}
 	if (level == 0 && fine_level == 0 && opts.problem != "sphere") {
 		grav.set_avg_zero();

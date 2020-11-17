@@ -11,7 +11,7 @@ struct cosmos {
 		arc & adot;
 	}
 	cosmos();
-	void advance_to_time(double, int = 100);
+	void advance_to_time(double, int = 10000);
 	void advance_to_scalefactor(double);
 };
 
@@ -59,6 +59,18 @@ void cosmos::advance_to_time(double t2, int Nstep) {
 
 }
 
+
+static cosmos C;
+
+void cosmos_init() {
+	C = cosmos();
+}
+
+void cosmos_reset_time() {
+	C.t = 0.0;
+}
+
+
 void cosmos::advance_to_scalefactor(double a2) {
 	double a1 = a2;
 	while (std::abs(a / a2 - 1.0) > 1.0e-6) {
@@ -68,13 +80,9 @@ void cosmos::advance_to_scalefactor(double a2) {
 
 }
 
-static cosmos C;
-
 double cosmos_set_z(double z) {
 	C.advance_to_scalefactor(1.0 / (z + 1.0));
-	double t = -C.t;
-	C.t = 0.0;
-	return t;
+	return -C.t;
 }
 
 double cosmos_a() {
@@ -85,7 +93,7 @@ double cosmos_adot() {
 	return C.adot;
 }
 
-void cosmos_advance(double dt) {
-	C.advance_to_time(C.t + dt);
+void cosmos_advance(double t) {
+	C.advance_to_time( t - opts.tmax);
 
 }

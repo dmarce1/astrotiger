@@ -3,6 +3,7 @@
 #include <astrotiger/hpx.hpp>
 #include <astrotiger/options.hpp>
 #include <boost/program_options.hpp>
+#include <astrotiger/cosmos.hpp>
 
 #include <fstream>
 #include <iostream>
@@ -45,7 +46,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("cfl", po::value<double>(&cfl)->default_value(0.2), "cfl factor") //
 	("efficiency", po::value<double>(&efficiency)->default_value(0.25), "refinement efficiency") //
 	("code_to_g", po::value<double>(&code_to_g)->default_value(1.988e43), "code to gram conversion") //
-	("code_to_cm", po::value<double>(&code_to_cm)->default_value(1.0e26), "size of domain") //
+	("code_to_cm", po::value<double>(&code_to_cm)->default_value(3.0e25), "size of domain") //
 	("code_to_cm_per_s", po::value<double>(&code_to_cm_per_s)->default_value(3e10), "code to cm/s") //
 	("gamma", po::value<double>(&gamma)->default_value(5.0 / 3.0), "fluid gamma") //
 	("refine_slope", po::value<double>(&refine_slope)->default_value(0.025), "refinement slope criteria") //
@@ -91,6 +92,7 @@ bool options::process_options(int argc, char *argv[]) {
 			bnd[5] = str_to_bc_type(zmbnd);
 		}
 	}
+	G = 1;
 	if (problem == "rt" && NDIM > 1) {
 		bnd[2] = bnd[3] = REFLECTING;
 		gamma = 7.0 / 5.0;
@@ -111,10 +113,17 @@ bool options::process_options(int argc, char *argv[]) {
 		code_to_s = code_to_cm / code_to_cm_per_s;
 		omega_m = 0.3;
 		H0 = Hcgs * code_to_s;
+		printf( "%e %e %e  %e\n",H0, code_to_s, code_to_cm, code_to_cm_per_s);
 		G = Gcgs / pow(code_to_cm, 3) * code_to_g * pow(code_to_s, 2);
 		clight = ccgs / code_to_cm * code_to_s;
 		m_tot = omega_m * 3.0 * H0 * H0 / (8 * M_PI * G);
 		hydro = gravity = self_gravity = particles = true;
+		m_tot = omega_m * 3.0 * H0 * H0 / (8 * M_PI * G);
+		set(*this);
+		cosmos_init();
+		tmax = cosmos_set_z(50.0);
+		printf( "tmax set to %e\n", tmax);
+		printf( "mtot = %e\n", m_tot);
 	}
 
 	nhydro = 3 + NDIM;
@@ -138,7 +147,6 @@ bool options::process_options(int argc, char *argv[]) {
 		printf("Order %i not supported\n");
 		abort();
 	}
-	G = 1;
 
 	const auto loc = hpx::find_all_localities();
 	const auto sz = loc.size();

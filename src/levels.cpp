@@ -12,12 +12,12 @@ HPX_PLAIN_ACTION (levels_hydro_initialize);
 HPX_PLAIN_ACTION (levels_hydro_substep);
 HPX_PLAIN_ACTION (levels_output_silo);
 HPX_PLAIN_ACTION (levels_fine_fluxes);
+HPX_PLAIN_ACTION (levels_max_level);
 HPX_PLAIN_ACTION (levels_apply_coarse_correction);
 
 static std::vector<std::unordered_set<tree*>> levels;
 static mutex_type mtx;
 static std::vector<hpx::id_type> other_localities;
-
 
 void levels_init() {
 	levels.resize(opts.max_level + 1);
@@ -49,13 +49,33 @@ void levels_get_hydro_boundaries(int level, double t) {
 		futs.push_back(hpx::lcos::broadcast < levels_get_hydro_boundaries_action > (other_localities, level, t));
 	}
 	for (auto *ptr : these_levels[level]) {
-		futs.push_back(hpx::async([ptr,t]() {
+		futs.push_back(hpx::async([ptr, t]() {
 			ptr->get_hydro_boundaries(t);
 		}));
 	}
 	hpx::wait_all(futs.begin(), futs.end());
 }
 
+int levels_max_level() {
+	hpx::future<std::vector<int>> fut;
+	if (hpx::get_locality_id() == 0 && other_localities.size()) {
+		fut = hpx::lcos::broadcast < levels_max_level_action > (other_localities);
+	}
+	int l;
+	for (l = 0; l <= opts.max_level; l++) {
+		if (levels[l].size() == 0) {
+			break;
+		}
+	}
+	l--;
+	if (fut.valid()) {
+		const auto tmp = fut.get();
+		for (int i = 0; i < tmp.size(); i++) {
+			l = std::max(l, tmp[i]);
+		}
+	}
+	return l;
+}
 
 void levels_set_child_families(int level) {
 	auto these_levels = levels;
@@ -160,7 +180,7 @@ void levels_output_silo(const std::string filename) {
 		output.data.resize(opts.nhydro + 2);
 		if (opts.particles) {
 			output.pcoords.resize(NDIM);
-			output.pdata.resize(NDIM + 1);
+			output.pdata.resize(NDIM + 2);
 		}
 		int node_index = 0;
 		for (int level = 0; level <= opts.max_level; level++) {
@@ -178,7 +198,7 @@ void levels_output_silo(const std::string filename) {
 					for (int dim = 0; dim < NDIM; dim++) {
 						output.pcoords[dim].insert(output.pcoords[dim].end(), this_output.pcoords[dim].begin(), this_output.pcoords[dim].end());
 					}
-					for (int f = 0; f < NDIM + 1; f++) {
+					for (int f = 0; f < NDIM + 2; f++) {
 						output.pdata[f].insert(output.pdata[f].end(), this_output.pdata[f].begin(), this_output.pdata[f].end());
 					}
 				}
@@ -214,7 +234,7 @@ void levels_output_silo(const std::string filename) {
 			}
 			SILO_CHECK(DBPutPointmesh(db, "point_mesh", NDIM, coords, output.pcoords[0].size(), DB_DOUBLE, NULL));
 			const auto names = particles::field_names();
-			for (int f = 0; f < NDIM + 1; f++) {
+			for (int f = 0; f < NDIM + 2; f++) {
 				SILO_CHECK(DBPutPointvar1(db,names[f].c_str(), "point_mesh", output.pdata[f].data(), output.pdata[f].size(), DB_DOUBLE, NULL));
 			}
 		}

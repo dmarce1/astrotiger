@@ -1,7 +1,7 @@
 #include <astrotiger/options.hpp>
 #include <astrotiger/particles.hpp>
 #include <astrotiger/rand.hpp>
-#include <astrotiger/astrotiger.hpp>
+#include <astrotiger/cosmos.hpp>
 #include <array>
 
 std::vector<double> particles::pack_cic_restrict() const {
@@ -56,8 +56,9 @@ void particles::unpack_cic_prolong(const std::vector<double> &data, const multi_
 }
 
 void particles::compute_cloud_in_cell(double dt) {
-//	printf( "%i %s\n", parts.size(), box.to_string().c_str());
 	const auto a = cosmos_a();
+	const auto adot = cosmos_adot();
+//	printf( "%i %s\n", parts.size(), box.to_string().c_str());
 	const auto rhobox = box.pad(2);
 	rho.resize(rhobox);
 	multi_array<double> drho_dt(box.pad(2));
@@ -101,7 +102,7 @@ void particles::compute_cloud_in_cell(double dt) {
 					} else {
 						sgn = +1.0;
 					}
-					drho_dt[j] += p.m * dvinv * sgn * p.v[dim] / (a*dx);
+					drho_dt[j] += p.m * dvinv * sgn * p.v[dim] / (a * dx);
 				}
 				assert(wt >= 0.0);
 				assert(wt <= 1.0);
@@ -116,7 +117,7 @@ void particles::compute_cloud_in_cell(double dt) {
 	}
 
 	for (multi_iterator i(box.pad(1)); !i.end(); i++) {
-		rho[i] += dt * drho_dt[i];
+		rho[i] += dt * (drho_dt[i] - NDIM * adot / a * rho[i]);
 //		if( rho[i] < 0.0 ) {
 //			printf( "!! %e %e %e\n", dt, rho[i], dt * drho_dt[i]);
 //		}
@@ -169,40 +170,24 @@ void particles::set_child_boxes(const std::vector<multi_range> &boxes) {
 }
 
 void particles::initialize() {
-	constexpr int N = 100000;
-	constexpr double a = 0.1;
-	constexpr double c0 = 3.0 * 1.0 / (4.0 * M_PI * a * a * a);
-	double v2 = 0.0;
-	double p1 = 0.0;
-	if (opts.problem == "part_test") {
-		for (int i = 0; i < N; i++) {
+	if (opts.problem == "cosmos") {
+		const auto m = 0.87 * opts.m_tot / box.volume();
+		for (multi_iterator i(box); !i.end(); i++) {
 			particle p;
-			double r;
-			double prob;
-			double rnd;
 			vect<double> x;
-			do {
-				r = 0.0;
-				for (int dim = 0; dim < NDIM; dim++) {
-					x[dim] = rand1();
-					r += std::pow(x[dim] - 0.5, 2);
-				}
-				r = std::sqrt(r);
-				prob = std::pow(1.0 + r * r / a / a, -2.5);
-			} while (prob < rand1());
-			p.x = x;
-			const auto sigma = std::sqrt(1.0 / 6.0 / std::sqrt(a * a + r * r));
+			vect<float> v;
 			for (int dim = 0; dim < NDIM; dim++) {
-				p.v[dim] = rand_normal() * sigma;
+				const auto r = rand_normal();
+				x[dim] = (i.index()[dim] + 0.5 + 0.01 * r) * dx;
+				v[dim] = 0.001 * r;
 			}
-			p.m = 1.0 / N;
+			p.x = x;
+			p.v = v;
 			p.rung = 0;
+			p.m = m;
 			parts.push_back(p);
-			//		v2 += p.m * p.v.dot(p.v);
-			//		p1 += p.m * 1.0 / std::sqrt(a * a + r * r);
 		}
 	}
-	printf("v2 = %e p1 = %e\n", v2, p1);
 }
 
 void particles::kick(int kick_level, int this_level, const std::vector<double> &dt0, const std::vector<double> &dt1,
@@ -240,7 +225,8 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 
 			}
 //			printf("%e %e\n", this_g[0], this_g[1]);
-			p.v += (this_g - p.v * adot / a) * (dt0[p.rung] * 0.5);
+			auto dt = dt0[p.rung];
+			p.v = (this_g * 0.5 * dt + p.v) / (1.0 + dt * 0.5 * adot / a);
 			if (p.rung > this_level) {
 				if (this_level >= kick_level) {
 					p.rung = this_level;
@@ -248,7 +234,8 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 			} else if (p.rung < this_level) {
 				p.rung = this_level;
 			}
-			p.v += (this_g - p.v * adot / a) * (dt1[p.rung] * 0.5);
+			dt = dt1[p.rung];
+			p.v += this_g * 0.5 * dt - p.v * adot / a * 0.5 * dt;
 		}
 	}
 }
@@ -270,12 +257,13 @@ double particles::max_velocity() const {
 }
 
 std::vector<std::vector<double>> particles::pack_output() const {
-	std::vector<std::vector<double>> data(NDIM + 1);
+	std::vector<std::vector<double>> data(NDIM + 2);
 	for (const auto &part : parts) {
 		for (int dim = 0; dim < NDIM; dim++) {
 			data[dim].push_back(part.v[dim]);
 		}
 		data[NDIM].push_back(part.rung);
+		data[NDIM + 1].push_back(part.m);
 	}
 	return data;
 }
@@ -296,6 +284,7 @@ std::vector<std::string> particles::field_names() {
 		names.push_back(std::string("v_") + char('x' + char(dim)));
 	}
 	names.push_back("rung");
+	names.push_back("m");
 	return names;
 }
 

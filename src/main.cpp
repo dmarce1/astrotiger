@@ -1,7 +1,7 @@
 #include <astrotiger/tree.hpp>
 #include <astrotiger/levels.hpp>
 #include <astrotiger/output.hpp>
-#include <astrotiger/cosmic.hpp>
+#include <astrotiger/cosmos.hpp>
 
 static tree_client root;
 
@@ -79,6 +79,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 			coarse_level = level;
 		}
 		last_dt[level] = dt[level];
+		cosmos_advance(tm[level]);
 		if (refine) {
 			for (int l = level; l < opts.max_level; l++) {
 				printf("Refining level %i\n", l);
@@ -107,10 +108,17 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		}
 		dt[level] = opts.cfl * a * dx[level] / amax;
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
-		dt[level] = (tmax - tm[level]) / nstep;
-		printf("Advancing level %i from %e to %e\n", level, tm[level], tm[level] + dt[level]);
-		if (level == opts.max_level) {
-			if (opts.particles()) {
+		dt[level] = 1.001 * ((tmax - tm[level]) / nstep);
+		dt[level] = std::min(dt[level], tmax - tm[level]);
+		const auto a1 = cosmos_a();
+		const auto H1 = cosmos_adot() / a1;
+		cosmos_advance(tm[level] + dt[level]);
+		const auto a2 = cosmos_a();
+		const auto H2 = cosmos_adot() / a2;
+		cosmos_advance(tm[level]);
+		//	printf("Advancing level %i from %e to %e scale factor %e to %e %e %e\n", level, tm[level], tm[level] + dt[level], a1, a2, H1, H2);
+		if (opts.particles) {
+			if (level == levels_max_level()) {
 				root.kick(coarse_level, tm[level], last_dt, dt).get();
 			}
 		}
@@ -120,12 +128,14 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			solve_gravity(level, tm[level] + dt[level], mtot);
 		}
+		cosmos_advance(tm[level] + dt[level]);
 		levels_hydro_substep(level, 1, dt[level], nstep == 1.0);
 		tm[level] += dt[level];
 		const bool has_next_level = master(level + 1, coarse_level, tm[level], refine);
 		///	printf( "-\n");
 		if (opts.particles && !has_next_level) {
-			//		printf( "%i\n", coarse_level);
+			printf("%e %e %e %i %e %e %e %e\n", amax, tm[level], dt[level], level, a1, a2, H1, H2);
+			cosmos_advance(tm[level] + 0.5 * dt[level]);
 			root.drift(dt[level]).get();
 			root.finish_drift(std::vector<particle>()).get();
 		}
@@ -216,7 +226,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	const auto dt = 0.01;
+	const auto dt = 1;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

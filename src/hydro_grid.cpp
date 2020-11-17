@@ -9,6 +9,7 @@
 #include <astrotiger/hydro_flux.hpp>
 #include <astrotiger/multi_array.hpp>
 #include <astrotiger/polytrope.hpp>
+#include <astrotiger/cosmos.hpp>
 #include <astrotiger/tree.hpp>
 #include <astrotiger/rand.hpp>
 #include <vector>
@@ -31,6 +32,7 @@ void hydro_grid::store_flux() {
 }
 
 double hydro_grid::positivity_limit() const {
+	const auto a = cosmos_a();
 	double amax = 0.0;
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		double df_rho = 0.0;
@@ -136,13 +138,18 @@ double hydro_grid::compute_flux(int rk) {
 			}
 			std::vector<double> this_s(opts.nhydro, 0.0);
 			for (int dim = 0; dim < NDIM; dim++) {
-				this_s[sx_i + dim] -= U[rho_i] * g[dim];
-				this_s[sx_i + dim] -= (NDIM + 1) * H * S[sx_i + dim][i];
+				this_s[sx_i + dim] -= U[rho_i][j] * g[dim];
+				this_s[sx_i + dim] -= (NDIM + 1) * H * U[sx_i + dim][j];
 			}
-			this_s[rho_i] -= NDIM * H * U[rho_i][i];
+			this_s[rho_i] -= NDIM * H * U[rho_i][j];
 			this_s[egas_i] -= sdotg;
-			this_s[egas_i] -= H * (NDIM * U[egas_i][i] + U[sx_i][i] * U[sx_i][i] / U[rho_i][i]);
-			this_s[tau_i] -= NDIM * H / opts.gamma * U[tau_i];
+			double ek = 0.0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				ek += 0.5 * U[sx_i + dim][j] * U[sx_i + dim][j] / U[rho_i][j];
+			}
+			const auto p = (opts.gamma - 1.0) * (U[egas_i][j] - ek);
+			this_s[egas_i] -= H * (NDIM * (U[egas_i][j] + p) + U[sx_i][j] * U[sx_i][j] / U[rho_i][j]);
+			this_s[tau_i] -= NDIM * H * opts.gamma * U[tau_i][j];
 			for (int f = 0; f < opts.nhydro; f++) {
 				S[f][j] = (1.0 - opts.beta[rk]) * S[f][j] + opts.beta[rk] * this_s[f];
 			}
@@ -153,6 +160,7 @@ double hydro_grid::compute_flux(int rk) {
 
 void hydro_grid::substep_update(int rk, double dt) {
 	const double onembeta = 1.0 - opts.beta[rk];
+	const auto a = cosmos_a();
 	const double lambda = dt / dx / a;
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		for (int f = 0; f < opts.nhydro; f++) {
@@ -451,9 +459,10 @@ void hydro_grid::initialize() {
 			U[egas_i][i] = std::max(1.0e-12, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 			U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
-		} else if (opts.problem == "part_test") {
-			U[rho_i][i] = 1.0e-10;
-			U[egas_i][i] = 1.0e-20;
+		} else if (opts.problem == "cosmos") {
+			const auto a = cosmos_a();
+			U[rho_i][i] = opts.m_tot * 0.13 / std::pow(a, NDIM);
+			U[egas_i][i] = 1.0e-9*std::pow(U[rho_i][i], opts.gamma);
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		} else {
 			printf("unknown problem %s\n", opts.problem.c_str());
@@ -888,14 +897,14 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const multi_range &bbox, double dt) {
 	int k = 0;
 	const auto a = cosmos_a();
-	const auto lambda = dt / (a*dx);
+	const auto lambda = dt / (a * dx);
 	for (int dim = 0; dim < NDIM; dim++) {
 		auto this_box = bbox;
 		this_box.max[dim]++;
 		for (int f = 0; f < opts.nhydro; f++) {
 			for (multi_iterator i(this_box); !i.end(); i++) {
 				assert(k < data.size());
-				const auto flux = data[k] / (a*dx) - lambda * F0[dim][f][i];
+				const auto flux = data[k] / (a * dx) - lambda * F0[dim][f][i];
 
 				auto im = i.index();
 				im[dim]--;
@@ -971,6 +980,7 @@ void hydro_grid::unpack_field(int f, const std::vector<double> &data, multi_rang
 
 statistics hydro_grid::get_statistics(const std::vector<multi_range> &child_ranges) const {
 	statistics stats;
+	const auto a = cosmos_a();
 	stats.u.resize(opts.nhydro, 0.0);
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		bool refined = false;
@@ -982,7 +992,7 @@ statistics hydro_grid::get_statistics(const std::vector<multi_range> &child_rang
 		}
 		if (!refined) {
 			for (int f = 0; f < opts.nhydro; f++) {
-				stats.u[f] += std::pow(a * dx, NDIM) * U[f][i];
+				stats.u[f] += std::pow(dx * a, NDIM) * U[f][i];
 			}
 		}
 	}

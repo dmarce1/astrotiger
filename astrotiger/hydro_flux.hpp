@@ -42,7 +42,7 @@ void physical_flux(std::vector<T> &flux, const std::vector<T> u, T v, T p, int d
 }
 
 template<class T>
-double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vector<T> &ur, int dim, double a) {
+double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vector<T> &ur, int dim) {
 	const auto pr = hydro_pressure(ur);
 	const auto pl = hydro_pressure(ul);
 	const auto rho_r = ur[rho_i];

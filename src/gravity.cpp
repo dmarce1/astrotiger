@@ -2,7 +2,7 @@
 #include <astrotiger/options.hpp>
 #include <astrotiger/boxes.hpp>
 #include <astrotiger/hpx.hpp>
-#include <astrotiger/cosmos.cpp>
+#include <astrotiger/cosmos.hpp>
 
 #include <thread>
 
@@ -21,6 +21,7 @@ void gravity::resize(double dx_, const multi_range &box_) {
 }
 
 std::array<multi_array<double>, NDIM> gravity::get_acceleration(double w) const {
+	const auto a = cosmos_a();
 	std::array<multi_array<double>, NDIM> g;
 	const auto bbox = box.pad(-opts.gbw + 1);
 	for (int dim = 0; dim < NDIM; dim++) {
@@ -30,8 +31,8 @@ std::array<multi_array<double>, NDIM> gravity::get_acceleration(double w) const 
 			auto im = i.index();
 			ip[dim]++;
 			im[dim]--;
-			g[dim][i] = -w * (phi[ip] - phi[im]) / (2.0 * dx);
-			g[dim][i] -= (1.0 - w) * (phi0[ip] - phi0[im]) / (2.0 * dx);
+			g[dim][i] = -w * (phi[ip] - phi[im]) / (2.0 * dx * a);
+			g[dim][i] -= (1.0 - w) * (phi0[ip] - phi0[im]) / (2.0 * dx * a);
 		}
 	}
 	return g;
@@ -80,12 +81,14 @@ void gravity::set_amr_zones(const std::vector<multi_range> &boxes, const std::ve
 }
 
 void gravity::initialize_fine(const multi_array<double> &rho, double mtot, int level) {
+	const auto a = cosmos_a();
 	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 		active[i] = true;
 	}
-	const auto rho0 = mtot;
+	const auto rho0 = mtot / std::pow(a, NDIM);
 	for (multi_iterator i(box.pad(std::min(opts.gbw - opts.hbw, 0))); !i.end(); i++) {
-		R[i] = 4.0 * M_PI * opts.G * (rho[i] - (opts.problem == "sphere" ? 0.0 : rho0));
+		R[i] = 4.0 * M_PI * a * a * opts.G * (rho[i] - (opts.problem == "sphere" ? 0.0 : rho0));
+		//	printf("%e %e\n", rho[i], rho0);
 	}
 //	X = phi;
 }
@@ -277,6 +280,7 @@ multi_array<double> gravity::get_phi() const {
 }
 
 double gravity::finish_fine() {
+	const auto a = cosmos_a();
 	double gmax = 0.0;
 	phi0 = phi;
 	phi = X;
@@ -292,7 +296,7 @@ double gravity::finish_fine() {
 		}
 		gmax = std::max(gmax, std::sqrt(g2));
 	}
-	return std::sqrt(gmax * a * dx);
+	return std::sqrt(gmax * dx * a);
 }
 
 void gravity::relax() {
@@ -326,7 +330,9 @@ void gravity::relax() {
 	}
 }
 
-gravity_return gravity::get_restrict(double rho0) {
+gravity_return gravity::get_restrict(double mtot) {
+	const auto a = cosmos_a();
+	const auto rho0 = mtot / std::pow(a, NDIM);
 	gravity_return rc;
 	multi_array<std::uint8_t> active_c;
 	auto rbox = box.pad(-opts.gbw).half();
@@ -368,7 +374,7 @@ gravity_return gravity::get_restrict(double rho0) {
 			}
 			resid[i] += (2.0 * NDIM) * x[j] / (dx * dx);
 			resid[i] += R[i];
-			rc.resid = std::max(std::abs(resid[i] / (4.0 * M_PI * opts.G) / std::max(rho0, R[i])), rc.resid);
+			rc.resid = std::max(std::abs(resid[i] / (4.0 * M_PI * opts.G * a * a) / std::max(rho0, R[i])), rc.resid);
 		}
 	}
 	rc.R.reserve(active_vol);
