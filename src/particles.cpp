@@ -2,6 +2,7 @@
 #include <astrotiger/particles.hpp>
 #include <astrotiger/rand.hpp>
 #include <astrotiger/cosmos.hpp>
+#include <astrotiger/fileio.hpp>
 #include <array>
 
 std::vector<double> particles::pack_cic_restrict() const {
@@ -117,7 +118,7 @@ void particles::compute_cloud_in_cell(double dt) {
 	}
 
 	for (multi_iterator i(box.pad(1)); !i.end(); i++) {
-		rho[i] += dt * (drho_dt[i] - NDIM * adot / a * rho[i]);
+		rho[i] += dt * drho_dt[i];
 //		if( rho[i] < 0.0 ) {
 //			printf( "!! %e %e %e\n", dt, rho[i], dt * drho_dt[i]);
 //		}
@@ -171,21 +172,9 @@ void particles::set_child_boxes(const std::vector<multi_range> &boxes) {
 
 void particles::initialize() {
 	if (opts.problem == "cosmos") {
-		const auto m = 0.87 * opts.m_tot / box.volume();
-		for (multi_iterator i(box); !i.end(); i++) {
-			particle p;
-			vect<double> x;
-			vect<float> v;
-			for (int dim = 0; dim < NDIM; dim++) {
-				const auto r = rand_normal();
-				x[dim] = (i.index()[dim] + 0.5 + 0.01 * r) * dx;
-				v[dim] = 0.001 * r;
-			}
-			p.x = x;
-			p.v = v;
-			p.rung = 0;
-			p.m = m;
-			parts.push_back(p);
+		parts = fileio_get_particles();
+		for (auto &p : parts) {
+			p.m *= (opts.omega_m - opts.omega_b) / opts.omega_m;
 		}
 	}
 }

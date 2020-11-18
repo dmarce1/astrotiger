@@ -4,6 +4,7 @@
 #include <astrotiger/options.hpp>
 #include <boost/program_options.hpp>
 #include <astrotiger/cosmos.hpp>
+#include <astrotiger/fileio.hpp>
 
 #include <fstream>
 #include <iostream>
@@ -107,23 +108,11 @@ bool options::process_options(int argc, char *argv[]) {
 		particles = true;
 		gravity = self_gravity = true;
 	} else if (problem == "cosmos") {
-		const auto Gcgs = 6.67259e-8;
-		const auto ccgs = 2.99792458e+10;
-		const auto Hcgs = 3.2407789e-18;
-		code_to_s = code_to_cm / code_to_cm_per_s;
-		omega_m = 0.3;
-		H0 = Hcgs * code_to_s;
-		printf( "%e %e %e  %e\n",H0, code_to_s, code_to_cm, code_to_cm_per_s);
-		G = Gcgs / pow(code_to_cm, 3) * code_to_g * pow(code_to_s, 2);
-		clight = ccgs / code_to_cm * code_to_s;
-		m_tot = omega_m * 3.0 * H0 * H0 / (8 * M_PI * G);
 		hydro = gravity = self_gravity = particles = true;
-		m_tot = omega_m * 3.0 * H0 * H0 / (8 * M_PI * G);
+		opts = *this;
+		fileio_init_read();
+		*this = opts;
 		set(*this);
-		cosmos_init();
-		tmax = cosmos_set_z(50.0);
-		printf( "tmax set to %e\n", tmax);
-		printf( "mtot = %e\n", m_tot);
 	}
 
 	nhydro = 3 + NDIM;

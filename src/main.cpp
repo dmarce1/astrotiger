@@ -98,10 +98,12 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 			return false;
 		}
 //		levels_show();
+		double mtot1, mtot2;
 		if (opts.self_gravity) {
 			auto tmp = root.get_statistics(std::min(level, max_refined), tm[level]).get();
 			assert(tmp.u.size());
 			const auto mtot = tmp.u[rho_i];
+			mtot1 = mtot;
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			const auto gmax = solve_gravity(level, tm[level], mtot);
 			amax = std::max(amax, gmax);
@@ -111,10 +113,10 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		dt[level] = 1.001 * ((tmax - tm[level]) / nstep);
 		dt[level] = std::min(dt[level], tmax - tm[level]);
 		const auto a1 = cosmos_a();
-		const auto H1 = cosmos_adot() / a1;
+		const auto H1 = cosmos_adot();
 		cosmos_advance(tm[level] + dt[level]);
 		const auto a2 = cosmos_a();
-		const auto H2 = cosmos_adot() / a2;
+		const auto H2 = cosmos_adot();
 		cosmos_advance(tm[level]);
 		//	printf("Advancing level %i from %e to %e scale factor %e to %e %e %e\n", level, tm[level], tm[level] + dt[level], a1, a2, H1, H2);
 		if (opts.particles) {
@@ -122,19 +124,20 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 				root.kick(coarse_level, tm[level], last_dt, dt).get();
 			}
 		}
-		levels_hydro_substep(level, 0, dt[level], false);
+		levels_hydro_substep(level, 0, dt[level], false, a1, a2);
+		cosmos_advance(tm[level] + dt[level]);
 		if (opts.self_gravity) {
 			const auto mtot = root.get_statistics(std::min(level, max_refined), tm[level] + dt[level]).get().u[rho_i];
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
+			mtot2 = mtot;
 			solve_gravity(level, tm[level] + dt[level], mtot);
 		}
-		cosmos_advance(tm[level] + dt[level]);
-		levels_hydro_substep(level, 1, dt[level], nstep == 1.0);
+		levels_hydro_substep(level, 1, dt[level], nstep == 1.0, a1, a2);
 		tm[level] += dt[level];
 		const bool has_next_level = master(level + 1, coarse_level, tm[level], refine);
 		///	printf( "-\n");
 		if (opts.particles && !has_next_level) {
-			printf("%e %e %e %i %e %e %e %e\n", amax, tm[level], dt[level], level, a1, a2, H1, H2);
+			printf("%e %e %e %i %e %e %e %e %e %e\n", amax, tm[level], dt[level], level, a1, a2, H1, H2, mtot1, mtot2);
 			cosmos_advance(tm[level] + 0.5 * dt[level]);
 			root.drift(dt[level]).get();
 			root.finish_drift(std::vector<particle>()).get();
@@ -226,10 +229,11 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	const auto dt = 1;
+	double dt = .1;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;
+	//	dt = std::min((double) 0.01, (double) 0.001 * cosmos_a() / cosmos_adot());
 		master(0, 0, std::min(t + dt, opts.tmax));
 		std::string fname = "X." + std::to_string(i) + ".silo";
 		output_silo(fname);

@@ -12,6 +12,7 @@
 #include <astrotiger/cosmos.hpp>
 #include <astrotiger/tree.hpp>
 #include <astrotiger/rand.hpp>
+#include <astrotiger/fileio.hpp>
 #include <vector>
 
 hydro_grid::hydro_grid() {
@@ -120,6 +121,7 @@ double hydro_grid::compute_flux(int rk) {
 			ul[tau_i] = std::pow(vl[tau_i], 1.0 / opts.gamma);
 			amax = std::max(amax, hydro_flux(flux, ul, ur, dim));
 			for (int f = 0; f < opts.nhydro; f++) {
+				flux[f] /= a;
 				F[dim][f][j] = (1.0 - opts.beta[rk]) * F[dim][f][j] + opts.beta[rk] * flux[f];
 			}
 		}
@@ -139,17 +141,17 @@ double hydro_grid::compute_flux(int rk) {
 			std::vector<double> this_s(opts.nhydro, 0.0);
 			for (int dim = 0; dim < NDIM; dim++) {
 				this_s[sx_i + dim] -= U[rho_i][j] * g[dim];
-				this_s[sx_i + dim] -= (NDIM + 1) * H * U[sx_i + dim][j];
+//				this_s[sx_i + dim] -= (NDIM + 1) * H * U[sx_i + dim][j];
 			}
-			this_s[rho_i] -= NDIM * H * U[rho_i][j];
+//			this_s[rho_i] -= NDIM * H * U[rho_i][j];
 			this_s[egas_i] -= sdotg;
-			double ek = 0.0;
-			for (int dim = 0; dim < NDIM; dim++) {
-				ek += 0.5 * U[sx_i + dim][j] * U[sx_i + dim][j] / U[rho_i][j];
-			}
-			const auto p = (opts.gamma - 1.0) * (U[egas_i][j] - ek);
-			this_s[egas_i] -= H * (NDIM * (U[egas_i][j] + p) + U[sx_i][j] * U[sx_i][j] / U[rho_i][j]);
-			this_s[tau_i] -= NDIM * H * opts.gamma * U[tau_i][j];
+//			double ek = 0.0;
+//			for (int dim = 0; dim < NDIM; dim++) {
+//				ek += 0.5 * U[sx_i + dim][j] * U[sx_i + dim][j] / U[rho_i][j];
+//			}
+//			const auto p = (opts.gamma - 1.0) * (U[egas_i][j] - ek);
+//			this_s[egas_i] -= H * (NDIM * (U[egas_i][j] + p) + U[sx_i][j] * U[sx_i][j] / U[rho_i][j]);
+//			this_s[tau_i] -= NDIM * H * U[tau_i][j] / opts.gamma;
 			for (int f = 0; f < opts.nhydro; f++) {
 				S[f][j] = (1.0 - opts.beta[rk]) * S[f][j] + opts.beta[rk] * this_s[f];
 			}
@@ -158,10 +160,10 @@ double hydro_grid::compute_flux(int rk) {
 	return amax;
 }
 
-void hydro_grid::substep_update(int rk, double dt) {
+void hydro_grid::substep_update(int rk, double dt, double a0, double a1) {
 	const double onembeta = 1.0 - opts.beta[rk];
 	const auto a = cosmos_a();
-	const double lambda = dt / dx / a;
+	const double lambda = dt / dx;
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		for (int f = 0; f < opts.nhydro; f++) {
 			auto &u = U[f][i];
@@ -173,6 +175,19 @@ void hydro_grid::substep_update(int rk, double dt) {
 			}
 			u += S[f][i] * dt;
 		}
+	}
+	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+		double ek = 0.0;
+		for (int dim = 0; dim < NDIM; dim++) {
+			ek += 0.5 * U[sx_i + dim][i] * U[sx_i + dim][i] / U[rho_i][i];
+		}
+		const auto p = (opts.gamma - 1.0) * (U[egas_i][i] - ek);
+		U[egas_i][i] -= std::pow(a1 - a0, NDIM) / std::pow(a1, NDIM) * (U[egas_i][i] + p) + 2.0 * (a1 - a0) / a1 * ek;
+		for (int dim = 0; dim < NDIM; dim++) {
+			U[sx_i + dim][i] *= std::pow(a0 / a1, NDIM + 1);
+		}
+		U[rho_i][i] *= std::pow(a0 / a1, NDIM);
+		U[tau_i][i] *= std::pow(a0 / a1, NDIM / opts.gamma);
 	}
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		if (U[rho_i][i] <= 0.0) {
@@ -279,9 +294,10 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 	}
 	if (opts.particles) {
 		for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
-			R[i] = pcount[i] > 10;
+			R[i] = pcount[i] > 2;
 		}
 	}
+	return;
 	if (opts.hydro) {
 		multi_range dirs(multi_range(index_type(0)).pad(1));
 		int dirmax = (std::pow(3, NDIM) - 1) / 2;
@@ -339,136 +355,159 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 }
 
 void hydro_grid::initialize() {
-	for (multi_iterator i(box); !i.end(); i++) {
-		double r = 0.0;
-		for (int dim = 0; dim < NDIM; dim++) {
-			r += std::pow(coord(i[dim]) - 0.5, 2);
-		}
-		r = std::sqrt(r);
-		for (int dim = 0; dim < NDIM; dim++) {
-			U[sx_i + dim][i] = 0.0;
-		}
-		if (opts.problem == "sod") {
-			double xsum = 0.0;
-			for (int dim = 0; dim < 1; dim++) {
-				xsum += coord(i[dim]) - 0.5;
-			}
-			U[sx_i][i] = 0.0;
-			if (xsum > 0.0) {
-				U[rho_i][i] = 1.0;
-				U[egas_i][i] = 1.0;
-			} else {
-				U[rho_i][i] = 0.1;
-				U[egas_i][i] = 0.125;
-			}
-			double ek = 0.0;
-			for (int dim = 0.0; dim < NDIM; dim++) {
-				ek += std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
-			}
-			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
-			U[egas_i][i] -= ek;
-		} else if (opts.problem == "blast") {
+	const auto a = cosmos_a();
+	if (opts.problem == "cosmos") {
+		const auto &parts = fileio_get_particles();
+		for (multi_iterator i(box); !i.end(); i++) {
 			U[rho_i][i] = 1.0;
-			if (r < 3.0 * dx) {
-				U[egas_i][i] = 1.0;
-			} else {
-				U[egas_i][i] = 1.0e-3;
+			U[egas_i][i] = 1.0e-2;
+			for (int dim = 0; dim < NDIM; dim++) {
+				U[sx_i + dim][i] = 0.0;
 			}
 			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
-		} else if (opts.problem == "kh") {
-			const int dim = NDIM - 1;
-			const double rnd = 2.0 * rand1() - 1.0;
-			if (std::abs(coord(i.index()[dim]) - 0.5) > 0.25) {
-				U[rho_i][i] = 1.0;
-				U[sx_i][i] = +0.5 + rnd * 0.0001;
-			} else {
-				U[sx_i][i] = -0.5;
-				U[rho_i][i] = 2.0 + 2.0 * rnd * 0.0001;
+		}
+		for (const auto &p : parts) {
+			const multi_index j = p.x / dx;
+			const auto drho = p.m * opts.omega_b / opts.omega_m / (a * a * a * dx * dx * dx);
+			U[rho_i][j] += drho;
+			for (int dim = 0; dim < NDIM; dim++) {
+				U[sx_i + dim][j] += p.v[dim] * drho;
 			}
-			for (int dim = 1; dim < NDIM; dim++) {
-				const double rnd = 2.0 * (double) (rand() + 0.5) / RAND_MAX - 1.0;
-				U[sx_i + dim][i] = rnd * 0.001 * U[rho_i][i];
-			}
-			const auto p = 2.5;
-			const auto ein = p / (opts.gamma - 1.0);
+		}
+		for (multi_iterator i(box); !i.end(); i++) {
 			double ek = 0.0;
 			for (int dim = 0; dim < NDIM; dim++) {
-				ek += 0.5 * std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
+				ek += 0.5 * U[sx_i + dim][i] * U[sx_i + dim][i] / U[rho_i][i];
 			}
-			U[egas_i][i] = ein + ek;
-			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
-		} else if (opts.problem == "sphere") {
-			for (int f = 0; f < opts.nhydro; f++) {
-				U[f][i] = 0.0;
-			}
-			constexpr auto r0 = 0.1;
-			constexpr auto rho0 = 1.0 / std::pow(r0, NDIM);
-			if (r < 0.5 * r0) {
-				U[rho_i][i] = rho0 * (1.0 - 6.0 * r / r0 * r / r0 * (1.0 - r / r0));
-			} else if (r < r0) {
-				U[rho_i][i] = rho0 * 2.0 * std::pow(1.0 - r / r0, 3);
-			} else {
-				U[rho_i][i] = 1.0e-6 / 4.0 / M_PI;
-			}
-			if ( NDIM == 3) {
-				U[rho_i][i] *= 8.0 / M_PI;
-			} else if ( NDIM == 2) {
-				U[rho_i][i] *= 40.0 / (7.0 * M_PI);
-			} else {
-				U[rho_i][i] *= 4.0 / 3.0;
-			}
-			U[egas_i][i] = 1e-5;
-		} else if (opts.problem == "rt") {
-			const auto y = coord(i[1]);
-			double p;
-			if (y > 0.5) {
-				U[rho_i][i] = 2.0 * (1.0 + rand1() * 0.000);
-			} else {
-				U[rho_i][i] = 1.0 * (1.0 + rand1() * 0.000);
-			}
-			if (std::abs(y - 0.5) < 0.25) {
-				U[sy_i][i] = rand1() * 0.005 * (1.0 + std::cos(4.0 * M_PI * (y - 0.5))) * U[rho_i][i];
-			}
-			p = std::max(2.5 - 0.1 * y * U[rho_i][i], 1.0e-3);
-			const auto ein = p / (opts.gamma - 1.0);
-			double ek = 0.0;
-			for (int dim = 0; dim < NDIM; dim++) {
-				ek += 0.5 * std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
-			}
-			U[egas_i][i] = ein + ek;
-			U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
-		} else if (opts.problem == "polytrope") {
+			U[egas_i][i] += ek;
+		}
+	} else {
+		for (multi_iterator i(box); !i.end(); i++) {
 			double r = 0.0;
 			for (int dim = 0; dim < NDIM; dim++) {
-				auto x = coord(i[dim]);
-				x -= 0.5;
-				r += std::pow(x, 2);
+				r += std::pow(coord(i[dim]) - 0.5, 2);
 			}
 			r = std::sqrt(r);
-			const auto n = 1.5;
-			const auto alpha = 0.02;
-			const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
-			assert(theta <= 1.0);
-			auto &rho = U[rho_i][i];
-			rho = std::max(1.0e-10, std::pow(theta, n));
-			const auto vx = 0.0;
-			const auto vy = 0.00;
-			U[sx_i][i] = vx * rho;
-			U[sy_i][i] = vy * rho;
-			const auto K = 4.0 * M_PI * alpha * alpha / (n + 1);
-			U[egas_i][i] = std::max(1.0e-12, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
-			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
-			U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
-		} else if (opts.problem == "cosmos") {
-			const auto a = cosmos_a();
-			U[rho_i][i] = opts.m_tot * 0.13 / std::pow(a, NDIM);
-			U[egas_i][i] = 1.0e-9*std::pow(U[rho_i][i], opts.gamma);
-			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
-		} else {
-			printf("unknown problem %s\n", opts.problem.c_str());
-			abort();
-		}
+			for (int dim = 0; dim < NDIM; dim++) {
+				U[sx_i + dim][i] = 0.0;
+			}
+			if (opts.problem == "sod") {
+				double xsum = 0.0;
+				for (int dim = 0; dim < 1; dim++) {
+					xsum += coord(i[dim]) - 0.5;
+				}
+				U[sx_i][i] = 0.0;
+				if (xsum > 0.0) {
+					U[rho_i][i] = 1.0;
+					U[egas_i][i] = 1.0;
+				} else {
+					U[rho_i][i] = 0.1;
+					U[egas_i][i] = 0.125;
+				}
+				double ek = 0.0;
+				for (int dim = 0.0; dim < NDIM; dim++) {
+					ek += std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
+				}
+				U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
+				U[egas_i][i] -= ek;
+			} else if (opts.problem == "blast") {
+				U[rho_i][i] = 1.0;
+				if (r < 3.0 * dx) {
+					U[egas_i][i] = 1.0;
+				} else {
+					U[egas_i][i] = 1.0e-3;
+				}
+				U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
+			} else if (opts.problem == "kh") {
+				const int dim = NDIM - 1;
+				const double rnd = 2.0 * rand1() - 1.0;
+				if (std::abs(coord(i.index()[dim]) - 0.5) > 0.25) {
+					U[rho_i][i] = 1.0;
+					U[sx_i][i] = +0.5 + rnd * 0.0001;
+				} else {
+					U[sx_i][i] = -0.5;
+					U[rho_i][i] = 2.0 + 2.0 * rnd * 0.0001;
+				}
+				for (int dim = 1; dim < NDIM; dim++) {
+					const double rnd = 2.0 * (double) (rand() + 0.5) / RAND_MAX - 1.0;
+					U[sx_i + dim][i] = rnd * 0.001 * U[rho_i][i];
+				}
+				const auto p = 2.5;
+				const auto ein = p / (opts.gamma - 1.0);
+				double ek = 0.0;
+				for (int dim = 0; dim < NDIM; dim++) {
+					ek += 0.5 * std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
+				}
+				U[egas_i][i] = ein + ek;
+				U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
+			} else if (opts.problem == "sphere") {
+				for (int f = 0; f < opts.nhydro; f++) {
+					U[f][i] = 0.0;
+				}
+				constexpr auto r0 = 0.1;
+				constexpr auto rho0 = 1.0 / std::pow(r0, NDIM);
+				if (r < 0.5 * r0) {
+					U[rho_i][i] = rho0 * (1.0 - 6.0 * r / r0 * r / r0 * (1.0 - r / r0));
+				} else if (r < r0) {
+					U[rho_i][i] = rho0 * 2.0 * std::pow(1.0 - r / r0, 3);
+				} else {
+					U[rho_i][i] = 1.0e-6 / 4.0 / M_PI;
+				}
+				if ( NDIM == 3) {
+					U[rho_i][i] *= 8.0 / M_PI;
+				} else if ( NDIM == 2) {
+					U[rho_i][i] *= 40.0 / (7.0 * M_PI);
+				} else {
+					U[rho_i][i] *= 4.0 / 3.0;
+				}
+				U[egas_i][i] = 1e-5;
+			} else if (opts.problem == "rt") {
+				const auto y = coord(i[1]);
+				double p;
+				if (y > 0.5) {
+					U[rho_i][i] = 2.0 * (1.0 + rand1() * 0.000);
+				} else {
+					U[rho_i][i] = 1.0 * (1.0 + rand1() * 0.000);
+				}
+				if (std::abs(y - 0.5) < 0.25) {
+					U[sy_i][i] = rand1() * 0.005 * (1.0 + std::cos(4.0 * M_PI * (y - 0.5))) * U[rho_i][i];
+				}
+				p = std::max(2.5 - 0.1 * y * U[rho_i][i], 1.0e-3);
+				const auto ein = p / (opts.gamma - 1.0);
+				double ek = 0.0;
+				for (int dim = 0; dim < NDIM; dim++) {
+					ek += 0.5 * std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
+				}
+				U[egas_i][i] = ein + ek;
+				U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
+			} else if (opts.problem == "polytrope") {
+				double r = 0.0;
+				for (int dim = 0; dim < NDIM; dim++) {
+					auto x = coord(i[dim]);
+					x -= 0.5;
+					r += std::pow(x, 2);
+				}
+				r = std::sqrt(r);
+				const auto n = 1.5;
+				const auto alpha = 0.02;
+				const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
+				assert(theta <= 1.0);
+				auto &rho = U[rho_i][i];
+				rho = std::max(1.0e-10, std::pow(theta, n));
+				const auto vx = 0.0;
+				const auto vy = 0.00;
+				U[sx_i][i] = vx * rho;
+				U[sy_i][i] = vy * rho;
+				const auto K = 4.0 * M_PI * alpha * alpha / (n + 1);
+				U[egas_i][i] = std::max(1.0e-12, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
+				U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
+				U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
+			} else {
+				printf("unknown problem %s\n", opts.problem.c_str());
+				abort();
+			}
 
+		}
 	}
 }
 

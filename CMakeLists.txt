@@ -30,6 +30,7 @@ set(astrotiger_source_files
 	src/cosmos.cpp
 	src/geometry.cpp
 	src/gravity.cpp
+	src/fileio.cpp
 	src/hpx.cpp
 	src/hydro_grid.cpp
 	src/main.cpp
@@ -49,6 +50,7 @@ set(astrotiger_header_files
  	astrotiger/channel.hpp	
  	astrotiger/cosmos.hpp	
  	astrotiger/defs.hpp	
+ 	astrotiger/fileio.hpp	
  	astrotiger/geometry.hpp	
  	astrotiger/gravity.hpp	
  	astrotiger/hpx.hpp	

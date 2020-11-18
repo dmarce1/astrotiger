@@ -1154,20 +1154,20 @@ std::vector<tree_client> tree::get_children() const {
 	return children;
 }
 
-void tree::hydro_substep(int rk, double this_dt, bool last) {
+void tree::hydro_substep(int rk, double this_dt, bool last, double a1, double a2) {
 	dt = this_dt;
 	if (rk == 0) {
 		hydro.store();
 		refine_step = 1;
 		energy_step = 0;
 	}
-	hydro.substep_update(rk, dt);
+	hydro.substep_update(rk, dt, a1, a2);
 	if (rk == opts.nrk - 1) {
-		if (!last) {
-			hydro.update_energy();
-			energy_step++;
-			get_energy_boundaries(t);
-		}
+//		if (!last) {
+//			hydro.update_energy();
+//			energy_step++;
+//			get_energy_boundaries(t);
+//		}
 		t0 = t;
 		t += dt;
 		last_dt = dt;
@@ -1175,8 +1175,8 @@ void tree::hydro_substep(int rk, double this_dt, bool last) {
 	const double next_t = ((rk != opts.nrk - 1) ? (t + opts.alpha[rk + 1] * this_dt) : t);
 	get_hydro_boundaries(next_t);
 	hydro.store_flux();
-	if (rk == opts.nrk - 1) {
-		hydro.compute_flux(rk == opts.nrk - 1 ? 0 : rk + 1);
+	if (rk == 0) {
+		hydro.compute_flux(1);
 	}
 }
 

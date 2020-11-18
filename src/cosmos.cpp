@@ -15,11 +15,13 @@ struct cosmos {
 	void advance_to_scalefactor(double);
 };
 
+static double H0;
+
 cosmos::cosmos() {
 	a = 1.0;
 	t = 0.0;
 	tau = 0.0;
-	adot = opts.H0;
+	adot = H0;
 }
 
 double dadt(double adot) {
@@ -27,7 +29,7 @@ double dadt(double adot) {
 }
 
 double dadotdt(double a, double adot) {
-	return opts.H0 * opts.H0 * (-0.5 * opts.omega_m / (a * a) + a * (1.0 - opts.omega_m));
+	return H0 * H0 * (-0.5 * opts.omega_m / (a * a) + a * (1.0 - opts.omega_m));
 }
 
 double dtaudt(double a) {
@@ -80,7 +82,9 @@ void cosmos::advance_to_scalefactor(double a2) {
 
 }
 
-double cosmos_set_z(double z) {
+double cosmos_set_z(double z, double h0) {
+	H0 = h0;
+	cosmos_init();
 	C.advance_to_scalefactor(1.0 / (z + 1.0));
 	return -C.t;
 }

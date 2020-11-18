@@ -17,6 +17,7 @@ public:
 	double clight;
 	double m_tot;
 	double omega_m;
+	double omega_b;
 	double code_to_cm;
 	double code_to_cm_per_s;
 	double code_to_g;
@@ -44,6 +45,8 @@ public:
 	double G;
 	double tmax;
 	double efficiency;
+	double part_mass;
+	double z;
 	std::string xpbnd;
 	std::string ypbnd;
 	std::string zpbnd;
@@ -57,6 +60,9 @@ public:
 
 	template<class Arc>
 	void serialize(Arc &arc, unsigned) {
+		arc & z;
+		arc & part_mass;
+		arc & omega_b;
 		arc & code_to_g;
 		arc & code_to_cm_per_s;
 		arc & code_to_cm;

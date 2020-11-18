@@ -169,7 +169,7 @@ public:
 	std::vector<std::vector<double>> get_hydro_prolong(std::vector<multi_range>, double);
 	std::vector<std::vector<double>> get_energy_prolong(std::vector<multi_range>, double);
 	std::pair<std::vector<double>, std::vector<double>> get_hydro_restrict();
-	void hydro_substep(int, double, bool);
+	void hydro_substep(int, double, bool, double, double);
 	void hydro_initialize(bool);
 	output_return output(DBfile *db, int) const;
 	multi_range get_box() const;
@@ -181,7 +181,7 @@ public:
 	void sanity() const;
 	statistics get_statistics(int lev, double t);
 	std::vector<double> restrict_all();
-	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m, int iters);
+	gravity_return gravity_solve(int pass, int level, const std::vector<double> coarse, double t, double m, int iterd);
 	double compute_error();
 	std::vector<double> get_fine_flux();
 	double apply_fine_fluxes();

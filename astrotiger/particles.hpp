@@ -14,6 +14,8 @@
 
 #include <cstdint>
 #include <vector>
+#include <array>
+
 
 struct particle {
 	vect<double> x;

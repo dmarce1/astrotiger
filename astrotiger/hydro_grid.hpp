@@ -81,7 +81,7 @@ public:
 	void unpack(const std::vector<double>&, multi_range bbox);
 	void unpack_field(int f, const std::vector<double>&, multi_range bbox);
 	void unpack_refinement(const std::vector<std::uint8_t>&, multi_range bbox);
-	void substep_update(int rk, double dt);
+	void substep_update(int rk, double dt, double a0, double a1);
 	void update_energy();
 	statistics get_statistics(const std::vector<multi_range>&) const;
 	double compare_analytic(const std::vector<multi_range> &cboxes, multi_array<double> &results) const;
