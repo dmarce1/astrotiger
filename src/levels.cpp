@@ -90,15 +90,15 @@ void levels_set_child_families(int level) {
 	}
 	hpx::wait_all(futs.begin(), futs.end());
 }
-void levels_apply_coarse_correction(int level) {
+void levels_apply_coarse_correction(int level, double a0, double a1) {
 	auto these_levels = levels;
 	std::vector<hpx::future<void>> futs;
 	if (hpx::get_locality_id() == 0 && other_localities.size()) {
-		futs.push_back(hpx::lcos::broadcast < levels_apply_coarse_correction_action > (other_localities, level));
+		futs.push_back(hpx::lcos::broadcast < levels_apply_coarse_correction_action > (other_localities, level, a0, a1));
 	}
 	for (auto *ptr : these_levels[level]) {
-		futs.push_back(hpx::async([ptr]() {
-			ptr->apply_coarse_correction();
+		futs.push_back(hpx::async([a0, a1, ptr]() {
+			ptr->apply_coarse_correction(a0, a1);
 		}));
 	}
 	hpx::wait_all(futs.begin(), futs.end());

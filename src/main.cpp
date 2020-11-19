@@ -59,8 +59,11 @@ double solve_gravity(int l, double t, double mtot) {
 }
 
 bool master(int level, int coarse_level, double tmax, bool already_refined = false) {
+	cosmos_advance(tm[level]);
+	double coarse_a0 = cosmos_a();
 	if (level > opts.max_level) {
-		levels_apply_coarse_correction(level - 1);
+		printf( "**Applying coarse correction to level %i\n", level - 1);
+	levels_apply_coarse_correction(level - 1, coarse_a0, coarse_a0);
 		return false;
 	}
 //	int oi = 0;
@@ -89,13 +92,17 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 				levels_set_child_families(l);
 				levels_get_hydro_boundaries(l + 1, tm[l + 1]);
 			}
+		} else {
+			levels_hydro_initialize(level, false);
 		}
 		double amax;
 		amax = levels_fine_fluxes(level);
 		if (amax == 0.0) {
 			tm[level] = tm[level - 1];
 			master(level + 1, coarse_level, tm[level]);
-			levels_apply_coarse_correction(level - 1);
+			double coarse_a1 = cosmos_a();
+//			printf( "--Applying coarse correction to level %i\n", level - 1);
+			levels_apply_coarse_correction(level - 1, coarse_a0, coarse_a1);
 			return false;
 		}
 //		levels_show();
@@ -120,7 +127,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		const auto a2 = cosmos_a();
 		const auto H2 = cosmos_adot();
 		cosmos_advance(tm[level]);
-		//	printf("Advancing level %i from %e to %e scale factor %e to %e %e %e\n", level, tm[level], tm[level] + dt[level], a1, a2, H1, H2);
+//		printf("Advancing level %i from %e to %e scale factor %e to %e %e %e\n", level, tm[level], tm[level] + dt[level], a1, a2, H1, H2);
 		if (opts.particles) {
 			if (level == levels_max_level()) {
 				root.kick(coarse_level, tm[level], last_dt, dt).get();
@@ -148,8 +155,11 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		}
 		this_step++;
 	} while (nstep != 1.0);
+	cosmos_advance(tm[level]);
+	double coarse_a1 = cosmos_a();
 	if (level > 0) {
-		levels_apply_coarse_correction(level - 1);
+//		printf( "Applying coarse correction to level %i\n", level - 1);
+		levels_apply_coarse_correction(level - 1, coarse_a0, coarse_a1);
 	}
 	super_step[level]++;
 	return true;
@@ -233,7 +243,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	double dt = 0.1;
+	double dt = 0.001;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

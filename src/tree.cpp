@@ -629,6 +629,7 @@ std::vector<double> tree::restrict_all() {
 		hydro.unpack(tmp, cbox);
 	}
 	get_hydro_boundaries(t);
+	hydro_step = 0;
 	return hydro.pack_restrict(box.half());
 }
 
@@ -637,7 +638,7 @@ std::vector<double> tree::get_fine_flux() {
 	return hydro.pack_coarse_flux();
 }
 
-void tree::apply_coarse_correction() {
+void tree::apply_coarse_correction(double a0, double a1) {
 	std::vector<hpx::future<std::pair<std::vector<double>, std::vector<double>>>> futs;
 	for (int i = 0; i < children.size(); i++) {
 		futs.push_back(children[i].get_hydro_restrict());
@@ -647,7 +648,7 @@ void tree::apply_coarse_correction() {
 		const auto cbox = children[i].get_box().half();
 		u.push_back(futs[i].get());
 		if (dt != 0.0) {
-			hydro.unpack_coarse_correction(u[i].second, cbox, last_dt);
+			hydro.unpack_coarse_correction(u[i].second, cbox, last_dt, a0, a1);
 		}
 	}
 	energy_step++;
@@ -663,6 +664,7 @@ void tree::apply_coarse_correction() {
 }
 
 void tree::hydro_initialize(bool refine) {
+	hydro_step = 0;
 	std::vector<multi_range> force_refine_boxes;
 	hpx::future<multi_array<int>> pfut;
 	hydro.store();
@@ -817,6 +819,7 @@ double tree::apply_fine_fluxes() {
 }
 
 void tree::get_hydro_boundaries(double this_time) {
+//	printf( "%i\n", (int) hydro_step);
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.hbw).intersection(box);
 		if (inter.volume()) {

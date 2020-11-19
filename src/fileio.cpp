@@ -119,7 +119,7 @@ void fileio_init_read() {
 		if ( NDIM > 1) {
 			part.x[1] = y;
 		}
-		if (NDIM > 3) {
+		if (NDIM > 2) {
 			part.x[2] = z;
 		}
 		part.rung = 0;

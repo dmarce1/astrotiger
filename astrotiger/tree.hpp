@@ -194,7 +194,7 @@ public:
 	double max_part_velocity() const;
 	void kick(int, double, std::vector<double>, std::vector<double>);
 	std::vector<double> compute_cic(const std::vector<double>&, double t, int );
-	void apply_coarse_correction();
+	void apply_coarse_correction(double a0, double a1);
 
 
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_cic);
