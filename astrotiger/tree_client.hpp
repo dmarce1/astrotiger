@@ -84,6 +84,7 @@ public:
 	hpx::future<std::vector<double>> get_fine_flux() const;
 	hpx::future<tree_client> truncate(multi_range box) const;
 	hpx::future<void> delist() const;
+	hpx::future<energy_statistics> get_energy_statistics() const;
 	hpx::future<void> list() const;
 	hpx::future<void> set_family(tree_client p, tree_client, std::vector<sibling> c) const;
 	hpx::future<double> initialize(int) const;

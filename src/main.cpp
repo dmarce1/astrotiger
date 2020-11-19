@@ -59,11 +59,14 @@ double solve_gravity(int l, double t, double mtot) {
 }
 
 bool master(int level, int coarse_level, double tmax, bool already_refined = false) {
+	if (level == 0) {
+		levels_show();
+	}
 	cosmos_advance(tm[level]);
 	double coarse_a0 = cosmos_a();
 	if (level > opts.max_level) {
-		printf( "**Applying coarse correction to level %i\n", level - 1);
-	levels_apply_coarse_correction(level - 1, coarse_a0, coarse_a0);
+//		printf( "**Applying coarse correction to level %i\n", level - 1);
+		levels_apply_coarse_correction(level - 1, coarse_a0, coarse_a0);
 		return false;
 	}
 //	int oi = 0;
@@ -76,9 +79,26 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 	const int max_refined = stats.min_level;
 	int this_step = 0;
 	int oi = 100;
+	static auto e = root.get_energy_statistics().get();
+	static auto last_e = e;
+	cosmos_advance(0.0);
+	static double last_a = cosmos_a();
+	static double a = cosmos_a();
+	static double epec = 0.0;
 	do {
+		if (level == 0) {
+			cosmos_advance(tm[level]);
+			last_e = e;
+			last_a = a;
+			e = root.get_energy_statistics().get();
+			a = cosmos_a();
+			epec += 0.5 * (e.ekin + last_e.ekin) * (a - last_a);
+			const auto etot = a * e.ekin + a * e.epot + epec;
+			static const auto etot0 = etot;
+			printf("%e %e %e %e %e %e %e\n", tm[level], a * e.ekin, a * e.epot, epec, etot, a, (etot-etot0)/e.ekin);
+		}
 		const auto a = cosmos_a();
-		bool refine = ((nstep == -1) && !already_refined) || (this_step % 2 == 0 && this_step > 0);
+		bool refine = ((nstep == -1) && !already_refined) || (this_step % 2 == 0 && this_step > 0 && level == 0);
 		if (nstep != -1) {
 			coarse_level = level;
 		}
@@ -86,11 +106,12 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		cosmos_advance(tm[level]);
 		if (refine) {
 			for (int l = level; l < opts.max_level; l++) {
-				printf("Refining level %i\n", l);
+//				printf("Refining level %i\n", l);
 				levels_hydro_initialize(l, refine);
-				levels_show();
+//				levels_show();
 				levels_set_child_families(l);
 				levels_get_hydro_boundaries(l + 1, tm[l + 1]);
+//				levels_energy_update(l + 1);
 			}
 		} else {
 			levels_hydro_initialize(level, false);
@@ -116,6 +137,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 			const auto gmax = solve_gravity(level, tm[level], mtot);
 //			printf( "gmax  = %e\n", gmax);
 			amax = std::max(amax, gmax);
+//			amax = std::max(amax, opts.cfl * a * dx[level] * cosmos_adot() / cosmos_a());
 		}
 		dt[level] = opts.cfl * a * dx[level] / amax;
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
@@ -145,10 +167,10 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		tm[level] += dt[level];
 		const bool has_next_level = master(level + 1, coarse_level, tm[level], refine);
 		///	printf( "-\n");
-	//	std::string fname = "X." + std::to_string(oi++) + ".silo";
-	//	output_silo(fname);
+		//	std::string fname = "X." + std::to_string(oi++) + ".silo";
+		//	output_silo(fname);
 		if (opts.particles && !has_next_level) {
-			printf("%e %e %e %i %e %e %e %e %e %e\n", amax, tm[level], dt[level], coarse_level, a1, a2, H1, H2, mtot1, mtot2);
+			//e		printf("%e %e %e %i %e %e %e %e %e %e\n", amax, tm[level], dt[level], coarse_level, a1, a2, H1, H2, mtot1, mtot2);
 			cosmos_advance(tm[level] + 0.5 * dt[level]);
 			root.drift(dt[level]).get();
 			root.finish_drift(std::vector<particle>()).get();
@@ -243,11 +265,10 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	double dt = 0.001;
+	double dt = opts.tmax / 100.0;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;
-		//	dt = std::min((double) 0.01, (double) 0.001 * cosmos_a() / cosmos_adot());
 		master(0, 0, std::min(t + dt, opts.tmax));
 		std::string fname = "X." + std::to_string(i) + ".silo";
 		output_silo(fname);

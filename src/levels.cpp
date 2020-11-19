@@ -13,6 +13,7 @@ HPX_PLAIN_ACTION (levels_hydro_substep);
 HPX_PLAIN_ACTION (levels_output_silo);
 HPX_PLAIN_ACTION (levels_fine_fluxes);
 HPX_PLAIN_ACTION (levels_max_level);
+HPX_PLAIN_ACTION (levels_energy_update);
 HPX_PLAIN_ACTION (levels_apply_coarse_correction);
 
 static std::vector<std::unordered_set<tree*>> levels;
@@ -90,6 +91,20 @@ void levels_set_child_families(int level) {
 	}
 	hpx::wait_all(futs.begin(), futs.end());
 }
+void levels_energy_update(int level) {
+	auto these_levels = levels;
+	std::vector<hpx::future<void>> futs;
+	if (hpx::get_locality_id() == 0 && other_localities.size()) {
+		futs.push_back(hpx::lcos::broadcast < levels_energy_update_action > (other_localities, level));
+	}
+	for (auto *ptr : these_levels[level]) {
+		futs.push_back(hpx::async([ptr]() {
+			ptr->energy_update();
+		}));
+	}
+	hpx::wait_all(futs.begin(), futs.end());
+}
+
 void levels_apply_coarse_correction(int level, double a0, double a1) {
 	auto these_levels = levels;
 	std::vector<hpx::future<void>> futs;

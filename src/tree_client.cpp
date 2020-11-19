@@ -7,6 +7,10 @@
 
 #include <astrotiger/tree.hpp>
 
+hpx::future<energy_statistics> tree_client::get_energy_statistics() const {
+	return hpx::async<tree::get_energy_statistics_action>(gid);
+}
+
 hpx::future<std::vector<double>> tree_client::compute_cic(const std::vector<double> &data, double t, int lev) const {
 	return hpx::async<tree::compute_cic_action>(gid, data, t, lev);
 }

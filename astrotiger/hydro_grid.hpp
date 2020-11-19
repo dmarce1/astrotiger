@@ -15,9 +15,11 @@
 
 #include <array>
 
+class energy_statistics;
+
 #define rho_i 0
 #define egas_i 1
-#define eps_i 2
+#define tau_i 2
 #define sx_i 3
 #define sy_i 4
 #define sz_i 5
@@ -90,6 +92,7 @@ public:
 	void to_array(multi_array<double>&, const multi_range &bbox, int, double) const;
 	std::vector<double> pack_coarse_flux();
 	double unpack_fine_flux(const std::vector<double>&, const multi_range&);
+	energy_statistics get_energy_statistics(const multi_array<double> &phi, const std::vector<multi_range>& exclude) const;
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

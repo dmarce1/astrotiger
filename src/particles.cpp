@@ -3,6 +3,7 @@
 #include <astrotiger/rand.hpp>
 #include <astrotiger/cosmos.hpp>
 #include <astrotiger/fileio.hpp>
+#include <astrotiger/tree.hpp>
 #include <array>
 
 std::vector<double> particles::pack_cic_restrict() const {
@@ -227,6 +228,41 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 			p.v += this_g * 0.5 * dt - p.v * adot / a * 0.5 * dt;
 		}
 	}
+}
+
+energy_statistics particles::get_energy_statistics(const multi_array<double> &phi) const {
+	energy_statistics e;
+	e.epot = 0.0;
+	e.ekin = 0.0;
+	for (auto &p : parts) {
+		multi_index i;
+		vect<double> this_g;
+		for (int dim = 0; dim < NDIM; dim++) {
+			i[dim] = int(((p.x[dim] - 0.5 * dx) + opts.max_bw * dx) / dx) - opts.max_bw;
+		}
+		double this_phi = 0.0;
+		multi_range this_box(i);
+		for (int dim2 = 0; dim2 < NDIM; dim2++) {
+			this_box.max[dim2]++;
+		}
+		for (multi_iterator j(this_box); !j.end(); j++) {
+			double w = 1.0;
+			for (int dim2 = 0; dim2 < NDIM; dim2++) {
+				const auto tmp = ((p.x[dim2] - 0.5 * dx) + opts.max_bw * dx) / dx - opts.max_bw;
+				if (j.index()[dim2] != i[dim2]) {
+					w *= tmp - i[dim2];
+				} else {
+					w *= 1.0 - tmp + i[dim2];
+				}
+			}
+			assert(w >= 0.0);
+			assert(w <= 1.0);
+			this_phi += w * phi[j];
+		}
+		e.epot += 0.5 * p.m * this_phi;
+		e.ekin += 0.5 * p.m * p.v.dot(p.v);
+	}
+	return e;
 }
 
 double particles::max_velocity() const {

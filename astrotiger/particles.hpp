@@ -17,6 +17,8 @@
 #include <array>
 
 
+class energy_statistics;
+
 struct particle {
 	vect<double> x;
 	vect<float> v;
@@ -61,6 +63,7 @@ public:
 	void set_child_boxes(const std::vector<multi_range>&);
 	std::vector<particle> get_child_parts();
 	void kick(int kick_level, int this_level, const std::vector<double>&, const std::vector<double>&, const std::array<multi_array<double>, NDIM> &g);
+	energy_statistics get_energy_statistics(const multi_array<double>& phi) const;
 	template<class A>
 	void serialize(A &&arc, unsigned) {
 		arc & parts;

@@ -20,6 +20,15 @@
 
 #define GRAVITY_FINAL_PASS 1000000
 
+struct energy_statistics {
+	double ekin;
+	double epot;
+	template<class A>
+	void serialize(A&& a, unsigned) {
+		a & ekin;
+		a & epot;
+	}
+};
 
 struct statistics {
 	std::vector<double> u;
@@ -178,6 +187,7 @@ public:
 	void get_gravity_boundaries(int);
 	void get_hydro_boundaries(double);
 	void get_energy_boundaries(double);
+	void energy_update();
 	void sanity() const;
 	statistics get_statistics(int lev, double t);
 	std::vector<double> restrict_all();
@@ -188,6 +198,7 @@ public:
 	void drift(double);
 	void finish_drift(std::vector<particle>);
 	void recv_parts(std::vector<particle>);
+	energy_statistics get_energy_statistics() const;
 	range<double> range_int_to_double( const multi_range& box );
 	multi_array<int> get_particle_count() const;
 	hpx::future<void> send_child_particles();
@@ -197,6 +208,7 @@ public:
 	void apply_coarse_correction(double a0, double a1);
 
 
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_energy_statistics);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_cic);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,kick);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,max_part_velocity);

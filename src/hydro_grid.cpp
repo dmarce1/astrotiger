@@ -18,6 +18,28 @@
 hydro_grid::hydro_grid() {
 }
 
+energy_statistics hydro_grid::get_energy_statistics(const multi_array<double> &phi, const std::vector<multi_range> &exclude) const {
+	const auto a = cosmos_a();
+	energy_statistics e;
+	e.ekin = 0.0;
+	e.epot = 0.0;
+	const auto dv = std::pow(dx * a, NDIM);
+	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+		bool use = true;
+		for (const auto &c : exclude) {
+			if (c.contains(i)) {
+				use = false;
+				break;
+			}
+		}
+		if (use) {
+			e.ekin += U[egas_i][i] * dv;
+			e.epot += U[rho_i][i] * 0.5 * phi[i] * dv;
+		}
+	}
+	return e;
+}
+
 void hydro_grid::to_array(multi_array<double> &a, const multi_range &bbox, int f, double w) const {
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		a[i] = w * U[f][i] + (1.0 - w) * U0[f][i];
@@ -37,21 +59,21 @@ double hydro_grid::positivity_limit() const {
 	double amax = 0.0;
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		double df_rho = 0.0;
-		double df_eps = 0.0;
+		double df_tau = 0.0;
 		for (int dim = 0; dim < NDIM; dim++) {
 			multi_index ip1 = i;
 			ip1[dim]++;
 			df_rho += (F[dim][rho_i][ip1] - F[dim][rho_i][i]) / std::pow(a, NDIM - 1);
-			df_eps += (F[dim][eps_i][ip1] - F[dim][eps_i][i]) / std::pow(a, NDIM - 1);
+			df_tau += (F[dim][tau_i][ip1] - F[dim][tau_i][i]) / std::pow(a, NDIM - 1);
 		}
 		amax = std::max(amax, std::max(df_rho, 0.0) / U[rho_i][i]);
-		amax = std::max(amax, std::max(df_eps, 0.0) / U[eps_i][i]);
+		amax = std::max(amax, std::max(df_tau, 0.0) / U[tau_i][i]);
 	}
 	return amax;
 }
 
 void hydro_grid::transform_scale(double a0, double a1) {
-	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
+	for (multi_iterator i(box); !i.end(); i++) {
 		double ek = 0.0;
 		for (int dim = 0; dim < NDIM; dim++) {
 			ek += 0.5 * U[sx_i + dim][i] * U[sx_i + dim][i] / U[rho_i][i];
@@ -64,7 +86,7 @@ void hydro_grid::transform_scale(double a0, double a1) {
 			U[sx_i + dim][i] *= std::pow(a0 / a1, NDIM + 1);
 		}
 		U[rho_i][i] *= std::pow(a0 / a1, NDIM);
-		U[eps_i][i] *= std::pow(a0 / a1, NDIM);
+		U[tau_i][i] *= std::pow(a0 / a1, NDIM);
 	}
 }
 
@@ -88,12 +110,12 @@ double hydro_grid::compute_flux(int rk) {
 			printf("compute_flux: rho is less than zero %e\n", U[rho_i][i]);
 			abort();
 		}
-		if (U[eps_i][i] < 0.0) {
-			printf("compute_flux: eps is less than zero %e\n", U[eps_i][i]);
+		if (U[tau_i][i] < 0.0) {
+			printf("compute_flux: tau is less than zero %e\n", U[tau_i][i]);
 			abort();
 		}
 		assert(U[rho_i][i] > 0.0);
-		assert(U[eps_i][i] >= 0.0);
+		assert(U[tau_i][i] >= 0.0);
 		const auto rhoinv = 1.0 / U[rho_i][i];
 		double ek = 0.0;
 		V[rho_i][i] = U[rho_i][i];
@@ -102,7 +124,7 @@ double hydro_grid::compute_flux(int rk) {
 			V[sx_i + dim][i] = U[sx_i + dim][i] * rhoinv;
 		}
 		V[egas_i][i] = U[egas_i][i] - ek;
-		V[eps_i][i] = U[eps_i][i];
+		V[tau_i][i] = std::pow(U[tau_i][i], opts.gamma);
 
 	}
 	for (int dim = 0; dim < NDIM; dim++) {
@@ -135,8 +157,8 @@ double hydro_grid::compute_flux(int rk) {
 			}
 			ur[egas_i] = vr[egas_i] + ekr;
 			ul[egas_i] = vl[egas_i] + ekl;
-			ur[eps_i] = vr[eps_i];
-			ul[eps_i] = vl[eps_i];
+			ur[tau_i] = std::pow(vr[tau_i], 1.0 / opts.gamma);
+			ul[tau_i] = std::pow(vl[tau_i], 1.0 / opts.gamma);
 			const auto this_amax = hydro_flux(flux, ul, ur, dim);
 			amax = std::max(amax, this_amax);
 //			if (this_amax > 1e4) {
@@ -175,20 +197,12 @@ double hydro_grid::compute_flux(int rk) {
 			}
 //			this_s[rho_i] -= NDIM * H * U[rho_i][j];
 			this_s[egas_i] += sdotg;
-			for (int dim = 0; dim < NDIM; dim++) {
-				auto jp = j.index();
-				jp[dim]++;
-				const auto vl = (VR[sx_i + dim][j] + VL[sx_i + dim][j]) * 0.5;
-				const auto vr = (VR[sx_i + dim][jp] + VL[sx_i + dim][jp]) * 0.5;
-				this_s[eps_i] -= (opts.gamma - 1.0) * U[eps_i][j] * (vr - vl) / (a * dx);
-			}
-//			double ek = 0.0;
 //			for (int dim = 0; dim < NDIM; dim++) {
 //				ek += 0.5 * U[sx_i + dim][j] * U[sx_i + dim][j] / U[rho_i][j];
 //			}
 //			const auto p = (opts.gamma - 1.0) * (U[egas_i][j] - ek);
 //			this_s[egas_i] -= H * (NDIM * (U[egas_i][j] + p) + U[sx_i][j] * U[sx_i][j] / U[rho_i][j]);
-//			this_s[eps_i] -= NDIM * H * U[eps_i][j] / opts.gamma;
+//			this_s[tau_i] -= NDIM * H * U[tau_i][j] / opts.gamma;
 			for (int f = 0; f < opts.nhydro; f++) {
 				S[f][j] = (1.0 - opts.beta[rk]) * S[f][j] + opts.beta[rk] * this_s[f];
 			}
@@ -219,8 +233,8 @@ void hydro_grid::substep_update(int rk, double dt, double a0, double a1) {
 			printf("substep_update: rho is less than zero %e\n", U[rho_i][i]);
 			abort();
 		}
-		if (U[eps_i][i] < 0.0) {
-			printf("substep_update: au is less than zero %e\n", U[eps_i][i]);
+		if (U[tau_i][i] < 0.0) {
+			printf("substep_update: au is less than zero %e\n", U[tau_i][i]);
 			abort();
 		}
 	}
@@ -319,7 +333,7 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 	}
 	if (opts.particles) {
 		for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
-			R[i] = pcount[i] > 2;
+			R[i] = pcount[i] > (1 << NDIM);
 		}
 	}
 	return;
@@ -345,14 +359,14 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 			}
 			for (multi_iterator k(box.pad(-opts.hbw)); !k.end(); k++) {
 				if (!R[k]) {
-					constexpr double eps = 0.1;
+					constexpr double tau = 0.1;
 					for (int f = 0; f < opts.nhydro; f++) {
 						const auto up = U[f][k.index() + j];
 						const auto u0 = U[f][k];
 						const auto um = U[f][k.index() - j];
 						double c0;
 						if (f < sx_i || f >= sx_i + NDIM) {
-							c0 = eps * (std::abs(up) + std::abs(um) + 2.0 * std::abs(u0));
+							c0 = tau * (std::abs(up) + std::abs(um) + 2.0 * std::abs(u0));
 						} else {
 							double vp = 0.0;
 							double v0 = 0.0;
@@ -362,7 +376,7 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 								v0 += std::max(0.0, U[egas_i][k] / U[rho_i][k]);
 								vp += std::max(0.0, U[egas_i][k.index() + j] / U[rho_i][k.index() + 1]);
 							}
-							c0 = eps * (std::sqrt(vp) + std::sqrt(vm) + 2.0 * std::sqrt(v0));
+							c0 = tau * (std::sqrt(vp) + std::sqrt(vm) + 2.0 * std::sqrt(v0));
 						}
 						const auto num = std::abs(up + um - 2.0 * u0) / std::sqrt(n_one);
 						const auto den = std::abs(up - u0) + std::abs(u0 - um) + c0;
@@ -384,21 +398,46 @@ void hydro_grid::initialize() {
 	if (opts.problem == "cosmos") {
 		const auto &parts = fileio_get_particles();
 		for (multi_iterator i(box); !i.end(); i++) {
-			U[rho_i][i] = 10.0;
-			U[egas_i][i] = 1.0e-1;
+			U[rho_i][i] = 1.0e-3;
+			U[egas_i][i] = 1.0e-10;
 			for (int dim = 0; dim < NDIM; dim++) {
 				U[sx_i + dim][i] = 0.0;
 			}
-			U[eps_i][i] = U[egas_i][i];
+			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		}
-		for (const auto &p : parts) {
-			const multi_index j = p.x / dx;
-			if (box.contains(j)) {
-				const auto drho = p.m * opts.omega_b / opts.omega_m / (std::pow(a, NDIM) * dx * dx * dx);
-				U[rho_i][j] += drho;
+		multi_range pbox = multi_range(vect<int>(0)).pad(1);
+		for (multi_iterator q(pbox); !q.end(); q++) {
+			for (const auto &p : parts) {
+				const auto x = p.x + vect<double>(q.index());
+				multi_index j;
+				vect<double> w;
 				for (int dim = 0; dim < NDIM; dim++) {
-					U[sx_i + dim][j] += p.v[dim] * drho;
+					j[dim] = int((x[dim] + 1.0 - 0.5 * dx) / dx) - int((1.0 + 0.1 * dx) / dx);
+					w[dim] = (x[dim] - 0.5 * dx) / dx - j[dim];
 				}
+				auto this_box = multi_range(j);
+				for (int dim = 0; dim < NDIM; dim++) {
+					this_box.max[dim]++;
+				}
+				for (multi_iterator k(this_box); !k.end(); k++) {
+					double wt = 1.0;
+					for (int dim = 0; dim < NDIM; dim++) {
+						if (j[dim] == k[dim]) {
+							wt *= 1.0 - w[dim];
+						} else {
+							wt *= w[dim];
+						}
+					}
+					if (box.contains(k)) {
+						//	printf( "%e\n", wt);
+						const auto drho = wt * p.m * opts.omega_b / opts.omega_m / (std::pow(a, NDIM) * dx * dx * dx);
+						U[rho_i][k] += drho;
+						for (int dim = 0; dim < NDIM; dim++) {
+							U[sx_i + dim][k] += p.v[dim] * drho;
+						}
+					}
+				}
+
 			}
 		}
 		for (multi_iterator i(box); !i.end(); i++) {
@@ -435,7 +474,7 @@ void hydro_grid::initialize() {
 				for (int dim = 0.0; dim < NDIM; dim++) {
 					ek += std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
 				}
-				U[eps_i][i] = U[egas_i][i];
+				U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 				U[egas_i][i] -= ek;
 			} else if (opts.problem == "blast") {
 				U[rho_i][i] = 1.0;
@@ -444,7 +483,7 @@ void hydro_grid::initialize() {
 				} else {
 					U[egas_i][i] = 1.0e-3;
 				}
-				U[eps_i][i] = U[egas_i][i];
+				U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 			} else if (opts.problem == "kh") {
 				const int dim = NDIM - 1;
 				const double rnd = 2.0 * rand1() - 1.0;
@@ -466,7 +505,7 @@ void hydro_grid::initialize() {
 					ek += 0.5 * std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
 				}
 				U[egas_i][i] = ein + ek;
-				U[eps_i][i] = ein;
+				U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
 			} else if (opts.problem == "sphere") {
 				for (int f = 0; f < opts.nhydro; f++) {
 					U[f][i] = 0.0;
@@ -506,7 +545,7 @@ void hydro_grid::initialize() {
 					ek += 0.5 * std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
 				}
 				U[egas_i][i] = ein + ek;
-				U[eps_i][i] = ein;
+				U[tau_i][i] = std::pow(ein, 1.0 / opts.gamma);
 			} else if (opts.problem == "polytrope") {
 				double r = 0.0;
 				for (int dim = 0; dim < NDIM; dim++) {
@@ -527,7 +566,7 @@ void hydro_grid::initialize() {
 				U[sy_i][i] = vy * rho;
 				const auto K = 4.0 * M_PI * alpha * alpha / (n + 1);
 				U[egas_i][i] = std::max(1.0e-12, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
-				U[eps_i][i] = U[egas_i][i];
+				U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 				U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
 			} else {
 				printf("unknown problem %s\n", opts.problem.c_str());
@@ -584,22 +623,22 @@ void hydro_grid::enforce_physical_bc(int dir) {
 
 void hydro_grid::update_energy() {
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
-		double max_egas = 0.0;
+//		double U[egas_i][i] = 0.0;
 		double ekin = 0.0;
-		for (multi_iterator d(multi_range(0).pad(1)); !d.end(); d++) {
-			max_egas = std::max(max_egas, U[egas_i][i]);
-		}
+//		for (multi_iterator d(multi_range(0).pad(1)); !d.end(); d++) {
+//			max_egas = std::max(max_egas, U[egas_i][i]);
+//		}
 		for (int dim = 0; dim < NDIM; dim++) {
 			ekin += 0.5 * std::pow(U[sx_i + dim][i], 2) / U[rho_i][i];
 		}
 		const double eint = U[egas_i][i] - ekin;
-		if (eint > max_egas * 0.1) {
-//			const auto a = U[eps_i][i];
+		if (eint > U[egas_i][i] * 0.1) {
+//			const auto a = U[tau_i][i];
 //			const auto b = std::pow(eint, 1.0 / opts.gamma);
 //			if (std::abs(std::log(a / b)) > 0.1) {
 //				printf("%e %e\n", a, b);
 //			}
-			U[eps_i][i] = eint;
+			U[tau_i][i] = std::pow(eint, 1.0 / opts.gamma);
 		}
 	}
 }
@@ -647,20 +686,20 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 	}
 	if (range.volume()) {
 		boxes.push_back(range);
-//		for (const auto &amr : amr_boxes) {
-//			tmp.resize(0);
-//			for (const auto &b : boxes) {
-//				const auto amrbox = amr.pad(0);
-//				if (amrbox.intersection(b).volume()) {
-//					auto tmp2 = b.subtract(amrbox);
-//					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
-//				} else {
-//					tmp.push_back(b);
-//				}
-//			}
-//			boxes = std::move(tmp);
-//		}
-//		tmp.resize(0);
+		for (const auto &amr : amr_boxes) {
+			tmp.resize(0);
+			for (const auto &b : boxes) {
+				const auto amrbox = amr.pad(1);
+				if (amrbox.intersection(b).volume()) {
+					auto tmp2 = b.subtract(amrbox);
+					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());
+				} else {
+					tmp.push_back(b);
+				}
+			}
+			boxes = std::move(tmp);
+		}
+		tmp.resize(0);
 		for (const auto &b : boxes) {
 			bool found = false;
 			for (multi_iterator i(b); !i.end(); i++) {
@@ -968,7 +1007,6 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const multi_range &bbox, double dt, double a0, double a1) {
 //	printf( "unpacking coarse_correcton\n");
 	int k = 0;
-	transform_scale(a1, a0);
 	const auto a = cosmos_a();
 	const auto lambda = dt / (dx * std::pow(a, NDIM));
 	for (int dim = 0; dim < NDIM; dim++) {
@@ -983,18 +1021,17 @@ void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const
 				U[f][i] += flux;
 				U[f][im] -= flux;
 				if (f == rho_i) {
-	//				printf("%e %e\n", data[k] / (dx * std::pow(a, NDIM)), lambda * F0[dim][f][i]);
+					//				printf("%e %e\n", data[k] / (dx * std::pow(a, NDIM)), lambda * F0[dim][f][i]);
 				}
 				k++;
-				const auto factor = std::pow(a, NDIM) * dx / (1 << (NDIM - 1));
-				if (i.index()[dim] % 2 == 0) {
-					const auto j = i.index() / 2;
-					Fc[dim][f][j] += flux * factor;
-				}
+//				const auto factor = std::pow(a, NDIM) * dx / (1 << (NDIM - 1));
+//				if (i.index()[dim] % 2 == 0) {
+//					const auto j = i.index() / 2;
+//					Fc[dim][f][j] += flux * factor;
+//				}
 			}
 		}
 	}
-	transform_scale(a0, a1);
 	assert(k == data.size());
 }
 
@@ -1033,11 +1070,11 @@ void hydro_grid::unpack(const std::vector<double> &data, multi_range bbox) {
 	}
 	for (multi_iterator i(bbox); !i.end(); i++) {
 		if (U[rho_i][i] <= 0.0) {
-			printf("rho is less than zero %e\n", U[rho_i][i]);
+			printf("1 rho is less than zero %e\n", U[rho_i][i]);
 			abort();
 		}
-		if (U[eps_i][i] < 0.0) {
-			printf("eps is less than zero %e\n", U[eps_i][i]);
+		if (U[tau_i][i] < 0.0) {
+			printf("1 tau is less than zero %e\n", U[tau_i][i]);
 			abort();
 		}
 	}
@@ -1079,7 +1116,7 @@ std::vector<std::string> hydro_grid::field_names() {
 	std::vector<std::string> names;
 	names.push_back("D");
 	names.push_back("E");
-	names.push_back("eps");
+	names.push_back("tau");
 	for (int dim = 0; dim < NDIM; dim++) {
 		names.push_back(std::string("S") + char('x' + dim));
 	}

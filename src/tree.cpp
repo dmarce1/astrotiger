@@ -39,6 +39,8 @@ using get_particle_count_action_type = tree::get_particle_count_action;
 using max_part_velocity_action_type = tree::max_part_velocity_action;
 using kick_action_type = tree::kick_action;
 using compute_cic_action_type = tree::compute_cic_action;
+using get_energy_statistics_action_type = tree::get_energy_statistics_action;
+HPX_REGISTER_ACTION (get_energy_statistics_action_type);
 HPX_REGISTER_ACTION (compute_cic_action_type);
 HPX_REGISTER_ACTION (kick_action_type);
 HPX_REGISTER_ACTION (max_part_velocity_action_type);
@@ -65,6 +67,33 @@ HPX_REGISTER_ACTION (set_family_action_type);
 HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
+
+energy_statistics tree::get_energy_statistics() const {
+	energy_statistics e, tmp;
+	e.ekin = e.epot = 0.0;
+	std::vector<multi_range> boxes;
+	std::vector<hpx::future<energy_statistics>> futs;
+	for( const auto c : children) {
+		boxes.push_back(c.get_box());
+		futs.push_back(c.get_energy_statistics());
+	}
+	for( auto& f : futs) {
+		tmp = f.get();
+		e.ekin += tmp.ekin;
+		e.epot += tmp.epot;
+	}
+	if (opts.particles) {
+		tmp = parts.get_energy_statistics(grav.get_phi());
+		e.ekin += tmp.ekin;
+		e.epot += tmp.epot;
+	}
+	if (opts.hydro) {
+		tmp = hydro.get_energy_statistics(grav.get_phi(), boxes);
+		e.ekin += tmp.ekin;
+		e.epot += tmp.epot;
+	}
+	return e;
+}
 
 std::vector<double> tree::compute_cic(const std::vector<double> &coarse, double this_t, int this_level) {
 	gravity_step = 0;
@@ -490,7 +519,7 @@ std::vector<double> tree::get_energy_boundary(multi_range b, int this_step) {
 	while (energy_step % 3 != this_step % 3) {
 		hpx::this_thread::yield();
 	}
-	return hydro.pack_field(egas_i, b);
+	return hydro.pack_field(tau_i, b);
 }
 
 std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> tree::get_refinement_boundary(multi_range b, int this_step) {
@@ -532,7 +561,7 @@ std::vector<std::vector<double>> tree::get_energy_prolong(std::vector<multi_rang
 	}
 	std::vector<std::vector<double>> p(ranges.size());
 	for (int j = 0; j < ranges.size(); j++) {
-		p[j] = hydro.pack_field_prolong(egas_i, ranges[j], w);
+		p[j] = hydro.pack_field_prolong(tau_i, ranges[j], w);
 	}
 	return p;
 }
@@ -644,6 +673,7 @@ void tree::apply_coarse_correction(double a0, double a1) {
 		futs.push_back(children[i].get_hydro_restrict());
 	}
 	std::vector<std::pair<std::vector<double>, std::vector<double>>> u;
+	hydro.transform_scale(a1, a0);
 	for (int i = 0; i < children.size(); i++) {
 		const auto cbox = children[i].get_box().half();
 		u.push_back(futs[i].get());
@@ -651,20 +681,28 @@ void tree::apply_coarse_correction(double a0, double a1) {
 			hydro.unpack_coarse_correction(u[i].second, cbox, last_dt, a0, a1);
 		}
 	}
-	energy_step++;
-	get_energy_boundaries(t);
-	hydro.update_energy();
+//	energy_step++;
+	//	get_energy_boundaries(t);
+	//	hydro.update_energy();
+	hydro.transform_scale(a0, a1);
 	for (int i = 0; i < children.size(); i++) {
 		const auto cbox = children[i].get_box().half();
 		hydro.unpack(u[i].first, cbox);
 	}
 	get_hydro_boundaries(t);
-	energy_step = 0;
 	hydro_step = 0;
+}
+
+void tree::energy_update() {
+	hydro.update_energy();
+//	energy_step++;
+//	printf( "%i\n", (int) energy_step);
+	get_energy_boundaries(t);
 }
 
 void tree::hydro_initialize(bool refine) {
 	hydro_step = 0;
+	energy_step = 0;
 	std::vector<multi_range> force_refine_boxes;
 	hpx::future<multi_array<int>> pfut;
 	hydro.store();
@@ -819,6 +857,7 @@ double tree::apply_fine_fluxes() {
 }
 
 void tree::get_hydro_boundaries(double this_time) {
+	energy_step = 0;
 //	printf( "%i\n", (int) hydro_step);
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.hbw).intersection(box);
@@ -982,14 +1021,14 @@ void tree::get_energy_boundaries(double this_time) {
 		auto parent_fut = parent.get_energy_prolong(parent_ranges, this_time);
 		const auto datas = parent_fut.get();
 		for (int i = 0; i < datas.size(); i++) {
-			hydro.unpack(datas[i], parent_ranges[i]);
+			hydro.unpack_field(tau_i, datas[i], parent_ranges[i]);
 		}
 	}
 	int j = 0;
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
 			const auto data = sib_futs[j].get();
-			hydro.unpack_field(egas_i, data, sib_ranges[i]);
+			hydro.unpack_field(tau_i, data, sib_ranges[i]);
 			j++;
 		}
 	}
@@ -1187,6 +1226,7 @@ void tree::hydro_substep(int rk, double this_dt, bool last, double a1, double a2
 		hydro.compute_flux(1);
 		hydro.store_flux();
 	}
+	energy_step = 0;
 }
 
 double tree::initialize(int this_level) {

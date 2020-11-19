@@ -26,9 +26,9 @@ template<class T>
 inline double hydro_pressure(const std::vector<T> &u) {
 	using namespace std;
 	auto eint = max(T(0), u[egas_i] - hydro_kinetic(u));
-	if (eint < u[egas_i] * 0.001) {
-		eint = u[eps_i];
-	}
+//	if (eint < u[egas_i] * 0.001) {
+		eint = std::pow(u[tau_i], opts.gamma);
+///	}
 	return (opts.gamma - 1.0) * eint;
 }
 
@@ -68,7 +68,7 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 			const auto rho0 = rho_l * (sl - vl) / (sl - s0);
 			u0[rho_i] = rho0;
 			u0[sx_i + dim] = rho0 * s0;
-			u0[eps_i] = rho0 / rho_l * ul[eps_i];
+			u0[tau_i] = rho0 / rho_l * ul[tau_i];
 			for (int dim2 = 0; dim2 < NDIM; dim2++) {
 				if (dim != dim2) {
 					u0[sx_i + dim2] = rho0 * ul[sx_i + dim2] / rho_l;
@@ -83,7 +83,7 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 			const auto rho0 = rho_r * (sr - vr) / (sr - s0);
 			u0[rho_i] = rho0;
 			u0[sx_i + dim] = rho0 * s0;
-			u0[eps_i] = rho0 / rho_r * ur[eps_i];
+			u0[tau_i] = rho0 / rho_r * ur[tau_i];
 			for (int dim2 = 0; dim2 < NDIM; dim2++) {
 				if (dim != dim2) {
 					u0[sx_i + dim2] = rho0 * ur[sx_i + dim2] / rho_r;
