@@ -27,7 +27,7 @@ inline double hydro_pressure(const std::vector<T> &u) {
 	using namespace std;
 	auto eint = max(T(0), u[egas_i] - hydro_kinetic(u));
 	if (eint < u[egas_i] * 0.001) {
-		eint = std::pow(u[tau_i], opts.gamma);
+		eint = u[eps_i];
 	}
 	return (opts.gamma - 1.0) * eint;
 }
@@ -49,19 +49,12 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 	const auto rho_l = ul[rho_i];
 	const auto rhorinv = 1.0 / rho_r;
 	const auto rholinv = 1.0 / rho_l;
-	const auto c0 = opts.gamma / (opts.gamma - 1.0);
-	const auto hr = (ur[egas_i] + pr) * rhorinv;
-	const auto hl = (ul[egas_i] + pl) * rholinv;
 	const auto vr = ur[sx_i + dim] * rhorinv;
 	const auto vl = ul[sx_i + dim] * rholinv;
-	const auto wl = std::sqrt(rho_l);
-	const auto wr = std::sqrt(rho_r);
-	const auto wsuminv = 1.0 / (wl + wr);
-	const auto vroe = (wl * vl + wr * vr) * wsuminv;
-	const auto hroe = (wl * hl + wr * hr) * wsuminv;
-	const auto aroe = std::sqrt((opts.gamma - 1.0) * std::max((hroe - 0.5 * vroe * vroe), 0.0));
-	const auto sr = vroe + aroe;
-	const auto sl = vroe - aroe;
+	const auto al = std::sqrt(opts.gamma * std::max(pl / rho_l, 1.0e-20));
+	const auto ar = std::sqrt(opts.gamma * std::max(pr / rho_r, 1.0e-20));
+	const auto sr = std::max(vr + ar, vl + al);
+	const auto sl = std::min(vr - ar, vl - al);
 
 	if (0 <= sl) {
 		physical_flux(flux, ul, vl, pl, dim);
@@ -75,7 +68,7 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 			const auto rho0 = rho_l * (sl - vl) / (sl - s0);
 			u0[rho_i] = rho0;
 			u0[sx_i + dim] = rho0 * s0;
-			u0[tau_i] = rho0 / rho_l * ul[tau_i];
+			u0[eps_i] = rho0 / rho_l * ul[eps_i];
 			for (int dim2 = 0; dim2 < NDIM; dim2++) {
 				if (dim != dim2) {
 					u0[sx_i + dim2] = rho0 * ul[sx_i + dim2] / rho_l;
@@ -90,7 +83,7 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 			const auto rho0 = rho_r * (sr - vr) / (sr - s0);
 			u0[rho_i] = rho0;
 			u0[sx_i + dim] = rho0 * s0;
-			u0[tau_i] = rho0 / rho_r * ur[tau_i];
+			u0[eps_i] = rho0 / rho_r * ur[eps_i];
 			for (int dim2 = 0; dim2 < NDIM; dim2++) {
 				if (dim != dim2) {
 					u0[sx_i + dim2] = rho0 * ur[sx_i + dim2] / rho_r;
@@ -106,7 +99,7 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 	return std::max(std::abs(sr), std::abs(sl));
 
 }
-//
+
 //template<class T>
 //double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vector<T> &ur, int dim) {
 //	using namespace std;

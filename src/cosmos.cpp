@@ -1,6 +1,8 @@
 #include <astrotiger/cosmos.hpp>
 #include <astrotiger/options.hpp>
 
+#include <cmath>
+
 struct cosmos {
 	double t, tau, a, adot;
 	template<class A>
@@ -29,7 +31,7 @@ double dadt(double adot) {
 }
 
 double dadotdt(double a, double adot) {
-	return H0 * H0 * (-0.5 * opts.omega_m / (a * a) + a * (1.0 - opts.omega_m));
+	return H0 * H0 * (-0.5 * opts.omega_m / std::pow(a,NDIM-1) + a * (1.0 - opts.omega_m));
 }
 
 double dtaudt(double a) {
@@ -72,7 +74,6 @@ void cosmos_reset_time() {
 	C.t = 0.0;
 }
 
-
 void cosmos::advance_to_scalefactor(double a2) {
 	double a1 = a2;
 	while (std::abs(a / a2 - 1.0) > 1.0e-6) {
@@ -98,6 +99,6 @@ double cosmos_adot() {
 }
 
 void cosmos_advance(double t) {
-	C.advance_to_time( t - opts.tmax);
+	C.advance_to_time(t - opts.tmax);
 
 }

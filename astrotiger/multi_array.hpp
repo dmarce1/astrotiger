@@ -127,7 +127,10 @@ public:
 		assert(i >= 0);
 		const auto c = a[ip] - a[i];
 		const auto b = a[i] - a[im];
-		return (std::copysign(0.5, c) + std::copysign(0.5, b)) * std::min(std::abs(c), std::abs(b));
+		auto slp(std::copysign(0.5, c) + std::copysign(0.5, b));
+		std::min(std::abs(c), std::abs(b));
+		slp = std::copysign(1.0, slp) * std::min(std::abs(slp), std::abs(a[i]));
+		return slp;
 	}
 
 	multi_array restrict_(const multi_range &res_box) const {
@@ -192,18 +195,15 @@ public:
 	}
 };
 
-
 struct boundary {
 	std::vector<multi_range> boxes;
 	std::vector<std::vector<double>> data;
 
 	template<class A>
-	void serialize(A&& arc, unsigned) {
+	void serialize(A &&arc, unsigned) {
 		arc & boxes;
 		arc & data;
 	}
 };
-
-
 
 #endif /* ASTROTIGER_MULTI_ARRAY_HPP_ */

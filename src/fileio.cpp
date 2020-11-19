@@ -113,9 +113,15 @@ void fileio_init_read() {
 			z = 0.0;
 		}
 		particle part;
-		part.x[0] = x;
-		part.x[1] = y;
-		part.x[2] = z;
+		if ( NDIM > 0) {
+			part.x[0] = x;
+		}
+		if ( NDIM > 1) {
+			part.x[1] = y;
+		}
+		if (NDIM > 3) {
+			part.x[2] = z;
+		}
 		part.rung = 0;
 		part.m = opts.part_mass;
 //		part.out = 0;
@@ -129,9 +135,15 @@ void fileio_init_read() {
 		FREAD_ASSERT(fread(&vx, sizeof(float), 1, fp));
 		FREAD_ASSERT(fread(&vy, sizeof(float), 1, fp));
 		FREAD_ASSERT(fread(&vz, sizeof(float), 1, fp));
-		part.v[0] = vx * c0;
-		part.v[1] = vy * c0;
-		part.v[2] = vz * c0;
+		if ( NDIM > 0) {
+			part.v[0] = vx * c0;
+		}
+		if ( NDIM > 1) {
+			part.v[1] = vy * c0;
+		}
+		if ( NDIM > 2) {
+			part.v[2] = vz * c0;
+		}
 	}
 	FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
 	fclose(fp);

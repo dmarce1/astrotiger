@@ -406,6 +406,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	}
 	gravity_return rc;
 	rc.resid = 0.0;
+	double vmax = 0.0;
 	if (level < fine_level) {
 		std::vector<hpx::future<gravity_return>> futs;
 		futs.reserve(children.size());
@@ -430,6 +431,7 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 			auto tmp = f.get();
 			grav.apply_restrict(tmp);
 			rc.resid = std::max(tmp.resid, rc.resid);
+			vmax = std::max(vmax, tmp.vmax);
 		}
 		for (int i = 0; i < iters; i++) {
 			int type = PACK_POTENTIAL_REDBLACK;
@@ -441,10 +443,10 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 		}
 	} else if (level == fine_level) {
 		get_gravity_boundaries(PACK_POTENTIAL);
-//		if (pass == GRAVITY_FINAL_PASS) {
-		rc.vmax = grav.finish_fine();
-		hydro.set_phi(grav.get_phi());
-//		}
+		if (pass == GRAVITY_FINAL_PASS) {
+			vmax = grav.finish_fine();
+			hydro.set_phi(grav.get_phi());
+		}
 	}
 	if (level == 0 && fine_level == 0 && opts.problem != "sphere") {
 		grav.set_avg_zero();
@@ -452,9 +454,8 @@ gravity_return tree::gravity_solve(int pass, int fine_level, const std::vector<d
 	auto tmp = grav.get_restrict(mtot);
 	if (level != fine_level) {
 		tmp.resid = rc.resid;
-		tmp.vmax = rc.vmax;
 	}
-
+	tmp.vmax = vmax;
 	return tmp;
 
 }
@@ -489,7 +490,7 @@ std::vector<double> tree::get_energy_boundary(multi_range b, int this_step) {
 	while (energy_step % 3 != this_step % 3) {
 		hpx::this_thread::yield();
 	}
-	return hydro.pack_field(tau_i, b);
+	return hydro.pack_field(egas_i, b);
 }
 
 std::pair<std::vector<std::uint8_t>, std::vector<multi_range>> tree::get_refinement_boundary(multi_range b, int this_step) {
@@ -531,7 +532,7 @@ std::vector<std::vector<double>> tree::get_energy_prolong(std::vector<multi_rang
 	}
 	std::vector<std::vector<double>> p(ranges.size());
 	for (int j = 0; j < ranges.size(); j++) {
-		p[j] = hydro.pack_field_prolong(tau_i, ranges[j], w);
+		p[j] = hydro.pack_field_prolong(egas_i, ranges[j], w);
 	}
 	return p;
 }
@@ -649,9 +650,9 @@ void tree::apply_coarse_correction() {
 			hydro.unpack_coarse_correction(u[i].second, cbox, last_dt);
 		}
 	}
-	hydro.update_energy();
 	energy_step++;
 	get_energy_boundaries(t);
+	hydro.update_energy();
 	for (int i = 0; i < children.size(); i++) {
 		const auto cbox = children[i].get_box().half();
 		hydro.unpack(u[i].first, cbox);
@@ -802,11 +803,16 @@ double tree::apply_fine_fluxes() {
 	for (const auto &c : children) {
 		cfuts.push_back(c.get_fine_flux());
 	}
-	amax = hydro.compute_flux(0);
+	const auto alocal = hydro.compute_flux(0);
+	double achild = 0.0;
+	const auto amaxp1 = std::max(amax, hydro.positivity_limit());
 	for (int i = 0; i < children.size(); i++) {
-		amax = std::max(amax, hydro.unpack_fine_flux(cfuts[i].get(), children[i].get_box().half()));
+		achild = std::max(achild, hydro.unpack_fine_flux(cfuts[i].get(), children[i].get_box().half()));
 	}
-	amax = std::max(amax, hydro.positivity_limit());
+	const auto amaxp2 = std::max(amax, hydro.positivity_limit());
+	amax = std::max(amaxp1, std::max(achild, alocal));
+	amax = std::max(amaxp2, amax);
+//	printf("%i %e %e %e %e\n", level, amaxp1, amaxp2, achild, alocal);
 	return amax;
 }
 
@@ -980,7 +986,7 @@ void tree::get_energy_boundaries(double this_time) {
 	for (int i = 0; i < sib_ranges.size(); i++) {
 		if (!sib_ranges[i].empty()) {
 			const auto data = sib_futs[j].get();
-			hydro.unpack_field(tau_i, data, sib_ranges[i]);
+			hydro.unpack_field(egas_i, data, sib_ranges[i]);
 			j++;
 		}
 	}
@@ -1174,9 +1180,9 @@ void tree::hydro_substep(int rk, double this_dt, bool last, double a1, double a2
 	}
 	const double next_t = ((rk != opts.nrk - 1) ? (t + opts.alpha[rk + 1] * this_dt) : t);
 	get_hydro_boundaries(next_t);
-	hydro.store_flux();
 	if (rk == 0) {
 		hydro.compute_flux(1);
+		hydro.store_flux();
 	}
 }
 
