@@ -67,6 +67,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 	if (level > opts.max_level) {
 //		printf( "**Applying coarse correction to level %i\n", level - 1);
 		levels_apply_coarse_correction(level - 1, coarse_a0, coarse_a0);
+		levels_energy_update(level - 1);
 		return false;
 	}
 //	int oi = 0;
@@ -85,7 +86,12 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 	static double last_a = cosmos_a();
 	static double a = cosmos_a();
 	static double epec = 0.0;
+	if (level == 0) {
+		printf("step    lev time         dt            ekin          epot          epec          etot          a           econ\n");
+	}
+	static int base_step = 0;
 	do {
+		levels_energy_update(level);
 		if (level == 0) {
 			cosmos_advance(tm[level]);
 			last_e = e;
@@ -95,7 +101,8 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 			epec += 0.5 * (e.ekin + last_e.ekin) * (a - last_a);
 			const auto etot = a * e.ekin + a * e.epot + epec;
 			static const auto etot0 = etot;
-			printf("%e %e %e %e %e %e %e\n", tm[level], a * e.ekin, a * e.epot, epec, etot, a, (etot-etot0)/e.ekin);
+			printf("%5i %4i %e %e %e %e %e %e %e %e\n", base_step + this_step, coarse_level, tm[level], dt[level], a * e.ekin, a * e.epot, epec, etot, a,
+					(etot - etot0) / e.ekin);
 		}
 		const auto a = cosmos_a();
 		bool refine = ((nstep == -1) && !already_refined) || (this_step % 2 == 0 && this_step > 0 && level == 0);
@@ -111,7 +118,6 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 //				levels_show();
 				levels_set_child_families(l);
 				levels_get_hydro_boundaries(l + 1, tm[l + 1]);
-//				levels_energy_update(l + 1);
 			}
 		} else {
 			levels_hydro_initialize(level, false);
@@ -135,9 +141,9 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 			mtot1 = mtot;
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			const auto gmax = solve_gravity(level, tm[level], mtot);
-//			printf( "gmax  = %e\n", gmax);
+//			printf( "amax = %e gmax  = %e\n", amax, gmax);
 			amax = std::max(amax, gmax);
-//			amax = std::max(amax, opts.cfl * a * dx[level] * cosmos_adot() / cosmos_a());
+			amax = std::max(amax, 100.0 * opts.cfl * a * dx[level] * cosmos_adot() / cosmos_a());
 		}
 		dt[level] = opts.cfl * a * dx[level] / amax;
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
@@ -184,6 +190,9 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		levels_apply_coarse_correction(level - 1, coarse_a0, coarse_a1);
 	}
 	super_step[level]++;
+	if( level == 0 ) {
+		base_step += this_step;
+	}
 	return true;
 }
 

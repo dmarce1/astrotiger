@@ -91,6 +91,7 @@ void levels_set_child_families(int level) {
 	}
 	hpx::wait_all(futs.begin(), futs.end());
 }
+
 void levels_energy_update(int level) {
 	auto these_levels = levels;
 	std::vector<hpx::future<void>> futs;

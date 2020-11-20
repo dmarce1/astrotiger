@@ -67,7 +67,6 @@ public:
 	void reset_flux_registers();
 	void reset_coarse_flux_registers();
 	double compute_flux(int rk);
-	void transform_scale(double a0, double a1);
 	void initialize();
 	void compute_refinement_criteria(const multi_array<int>& pcount);
 	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&, const std::vector<multi_range> &forced) const;
