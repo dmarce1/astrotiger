@@ -64,7 +64,7 @@ void particles::compute_cloud_in_cell(double dt) {
 	const auto rhobox = box.pad(2);
 	rho.resize(rhobox);
 	multi_array<double> drho_dt(box.pad(2));
-	const auto dvinv = std::pow(dx * a, -NDIM);
+	const auto dvinv = std::pow(dx, -NDIM);
 	for (multi_iterator i(rhobox); !i.end(); i++) {
 		rho[i] = 0.0;
 		drho_dt[i] = 0.0;
@@ -104,7 +104,7 @@ void particles::compute_cloud_in_cell(double dt) {
 					} else {
 						sgn = +1.0;
 					}
-					drho_dt[j] += p.m * dvinv * sgn * p.v[dim] / (a * dx);
+					drho_dt[j] += p.m * dvinv * sgn * p.v[dim] / (a * a * dx);
 				}
 				assert(wt >= 0.0);
 				assert(wt <= 1.0);
@@ -120,9 +120,6 @@ void particles::compute_cloud_in_cell(double dt) {
 
 	for (multi_iterator i(box.pad(1)); !i.end(); i++) {
 		rho[i] += dt * drho_dt[i];
-//		if( rho[i] < 0.0 ) {
-//			printf( "!! %e %e %e\n", dt, rho[i], dt * drho_dt[i]);
-//		}
 	}
 }
 
@@ -216,7 +213,7 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 			}
 //			printf("%e %e\n", this_g[0], this_g[1]);
 			auto dt = dt0[p.rung];
-			p.v = (this_g * 0.5 * dt + p.v) / (1.0 + dt * 0.5 * adot / a);
+			p.v += this_g * 0.5 * dt * a;
 			if (p.rung > this_level) {
 				if (this_level >= kick_level) {
 					p.rung = this_level;
@@ -225,7 +222,7 @@ void particles::kick(int kick_level, int this_level, const std::vector<double> &
 				p.rung = this_level;
 			}
 			dt = dt1[p.rung];
-			p.v += this_g * 0.5 * dt - p.v * adot / a * 0.5 * dt;
+			p.v += this_g * 0.5 * dt * a;
 		}
 	}
 }
@@ -234,6 +231,7 @@ energy_statistics particles::get_energy_statistics(const multi_array<double> &ph
 	energy_statistics e;
 	e.epot = 0.0;
 	e.ekin = 0.0;
+	const auto a = cosmos_a();
 	for (auto &p : parts) {
 		multi_index i;
 		vect<double> this_g;
@@ -260,7 +258,7 @@ energy_statistics particles::get_energy_statistics(const multi_array<double> &ph
 			this_phi += w * phi[j];
 		}
 		e.epot += 0.5 * p.m * this_phi;
-		e.ekin += 0.5 * p.m * p.v.dot(p.v);
+		e.ekin += 0.5 * p.m * p.v.dot(p.v) / (a * a);
 	}
 	return e;
 }
@@ -355,7 +353,7 @@ std::vector<particle> particles::drift(double dt) {
 	while (i < parts.size()) {
 		auto &part = parts[i];
 		for (int dim = 0; dim < NDIM; dim++) {
-			part.x[dim] += part.v[dim] * dt / a;
+			part.x[dim] += part.v[dim] * dt / (a * a);
 		}
 		bool leave_box = !rbox.contains(part.x);
 		if (!leave_box) {

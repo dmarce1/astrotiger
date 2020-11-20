@@ -384,7 +384,7 @@ statistics tree::get_statistics(int lev, double t) {
 		double m = 0.0;
 		const auto rho = parts.get_cic();
 		for (multi_iterator i(box); !i.end(); i++) {
-			m += std::pow(dx * a, NDIM) * rho[i];
+			m += std::pow(dx, NDIM) * rho[i];
 		}
 		stats.u[rho_i] += m;
 	}
@@ -673,7 +673,6 @@ void tree::apply_coarse_correction(double a0, double a1) {
 		futs.push_back(children[i].get_hydro_restrict());
 	}
 	std::vector<std::pair<std::vector<double>, std::vector<double>>> u;
-	hydro.transform_scale(a1, a0);
 	for (int i = 0; i < children.size(); i++) {
 		const auto cbox = children[i].get_box().half();
 		u.push_back(futs[i].get());
@@ -684,7 +683,6 @@ void tree::apply_coarse_correction(double a0, double a1) {
 //	energy_step++;
 	//	get_energy_boundaries(t);
 	//	hydro.update_energy();
-	hydro.transform_scale(a0, a1);
 	for (int i = 0; i < children.size(); i++) {
 		const auto cbox = children[i].get_box().half();
 		hydro.unpack(u[i].first, cbox);
@@ -1209,6 +1207,10 @@ void tree::hydro_substep(int rk, double this_dt, bool last, double a1, double a2
 		refine_step = 1;
 		energy_step = 0;
 	}
+	if (rk == 1) {
+		hydro.compute_flux(1);
+		hydro.store_flux();
+	}
 	hydro.substep_update(rk, dt, a1, a2);
 	if (rk == opts.nrk - 1) {
 //		if (!last) {
@@ -1222,10 +1224,6 @@ void tree::hydro_substep(int rk, double this_dt, bool last, double a1, double a2
 	}
 	const double next_t = ((rk != opts.nrk - 1) ? (t + opts.alpha[rk + 1] * this_dt) : t);
 	get_hydro_boundaries(next_t);
-	if (rk == 0) {
-		hydro.compute_flux(1);
-		hydro.store_flux();
-	}
 	energy_step = 0;
 }
 

@@ -85,9 +85,9 @@ void gravity::initialize_fine(const multi_array<double> &rho, double mtot, int l
 	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
 		active[i] = true;
 	}
-	const auto rho0 = mtot / std::pow(a, NDIM);
+	const auto rho0 = mtot;
 	for (multi_iterator i(box.pad(std::min(opts.gbw - opts.hbw, 0))); !i.end(); i++) {
-		R[i] = 4.0 * M_PI * a * a * opts.G * (rho[i] - (opts.problem == "sphere" ? 0.0 : rho0));
+		R[i] = 4.0 * M_PI * std::pow(a, 2 - NDIM) * opts.G * (rho[i] - (opts.problem == "sphere" ? 0.0 : rho0));
 		//	printf("%e %e\n", rho[i], rho0);
 	}
 //	X = phi;
@@ -332,7 +332,7 @@ void gravity::relax() {
 
 gravity_return gravity::get_restrict(double mtot) {
 	const auto a = cosmos_a();
-	const auto rho0 = mtot / std::pow(a, NDIM);
+	const auto rho0 = mtot;
 	gravity_return rc;
 	multi_array<std::uint8_t> active_c;
 	auto rbox = box.pad(-opts.gbw).half();

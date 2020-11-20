@@ -67,7 +67,6 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 	if (level > opts.max_level) {
 //		printf( "**Applying coarse correction to level %i\n", level - 1);
 		levels_apply_coarse_correction(level - 1, coarse_a0, coarse_a0);
-		levels_energy_update(level - 1);
 		return false;
 	}
 //	int oi = 0;
@@ -91,6 +90,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 	}
 	static int base_step = 0;
 	do {
+		cosmos_advance(tm[level]);
 		levels_energy_update(level);
 		if (level == 0) {
 			cosmos_advance(tm[level]);

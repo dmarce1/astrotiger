@@ -129,7 +129,7 @@ void fileio_init_read() {
 	}
 	FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
 	FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
-	const auto c0 = std::pow(1.0 / (1.0 + header.redshift), 0.5);
+	const auto c0 = std::pow(1.0 / (1.0 + header.redshift), 1.5);
 	for (auto &part : parts) {
 		float vx, vy, vz;
 		FREAD_ASSERT(fread(&vx, sizeof(float), 1, fp));
