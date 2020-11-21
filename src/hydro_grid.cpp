@@ -149,7 +149,6 @@ double hydro_grid::compute_flux(int rk) {
 			const auto this_amax = hydro_flux(flux, ul, ur, dim);
 			amax = std::max(amax, this_amax);
 			for (int f = 0; f < opts.nhydro; f++) {
-				flux[f] *= std::pow(a, NDIM - 1);
 				F[dim][f][j] = (1.0 - opts.beta[rk]) * F[dim][f][j] + opts.beta[rk] * flux[f];
 			}
 		}
@@ -180,8 +179,8 @@ double hydro_grid::compute_flux(int rk) {
 		for (multi_iterator i(fbox[dim]); !i.end(); i++) {
 			F[dim][rho_i][i] *= std::pow(a, NDIM - 1);
 			F[dim][tau_i][i] *= std::pow(a, NDIM - 1);
-			for (int dim = 0; dim < NDIM; dim++) {
-				F[dim][sx_i + dim][i] *= std::pow(a, NDIM);
+			for (int dim2 = 0; dim2 < NDIM; dim2++) {
+				F[dim][sx_i + dim2][i] *= std::pow(a, NDIM);
 			}
 			F[dim][egas_i][i] *= std::pow(a, NDIM * opts.gamma - 1);
 		}
@@ -1014,7 +1013,7 @@ void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const
 		}
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
-		U[tau_i][i] = std::max(0.1 * tau0[i], U[tau_i][i]);
+//		U[tau_i][i] = std::max(0.1 * tau0[i], U[tau_i][i]);
 	}
 	assert(k == data.size());
 }

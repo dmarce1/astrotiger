@@ -108,10 +108,11 @@ double gravity::coord(index_type i) const {
 }
 
 void gravity::set_outflow_boundaries() {
+	const auto a = cosmos_a();
 	multi_array<hpx::future<double>> futs(box);
 	for (multi_iterator i(box); !i.end(); i++) {
 		if (!box.pad(-1).contains(i)) {
-			futs[i] = hpx::async([i, this]() {
+			futs[i] = hpx::async([i, this, a]() {
 				double sum = 0.0;
 				for (multi_iterator j(box); !j.end(); j++) {
 					if (box.pad(-1).contains(j)) {
@@ -120,7 +121,7 @@ void gravity::set_outflow_boundaries() {
 							r2 += std::pow(coord(i.index()[dim]) - coord(j.index()[dim]), 2);
 						}
 						if (r2 != 0.0) {
-							const auto M = std::pow(dx, NDIM) * R[j] / (4.0 * M_PI * opts.G);
+							const auto M = std::pow(dx, NDIM) * R[j] * std::pow(a, NDIM - 2) / (4.0 * M_PI * opts.G);
 							const auto r = std::sqrt(r2);
 							if ( NDIM == 1) {
 								sum += opts.G * 4.0 * M_PI * std::abs(r) * M;
@@ -374,7 +375,7 @@ gravity_return gravity::get_restrict(double mtot) {
 			}
 			resid[i] += (2.0 * NDIM) * x[j] / (dx * dx);
 			resid[i] += R[i];
-			rc.resid = std::max(std::abs(resid[i] / (4.0 * M_PI * opts.G * a * a) / std::max(rho0, R[i])), rc.resid);
+			rc.resid = std::max(std::abs(resid[i] / std::max((4.0 * opts.G * rho0 * std::pow(a, 2 - NDIM)), std::abs(R[i]))), rc.resid);
 		}
 	}
 	rc.R.reserve(active_vol);

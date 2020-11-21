@@ -43,7 +43,7 @@ bool options::process_options(int argc, char *argv[]) {
 	("window", po::value<int>(&window)->default_value(1), "refinement window size") //
 	("min_box", po::value<int>(&min_box)->default_value(10), "minimum (box volume)^(1/3)") //
 	("max_level", po::value<int>(&max_level)->default_value(3), "maximum refinement level") //
-	("tmax", po::value<double>(&tmax)->default_value(0.25), "maximum simulation time") //
+	("tmax", po::value<double>(&tmax)->default_value(1.00), "maximum simulation time") //
 	("cfl", po::value<double>(&cfl)->default_value(0.2), "cfl factor") //
 	("efficiency", po::value<double>(&efficiency)->default_value(0.10), "refinement efficiency") //
 	("code_to_g", po::value<double>(&code_to_g)->default_value(1.988e43), "code to gram conversion") //

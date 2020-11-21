@@ -31,7 +31,7 @@ double dadt(double adot) {
 }
 
 double dadotdt(double a, double adot) {
-	return H0 * H0 * (-0.5 * opts.omega_m / std::pow(a,NDIM-1) + a * (1.0 - opts.omega_m));
+	return H0 * H0 * a * (-0.5 * opts.omega_m / std::pow(a, NDIM) + (1.0 - opts.omega_m));
 }
 
 double dtaudt(double a) {
@@ -62,7 +62,6 @@ void cosmos::advance_to_time(double t2, int Nstep) {
 	t = t2;
 
 }
-
 
 static cosmos C;
 

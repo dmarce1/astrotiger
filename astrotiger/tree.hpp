@@ -208,17 +208,7 @@ public:
 	void apply_coarse_correction(double a0, double a1);
 
 
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_energy_statistics);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,compute_cic);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,kick);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,max_part_velocity);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_particle_count);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,recv_parts);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,finish_drift);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,drift);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_fine_flux);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,restrict_all);
-	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_statistics);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_refinement_boundary);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_box);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,truncate);
@@ -232,6 +222,16 @@ public:
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_family);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,list);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,delist);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_energy_statistics);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,compute_cic);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,kick);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,max_part_velocity);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_particle_count);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,finish_drift);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,drift);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_fine_flux);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,restrict_all);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_statistics);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,gravity_solve);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,initialize);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,compute_error);

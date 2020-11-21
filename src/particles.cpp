@@ -264,6 +264,7 @@ energy_statistics particles::get_energy_statistics(const multi_array<double> &ph
 }
 
 double particles::max_velocity() const {
+	const auto a = cosmos_a();
 	std::array<double, NDIM> max;
 	for (int dim = 0; dim < NDIM; dim++) {
 		max[dim] = 0.0;
@@ -276,7 +277,7 @@ double particles::max_velocity() const {
 	for (int dim = 1; dim < NDIM; dim++) {
 		max[0] = std::max(max[0], max[dim]);
 	}
-	return max[0];
+	return max[0] / a;
 }
 
 std::vector<std::vector<double>> particles::pack_output() const {

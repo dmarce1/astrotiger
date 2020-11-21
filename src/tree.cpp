@@ -379,6 +379,7 @@ statistics tree::get_statistics(int lev, double t) {
 		}
 		stats.max_level = std::max(stats.max_level, tmp.max_level);
 	}
+	double pm = 0.0;
 	if (opts.particles && level == 0) {
 		compute_cic(std::vector<double>(), t, 0);
 		double m = 0.0;
@@ -386,7 +387,9 @@ statistics tree::get_statistics(int lev, double t) {
 		for (multi_iterator i(box); !i.end(); i++) {
 			m += std::pow(dx, NDIM) * rho[i];
 		}
-		stats.u[rho_i] += m;
+		pm += m;
+//		printf( "%e %e\n", stats.u[rho_i], pm);
+		stats.u[rho_i] += pm;
 	}
 	return stats;
 }
@@ -693,7 +696,7 @@ void tree::apply_coarse_correction(double a0, double a1) {
 
 void tree::energy_update() {
 	hydro.update_energy();
-//	energy_step++;
+	energy_step++;
 //	printf( "%i\n", (int) energy_step);
 	get_energy_boundaries(t);
 }

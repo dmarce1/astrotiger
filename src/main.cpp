@@ -33,7 +33,7 @@ double solve_gravity(int l, double t, double mtot) {
 //		printf("%3i %3i %e\n", pass, iters, r);
 		if (r > 0.5 * last_r && pass > 0) {
 			n++;
-			iters = std::pow(std::sqrt(2), n);
+			iters = std::pow(2, n);
 		}
 		if (pass > 500) {
 			std::string fname = "X." + std::to_string(oi++) + ".silo";
@@ -143,7 +143,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 			const auto gmax = solve_gravity(level, tm[level], mtot);
 //			printf( "amax = %e gmax  = %e\n", amax, gmax);
 			amax = std::max(amax, gmax);
-			amax = std::max(amax, 100.0 * opts.cfl * a * dx[level] * cosmos_adot() / cosmos_a());
+			amax = std::max(amax, dx[level] * cosmos_adot());
 		}
 		dt[level] = opts.cfl * a * dx[level] / amax;
 		nstep = std::ceil((tmax - tm[level]) / dt[level]);
@@ -155,7 +155,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		const auto a2 = cosmos_a();
 		const auto H2 = cosmos_adot();
 		cosmos_advance(tm[level]);
-//		printf("Advancing level %i from %e to %e scale factor %e to %e %e %e\n", level, tm[level], tm[level] + dt[level], a1, a2, H1, H2);
+//		printf("Advancing level %i from %e to %e scale factor %e to %e %e %e\n", level, tm[level], dt[level], a1, a2, H1, H2);
 		if (opts.particles) {
 			if (level == levels_max_level()) {
 				root.kick(coarse_level, tm[level], last_dt, dt).get();
@@ -274,7 +274,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	double dt = opts.tmax / 100.0;
+	double dt = opts.tmax;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;
