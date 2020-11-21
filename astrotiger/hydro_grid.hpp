@@ -91,7 +91,7 @@ public:
 	void to_array(multi_array<double>&, const multi_range &bbox, int, double) const;
 	std::vector<double> pack_coarse_flux();
 	double unpack_fine_flux(const std::vector<double>&, const multi_range&);
-	energy_statistics get_energy_statistics(const multi_array<double> &phi, const std::vector<multi_range>& exclude) const;
+	energy_statistics get_energy_statistics(const multi_array<double> &phi, const std::vector<multi_range>& exclude, double rho0) const;
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

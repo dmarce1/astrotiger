@@ -127,9 +127,7 @@ public:
 		assert(i >= 0);
 		const auto c = a[ip] - a[i];
 		const auto b = a[i] - a[im];
-		auto slp(std::copysign(0.5, c) + std::copysign(0.5, b));
-		std::min(std::abs(c), std::abs(b));
-		slp = std::copysign(1.0, slp) * std::min(std::abs(slp), std::abs(a[i]));
+		auto slp = (std::copysign(0.5, c) + std::copysign(0.5, b)) * std::min(std::abs(c), std::abs(b));
 		return slp;
 	}
 

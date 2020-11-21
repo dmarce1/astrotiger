@@ -198,7 +198,7 @@ public:
 	void drift(double);
 	void finish_drift(std::vector<particle>);
 	void recv_parts(std::vector<particle>);
-	energy_statistics get_energy_statistics() const;
+	energy_statistics get_energy_statistics(double rho0) const;
 	range<double> range_int_to_double( const multi_range& box );
 	multi_array<int> get_particle_count() const;
 	hpx::future<void> send_child_particles();

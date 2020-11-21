@@ -18,7 +18,7 @@
 hydro_grid::hydro_grid() {
 }
 
-energy_statistics hydro_grid::get_energy_statistics(const multi_array<double> &phi, const std::vector<multi_range> &exclude) const {
+energy_statistics hydro_grid::get_energy_statistics(const multi_array<double> &phi, const std::vector<multi_range> &exclude, double rho0) const {
 	const auto a = cosmos_a();
 	energy_statistics e;
 	e.ekin = 0.0;
@@ -56,14 +56,15 @@ void hydro_grid::store_flux() {
 
 double hydro_grid::positivity_limit() const {
 	double amax = 0.0;
+	const double a = cosmos_a();
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
 		double df_rho = 0.0;
 		double df_tau = 0.0;
 		for (int dim = 0; dim < NDIM; dim++) {
 			multi_index ip1 = i;
 			ip1[dim]++;
-			df_rho += (F[dim][rho_i][ip1] - F[dim][rho_i][i]);
-			df_tau += (F[dim][tau_i][ip1] - F[dim][tau_i][i]);
+			df_rho += (F[dim][rho_i][ip1] - F[dim][rho_i][i]) * a;
+			df_tau += (F[dim][tau_i][ip1] - F[dim][tau_i][i]) * a;
 		}
 		amax = std::max(amax, std::max(df_rho, 0.0) / U[rho_i][i]);
 		amax = std::max(amax, std::max(df_tau, 0.0) / U[tau_i][i]);
@@ -197,6 +198,7 @@ double hydro_grid::compute_flux(int rk) {
 }
 
 void hydro_grid::substep_update(int rk, double dt, double a0, double a1) {
+	const double a = cosmos_a();
 	const double onembeta = 1.0 - opts.beta[rk];
 	const double lambda = dt / dx;
 	for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
@@ -217,8 +219,18 @@ void hydro_grid::substep_update(int rk, double dt, double a0, double a1) {
 			abort();
 		}
 		if (U[tau_i][i] < 0.0) {
-			printf("substep_update: au is less than zero %e\n", U[tau_i][i]);
-			abort();
+			double ekin = 0.0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				ekin += 0.5 * std::pow(U[sx_i + dim][i], 2) * std::pow(a, -NDIM - 2) / U[rho_i][i];
+			}
+			const double eint = U[egas_i][i] * std::pow(a, -opts.gamma * NDIM) - ekin;
+
+			printf("substep_update %i: tau is less than zero %e %e\n", rk, U[tau_i][i], eint);
+			if (eint < 0.0) {
+				abort();
+			} else {
+				U[tau_i][i] = std::pow(a, NDIM) * std::pow(eint, 1.0 / opts.gamma);
+			}
 		}
 	}
 	if (rk == opts.nrk - 1) {
@@ -319,7 +331,6 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 			R[i] = pcount[i] > (1 << NDIM);
 		}
 	}
-	return;
 	if (opts.hydro) {
 		multi_range dirs(multi_range(index_type(0)).pad(1));
 		int dirmax = (std::pow(3, NDIM) - 1) / 2;
@@ -547,7 +558,7 @@ void hydro_grid::initialize() {
 				const auto vy = 0.00;
 				U[sx_i][i] = vx * rho;
 				U[sy_i][i] = vy * rho;
-				const auto K = 4.0 * M_PI * alpha * alpha / (n + 1);
+				const auto K = 4.0 * M_PI * cosmos_a() * cosmos_a() * alpha * alpha / (n + 1);
 				U[egas_i][i] = std::max(1.0e-12, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
 				U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 				U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
@@ -677,7 +688,7 @@ std::vector<multi_range> hydro_grid::refined_ranges(const std::vector<multi_rang
 		for (const auto &amr : amr_boxes) {
 			tmp.resize(0);
 			for (const auto &b : boxes) {
-				const auto amrbox = amr.pad(1);
+				const auto amrbox = amr.pad(2);
 				if (amrbox.intersection(b).volume()) {
 					auto tmp2 = b.subtract(amrbox);
 					tmp.insert(tmp.end(), tmp2.begin(), tmp2.end());

@@ -73,13 +73,17 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 	double nstep = -1;
 	const int refine_freq = 1;
 	statistics stats;
+	double mtot;
 	if (opts.self_gravity) {
 		stats = root.get_statistics(opts.max_level, tm[level]).get();
+		mtot = stats.u[rho_i];
+	} else {
+		mtot = 0.0;
 	}
 	const int max_refined = stats.min_level;
 	int this_step = 0;
 	int oi = 100;
-	static auto e = root.get_energy_statistics().get();
+	static auto e = root.get_energy_statistics(mtot).get();
 	static auto last_e = e;
 	cosmos_advance(0.0);
 	static double last_a = cosmos_a();
@@ -91,18 +95,20 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 	static int base_step = 0;
 	do {
 		cosmos_advance(tm[level]);
-		levels_energy_update(level);
+		//	levels_energy_update(level);
 		if (level == 0) {
 			cosmos_advance(tm[level]);
 			last_e = e;
 			last_a = a;
-			e = root.get_energy_statistics().get();
+			stats = root.get_statistics(opts.max_level, tm[level]).get();
+			mtot = stats.u[rho_i];
+			e = root.get_energy_statistics(mtot).get();
 			a = cosmos_a();
 			epec += 0.5 * (e.ekin + last_e.ekin) * (a - last_a);
 			const auto etot = a * e.ekin + a * e.epot + epec;
 			static const auto etot0 = etot;
-			printf("%5i %4i %e %e %e %e %e %e %e %e\n", base_step + this_step, coarse_level, tm[level], dt[level], a * e.ekin, a * e.epot, epec, etot, a,
-					(etot - etot0) / e.ekin);
+			printf("%5i %4i %e %e %e %e %e %e %e %e %e\n", base_step + this_step, coarse_level, tm[level], dt[level], a * e.ekin, a * e.epot, epec, etot, a,
+					(etot - etot0) / e.ekin, mtot);
 		}
 		const auto a = cosmos_a();
 		bool refine = ((nstep == -1) && !already_refined) || (this_step % 2 == 0 && this_step > 0 && level == 0);
@@ -190,7 +196,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		levels_apply_coarse_correction(level - 1, coarse_a0, coarse_a1);
 	}
 	super_step[level]++;
-	if( level == 0 ) {
+	if (level == 0) {
 		base_step += this_step;
 	}
 	return true;
@@ -274,7 +280,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	double dt = opts.tmax;
+	double dt = opts.tmax / 100.0;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

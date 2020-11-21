@@ -68,16 +68,16 @@ HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
 
-energy_statistics tree::get_energy_statistics() const {
+energy_statistics tree::get_energy_statistics(double rho0) const {
 	energy_statistics e, tmp;
 	e.ekin = e.epot = 0.0;
 	std::vector<multi_range> boxes;
 	std::vector<hpx::future<energy_statistics>> futs;
-	for( const auto c : children) {
-		boxes.push_back(c.get_box());
-		futs.push_back(c.get_energy_statistics());
+	for (const auto c : children) {
+		boxes.push_back(c.get_box().half());
+		futs.push_back(c.get_energy_statistics(rho0));
 	}
-	for( auto& f : futs) {
+	for (auto &f : futs) {
 		tmp = f.get();
 		e.ekin += tmp.ekin;
 		e.epot += tmp.epot;
@@ -88,7 +88,7 @@ energy_statistics tree::get_energy_statistics() const {
 		e.epot += tmp.epot;
 	}
 	if (opts.hydro) {
-		tmp = hydro.get_energy_statistics(grav.get_phi(), boxes);
+		tmp = hydro.get_energy_statistics(grav.get_phi(), boxes, rho0);
 		e.ekin += tmp.ekin;
 		e.epot += tmp.epot;
 	}
@@ -520,6 +520,7 @@ void tree::set_boundary(std::vector<double> &&data, const multi_range &bbox, int
 
 std::vector<double> tree::get_energy_boundary(multi_range b, int this_step) {
 	while (energy_step % 3 != this_step % 3) {
+//		printf( "%i %i %i\n", level, (int) energy_step, this_step);
 		hpx::this_thread::yield();
 	}
 	return hydro.pack_field(tau_i, b);
@@ -683,9 +684,9 @@ void tree::apply_coarse_correction(double a0, double a1) {
 			hydro.unpack_coarse_correction(u[i].second, cbox, last_dt, a0, a1);
 		}
 	}
+//	hydro.update_energy();
 //	energy_step++;
-	//	get_energy_boundaries(t);
-	//	hydro.update_energy();
+//	get_energy_boundaries(t);
 	for (int i = 0; i < children.size(); i++) {
 		const auto cbox = children[i].get_box().half();
 		hydro.unpack(u[i].first, cbox);
@@ -853,12 +854,10 @@ double tree::apply_fine_fluxes() {
 	const auto amaxp2 = std::max(amax, hydro.positivity_limit());
 	amax = std::max(amaxp1, std::max(achild, alocal));
 	amax = std::max(amaxp2, amax);
-//	printf("%i %e %e %e %e\n", level, amaxp1, amaxp2, achild, alocal);
 	return amax;
 }
 
 void tree::get_hydro_boundaries(double this_time) {
-	energy_step = 0;
 //	printf( "%i\n", (int) hydro_step);
 	for (const auto &sib : siblings) {
 		const auto inter = sib.box().pad(opts.hbw).intersection(box);
