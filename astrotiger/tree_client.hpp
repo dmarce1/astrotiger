@@ -74,6 +74,8 @@ public:
 		gid = id_;
 		box = box_;
 	}
+	hpx::future<double> get_average_phi(int) const;
+	hpx::future<void> set_average_phi(int, double) const;
 	hpx::future<std::vector<double>> compute_cic(const std::vector<double>&, double t, int lev) const;
 	hpx::future<void> kick(int, double, const std::vector<double>&, const std::vector<double>&) const;
 	hpx::future<double> max_part_velocity() const;

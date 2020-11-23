@@ -20,9 +20,10 @@ class energy_statistics;
 #define rho_i 0
 #define egas_i 1
 #define tau_i 2
-#define sx_i 3
-#define sy_i 4
-#define sz_i 5
+#define pot_i 3
+#define sx_i 4
+#define sy_i 5
+#define sz_i 6
 
 struct statistics;
 

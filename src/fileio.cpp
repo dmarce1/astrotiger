@@ -8,6 +8,7 @@
 #include <astrotiger/fileio.hpp>
 #include <astrotiger/options.hpp>
 #include <astrotiger/cosmos.hpp>
+#include <astrotiger/rand.hpp>
 
 // This header structure was copied from N-GenIC
 
@@ -45,106 +46,140 @@ const std::vector<particle>& fileio_get_particles() {
 }
 
 void fileio_init_read() {
-	std::int32_t dummy;
-	std::string filename = "ics";
-	FILE *fp = fopen(filename.c_str(), "rb");
-	if (!fp) {
-		printf("Unable to load %s\n", filename.c_str());
-		abort();
-	}
-	io_header header;
-	FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
-	FREAD_ASSERT(fread(&header, sizeof(header), 1, fp));
-	FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
-	const std::uint64_t total_parts = std::uint64_t(header.npartTotal[1]) + (std::uint64_t(header.npartTotal[2]) << std::uint64_t(32));
-	opts.omega_m = header.Omega0;
-	opts.omega_b = 0.17 * header.Omega0;
-	opts.part_mass = header.mass[1];
-	opts.m_tot = opts.part_mass * total_parts;
-	const auto Gcgs = 6.672e-8;
-	const auto Hcgs = 3.2407789e-18;
-	const auto mtot = opts.part_mass * total_parts;
-	opts.code_to_g = 1.98e44;
-	opts.code_to_cm_per_s = 3e10;
-	opts.code_to_cm = std::pow((8.0 * M_PI * Gcgs * mtot * opts.code_to_g) / (3.0 * opts.omega_m * Hcgs * Hcgs), 1.0 / 3.0);
-	opts.code_to_s = opts.code_to_cm / opts.code_to_cm_per_s;
-	opts.H0 = Hcgs * opts.code_to_s;
-	opts.G = Gcgs / pow(opts.code_to_cm, 3) * opts.code_to_g * pow(opts.code_to_s, 2);
-	opts.z = header.redshift;
-	opts.tmax = cosmos_set_z(opts.z, opts.H0);
-	printf("Reading %li particles\n", total_parts);
-	printf("code_to_cm =    %e\n", opts.code_to_cm);
-	printf("code_to_g  =    %e\n", opts.code_to_g);
-	printf("code_to_s  =    %e\n", opts.code_to_s);
-	printf("tmax  =        %e\n", opts.tmax);
-	printf("G          =    %e\n", opts.G);
-	printf("H0         =    %e\n", opts.H0);
-	printf("Z =             %e\n", header.redshift);
-	printf("particle mass = %e\n", header.mass[1]);
-	printf("mtot =          %e\n", mtot);
-	printf("Omega_m =       %e\n", header.Omega0);
-	printf("Omega_lambda =  %e\n", header.OmegaLambda);
-	printf("Hubble Param =  %e\n", header.HubbleParam);
-	FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
-	for (int i = 0; i < header.npart[1]; i++) {
-		float x, y, z;
-		FREAD_ASSERT(fread(&x, sizeof(float), 1, fp));
-		FREAD_ASSERT(fread(&y, sizeof(float), 1, fp));
-		FREAD_ASSERT(fread(&z, sizeof(float), 1, fp));
-		if (x > 1.0 || x < 0.0) {
-			printf("Particle x out of range %e!\n", x);
+	if ( NDIM == 3) {
+		std::int32_t dummy;
+		std::string filename = "ics";
+		FILE *fp = fopen(filename.c_str(), "rb");
+		if (!fp) {
+			printf("Unable to load %s\n", filename.c_str());
 			abort();
 		}
-		if (y > 1.0 || y < 0.0) {
-			printf("Particle y out of range %e!\n", y);
-			abort();
-		}
-		if (z > 1.0 || z < 0.0) {
-			printf("Particle z out of range %e!\n", z);
-			abort();
-		}
-		if (x == 1.0) {
-			x = 0.0;
-		}
-		if (y == 1.0) {
-			y = 0.0;
-		}
-		if (z == 1.0) {
-			z = 0.0;
-		}
-		particle part;
-		if ( NDIM > 0) {
-			part.x[0] = x;
-		}
-		if ( NDIM > 1) {
-			part.x[1] = y;
-		}
-		if (NDIM > 2) {
-			part.x[2] = z;
-		}
-		part.rung = 0;
-		part.m = opts.part_mass;
+		io_header header;
+		FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
+		FREAD_ASSERT(fread(&header, sizeof(header), 1, fp));
+		FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
+		const std::uint64_t total_parts = std::uint64_t(header.npartTotal[1]) + (std::uint64_t(header.npartTotal[2]) << std::uint64_t(32));
+		opts.omega_m = header.Omega0;
+		opts.omega_b = 0.17 * header.Omega0;
+		opts.part_mass = header.mass[1];
+		opts.m_tot = opts.part_mass * total_parts;
+		const auto Gcgs = 6.672e-8;
+		const auto Hcgs = 3.2407789e-18;
+		const auto mtot = opts.part_mass * total_parts;
+		opts.code_to_g = 1.98e44;
+		opts.code_to_cm_per_s = 3e10;
+		opts.code_to_cm = std::pow((8.0 * M_PI * Gcgs * mtot * opts.code_to_g) / (3.0 * opts.omega_m * Hcgs * Hcgs), 1.0 / 3.0);
+		opts.code_to_s = opts.code_to_cm / opts.code_to_cm_per_s;
+		opts.H0 = Hcgs * opts.code_to_s;
+		opts.G = Gcgs / pow(opts.code_to_cm, 3) * opts.code_to_g * pow(opts.code_to_s, 2);
+		opts.z = header.redshift;
+		opts.tmax = cosmos_set_z(opts.z, opts.H0);
+		printf("Reading %li particles\n", total_parts);
+		printf("code_to_cm =    %e\n", opts.code_to_cm);
+		printf("code_to_g  =    %e\n", opts.code_to_g);
+		printf("code_to_s  =    %e\n", opts.code_to_s);
+		printf("tmax  =        %e\n", opts.tmax);
+		printf("G          =    %e\n", opts.G);
+		printf("H0         =    %e\n", opts.H0);
+		printf("Z =             %e\n", header.redshift);
+		printf("particle mass = %e\n", header.mass[1]);
+		printf("mtot =          %e\n", mtot);
+		printf("Omega_m =       %e\n", header.Omega0);
+		printf("Omega_lambda =  %e\n", header.OmegaLambda);
+		printf("Hubble Param =  %e\n", header.HubbleParam);
+		FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
+		for (int i = 0; i < header.npart[1]; i++) {
+			float x, y, z;
+			FREAD_ASSERT(fread(&x, sizeof(float), 1, fp));
+			FREAD_ASSERT(fread(&y, sizeof(float), 1, fp));
+			FREAD_ASSERT(fread(&z, sizeof(float), 1, fp));
+			if (x > 1.0 || x < 0.0) {
+				printf("Particle x out of range %e!\n", x);
+				abort();
+			}
+			if (y > 1.0 || y < 0.0) {
+				printf("Particle y out of range %e!\n", y);
+				abort();
+			}
+			if (z > 1.0 || z < 0.0) {
+				printf("Particle z out of range %e!\n", z);
+				abort();
+			}
+			if (x == 1.0) {
+				x = 0.0;
+			}
+			if (y == 1.0) {
+				y = 0.0;
+			}
+			if (z == 1.0) {
+				z = 0.0;
+			}
+			particle part;
+			if ( NDIM > 0) {
+				part.x[0] = x;
+			}
+			if ( NDIM > 1) {
+				part.x[1] = y;
+			}
+			if (NDIM > 2) {
+				part.x[2] = z;
+			}
+			part.rung = 0;
+			part.m = opts.part_mass;
 //		part.out = 0;
-		parts.push_back(part);
+			parts.push_back(part);
+		}
+		FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
+		FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
+		const auto c0 = std::pow(1.0 / (1.0 + header.redshift), 1.5);
+		for (auto &part : parts) {
+			float vx, vy, vz;
+			FREAD_ASSERT(fread(&vx, sizeof(float), 1, fp));
+			FREAD_ASSERT(fread(&vy, sizeof(float), 1, fp));
+			FREAD_ASSERT(fread(&vz, sizeof(float), 1, fp));
+			if ( NDIM > 0) {
+				part.v[0] = vx * c0;
+			}
+			if ( NDIM > 1) {
+				part.v[1] = vy * c0;
+			}
+			if ( NDIM > 2) {
+				part.v[2] = vz * c0;
+			}
+		}
+		FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
+		fclose(fp);
+	} else if ( NDIM == 2) {
+		const int size = 128;
+		const int total_parts = size * size;
+		opts.omega_m = 0.3;
+		opts.omega_b = opts.omega_m;
+		opts.part_mass = 1.0 / total_parts;
+		opts.m_tot = 1.0;
+		opts.code_to_g = 1.0;
+		opts.code_to_cm_per_s = 1.0;
+		opts.code_to_cm = 1.0;
+		opts.code_to_s = 1.0;
+		opts.H0 = 1.0;
+		opts.G = 1.0;
+		opts.z = 128.0;
+
+		opts.gamma = 2.0;
+		opts.tmax = cosmos_set_z(opts.z, opts.H0);
+		printf( "Tmax = %e\n", opts.tmax);
+		const auto dx = 1.0 / size;
+		const auto a = 1.0 / (1.0+opts.z);
+		for (int i = 0; i < size; i++) {
+			for (int j = 0; j < size; j++) {
+				particle p;
+				p.x[0] = (i + 0.5) * dx + dx * (2 * rand1() - 1) * 0.1;
+				p.x[1] = (j + 0.5) * dx + dx * (2 * rand1() - 1) * 0.1;
+				p.v[0] = 0.0;
+				p.v[1] = 0.0;
+				p.rung = 0;
+				p.m = opts.part_mass;
+				parts.push_back(p);
+			}
+		}
 	}
-	FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
-	FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
-	const auto c0 = std::pow(1.0 / (1.0 + header.redshift), 1.5);
-	for (auto &part : parts) {
-		float vx, vy, vz;
-		FREAD_ASSERT(fread(&vx, sizeof(float), 1, fp));
-		FREAD_ASSERT(fread(&vy, sizeof(float), 1, fp));
-		FREAD_ASSERT(fread(&vz, sizeof(float), 1, fp));
-		if ( NDIM > 0) {
-			part.v[0] = vx * c0;
-		}
-		if ( NDIM > 1) {
-			part.v[1] = vy * c0;
-		}
-		if ( NDIM > 2) {
-			part.v[2] = vz * c0;
-		}
-	}
-	FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
-	fclose(fp);
 }

@@ -206,6 +206,8 @@ public:
 	void kick(int, double, std::vector<double>, std::vector<double>);
 	std::vector<double> compute_cic(const std::vector<double>&, double t, int );
 	void apply_coarse_correction(double a0, double a1);
+	double get_average_phi(int) const;
+	void set_average_phi(int, double);
 
 
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,recv_parts);
@@ -222,6 +224,8 @@ public:
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_family);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,list);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,delist);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_average_phi);
+	/**/HPX_DEFINE_COMPONENT_ACTION(tree,set_average_phi);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_energy_statistics);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,compute_cic);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,kick);

@@ -11,9 +11,9 @@ std::vector<double> last_dt;
 std::vector<double> tm;
 std::vector<int> super_step;
 
-double solve_gravity(int l, double t, double mtot) {
+double solve_gravity(int l, double t, double mtot, int max_refined) {
 
-	const double toler = 5.0e-4;
+	const double toler = 1.0e-3;
 	int pass = 0;
 	double r;
 	int oi = 101;
@@ -53,6 +53,10 @@ double solve_gravity(int l, double t, double mtot) {
 	r = tmp.resid / mtot;
 	if (kill) {
 		abort();
+	}
+	if (l <= max_refined) {
+		const auto dif = -root.get_average_phi(l).get();
+		root.set_average_phi(l, dif).get();
 	}
 	return tmp.vmax;
 //	printf("%3i %3i %e\n", pass, iters, tmp.resid);
@@ -108,7 +112,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 			const auto etot = a * e.ekin + a * e.epot + epec;
 			static const auto etot0 = etot;
 			printf("%5i %4i %e %e %e %e %e %e %e %e %e\n", base_step + this_step, coarse_level, tm[level], dt[level], a * e.ekin, a * e.epot, epec, etot, a,
-					(etot - etot0) / e.ekin, mtot);
+					(etot - etot0) / (e.ekin + epec), mtot);
 		}
 		const auto a = cosmos_a();
 		bool refine = ((nstep == -1) && !already_refined) || (this_step % 2 == 0 && this_step > 0 && level == 0);
@@ -146,7 +150,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 			const auto mtot = tmp.u[rho_i];
 			mtot1 = mtot;
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
-			const auto gmax = solve_gravity(level, tm[level], mtot);
+			const auto gmax = solve_gravity(level, tm[level], mtot, max_refined);
 //			printf( "amax = %e gmax  = %e\n", amax, gmax);
 			amax = std::max(amax, gmax);
 			amax = std::max(amax, dx[level] * cosmos_adot());
@@ -173,7 +177,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 			const auto mtot = root.get_statistics(std::min(level, max_refined), tm[level] + dt[level]).get().u[rho_i];
 //			printf("max_refined = %i level = %i\n", max_refined, level, mtot);
 			mtot2 = mtot;
-			solve_gravity(level, tm[level] + dt[level], mtot);
+			solve_gravity(level, tm[level] + dt[level], mtot, max_refined);
 		}
 		levels_hydro_substep(level, 1, dt[level], nstep == 1.0, a1, a2);
 		tm[level] += dt[level];
@@ -275,7 +279,7 @@ int hpx_main(int argc, char *argv[]) {
 			const auto tmp = root.get_statistics(std::min(l, max_refined), 0.0).get();
 			assert(tmp.u.size());
 			const auto mtot = tmp.u[rho_i];
-			solve_gravity(l, 0.0, mtot);
+			solve_gravity(l, 0.0, mtot, max_refined);
 		}
 	}
 	output_silo("X.0.silo");

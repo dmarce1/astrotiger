@@ -75,7 +75,7 @@ public:
 			X[i] = 0.0;
 		}
 	}
-	std::array<multi_array<double>,NDIM> get_acceleration(double) const;
+	std::array<multi_array<double>, NDIM> get_acceleration(double) const;
 	double coord(index_type i) const;
 	void set_outflow_boundaries();
 	multi_array<double> get_phi() const;
@@ -84,6 +84,8 @@ public:
 	std::vector<double> pack_phi(const multi_range&) const;
 	void unpack(const std::vector<double>&, const multi_range &bbox, int);
 
+	double get_phi_tot() const;
+	void set_average_phi(double);
 	void relax();
 	gravity_return get_restrict(double);
 	void apply_restrict(const gravity_return&);

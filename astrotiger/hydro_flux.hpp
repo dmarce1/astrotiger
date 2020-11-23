@@ -69,6 +69,7 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 			u0[rho_i] = rho0;
 			u0[sx_i + dim] = rho0 * s0;
 			u0[tau_i] = rho0 / rho_l * ul[tau_i];
+			u0[pot_i] = rho0 / rho_l * ul[pot_i];
 			for (int dim2 = 0; dim2 < NDIM; dim2++) {
 				if (dim != dim2) {
 					u0[sx_i + dim2] = rho0 * ul[sx_i + dim2] / rho_l;
@@ -84,6 +85,7 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 			u0[rho_i] = rho0;
 			u0[sx_i + dim] = rho0 * s0;
 			u0[tau_i] = rho0 / rho_r * ur[tau_i];
+			u0[pot_i] = rho0 / rho_r * ur[pot_i];
 			for (int dim2 = 0; dim2 < NDIM; dim2++) {
 				if (dim != dim2) {
 					u0[sx_i + dim2] = rho0 * ur[sx_i + dim2] / rho_r;

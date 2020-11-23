@@ -7,6 +7,14 @@
 
 #include <astrotiger/tree.hpp>
 
+hpx::future<double> tree_client::get_average_phi(int lev) const {
+	return hpx::async<tree::get_average_phi_action>(gid, lev);
+}
+
+hpx::future<void> tree_client::set_average_phi(int lev, double dif) const {
+	return hpx::async<tree::set_average_phi_action>(gid, lev, dif);
+}
+
 hpx::future<energy_statistics> tree_client::get_energy_statistics(double rho) const {
 	return hpx::async<tree::get_energy_statistics_action>(gid, rho);
 }

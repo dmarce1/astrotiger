@@ -40,6 +40,10 @@ using max_part_velocity_action_type = tree::max_part_velocity_action;
 using kick_action_type = tree::kick_action;
 using compute_cic_action_type = tree::compute_cic_action;
 using get_energy_statistics_action_type = tree::get_energy_statistics_action;
+using get_average_phi_action_type = tree::get_average_phi_action;
+HPX_REGISTER_ACTION (get_average_phi_action_type);
+using set_average_phi_action_type = tree::set_average_phi_action;
+HPX_REGISTER_ACTION (set_average_phi_action_type);
 HPX_REGISTER_ACTION (get_energy_statistics_action_type);
 HPX_REGISTER_ACTION (compute_cic_action_type);
 HPX_REGISTER_ACTION (kick_action_type);
@@ -67,6 +71,35 @@ HPX_REGISTER_ACTION (set_family_action_type);
 HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
+
+double tree::get_average_phi(int lev) const {
+	if (level == lev) {
+		return grav.get_phi_tot();
+	} else {
+		double tot = 0.0;
+		std::vector<hpx::future<double>> futs;
+		for (const auto &c : children) {
+			futs.push_back(c.get_average_phi(lev));
+		}
+		for (auto &f : futs) {
+			tot += f.get();
+		}
+		return tot;
+	}
+}
+
+void tree::set_average_phi(int lev, double dif) {
+	if (level == lev) {
+		grav.set_average_phi(dif);
+		hydro.set_phi(grav.get_phi());
+	} else {
+		std::vector<hpx::future<void>> futs;
+		for (const auto &c : children) {
+			futs.push_back(c.set_average_phi(lev, dif));
+		}
+		hpx::wait_all(futs.begin(), futs.end());
+	}
+}
 
 energy_statistics tree::get_energy_statistics(double rho0) const {
 	energy_statistics e, tmp;
@@ -854,6 +887,7 @@ double tree::apply_fine_fluxes() {
 	const auto amaxp2 = std::max(amax, hydro.positivity_limit());
 	amax = std::max(amaxp1, std::max(achild, alocal));
 	amax = std::max(amaxp2, amax);
+//	printf( "%e %e %e\n", amaxp1, amaxp2, alocal);
 	return amax;
 }
 
@@ -1108,6 +1142,7 @@ void tree::set_family(tree_client p, tree_client s, std::vector<sibling> sibs) {
 	parent = p;
 	self = s;
 	siblings = std::move(sibs);
+	hydro_step = 0;
 	if (p != tree_client()) {
 		assert(p.get_box().double_().contains(box));
 	}

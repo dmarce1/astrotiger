@@ -20,6 +20,20 @@ void gravity::resize(double dx_, const multi_range &box_) {
 
 }
 
+double gravity::get_phi_tot() const {
+	double total = 0.0;
+	for (multi_iterator i(box.pad(-opts.gbw)); !i.end(); i++) {
+		total += phi[i] * std::pow(dx, NDIM);
+	}
+	return total;
+}
+
+void gravity::set_average_phi(double dif) {
+	for (multi_iterator i(box); !i.end(); i++) {
+		phi[i] += dif;
+	}
+}
+
 std::array<multi_array<double>, NDIM> gravity::get_acceleration(double w) const {
 	const auto a = cosmos_a();
 	std::array<multi_array<double>, NDIM> g;

@@ -115,7 +115,7 @@ bool options::process_options(int argc, char *argv[]) {
 		set(*this);
 	}
 
-	nhydro = 3 + NDIM;
+	nhydro = 4 + NDIM;
 	hbw = 2;
 	gbw = 2;
 	max_bw = std::max(hbw, window);

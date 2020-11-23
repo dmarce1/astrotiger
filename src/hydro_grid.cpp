@@ -87,6 +87,7 @@ double hydro_grid::compute_flux(int rk) {
 			U[sx_i + dim][i] /= std::pow(a, NDIM + 1);
 		}
 		U[egas_i][i] /= std::pow(a, NDIM * opts.gamma);
+		U[pot_i][i] = U[rho_i][i] * phi[i];
 	}
 	for (int i = 0; i < opts.nhydro; i++) {
 		VR[i].resize(urlbox);
@@ -113,7 +114,11 @@ double hydro_grid::compute_flux(int rk) {
 		}
 		V[egas_i][i] = U[egas_i][i] - ek;
 		V[tau_i][i] = std::pow(U[tau_i][i], opts.gamma);
-
+		V[pot_i][i] = phi[i];
+	}
+	multi_array<double> drho_dt(box);
+	for( multi_iterator i(box); !i.end(); i++) {
+		drho_dt[i] = 0.0;
 	}
 	for (int dim = 0; dim < NDIM; dim++) {
 		for (int i = 0; i < opts.nhydro; i++) {
@@ -135,6 +140,8 @@ double hydro_grid::compute_flux(int rk) {
 			}
 			ur[rho_i] = vr[rho_i];
 			ul[rho_i] = vl[rho_i];
+			ur[pot_i] = vr[rho_i] * vr[pot_i];
+			ul[pot_i] = vl[rho_i] * vl[pot_i];
 			double ekr = 0.0;
 			double ekl = 0.0;
 			for (int dim = 0; dim < NDIM; dim++) {
@@ -149,6 +156,18 @@ double hydro_grid::compute_flux(int rk) {
 			ul[tau_i] = std::pow(vl[tau_i], 1.0 / opts.gamma);
 			const auto this_amax = hydro_flux(flux, ul, ur, dim);
 			amax = std::max(amax, this_amax);
+			auto jm = j.index();
+			jm[dim]--;
+			drho_dt[j] += flux[rho_i] / dx;
+			drho_dt[jm] -= flux[rho_i] / dx;
+			flux[egas_i] += flux[pot_i];
+			flux[pot_i] = 0.0;
+			flux[rho_i] *= std::pow(a, NDIM - 1);
+			flux[tau_i] *= std::pow(a, NDIM - 1);
+			for (int dim2 = 0; dim2 < NDIM; dim2++) {
+				flux[sx_i + dim2] *= std::pow(a, NDIM);
+			}
+			flux[egas_i] *= std::pow(a, NDIM * opts.gamma - 1);
 			for (int f = 0; f < opts.nhydro; f++) {
 				F[dim][f][j] = (1.0 - opts.beta[rk]) * F[dim][f][j] + opts.beta[rk] * flux[f];
 			}
@@ -157,33 +176,24 @@ double hydro_grid::compute_flux(int rk) {
 	if (opts.gravity) {
 		for (multi_iterator j(box.pad(-opts.hbw)); !j.end(); j++) {
 			vect<double> g;
-			double sdotg = 0.0;
+			//		double sdotg = 0.0;
 			for (int dim = 0; dim < NDIM; dim++) {
 				auto jp = j.index();
 				auto jm = j.index();
 				jp[dim]++;
 				jm[dim]--;
 				g[dim] = 0.5 * (-phi[jp] + phi[jm]) / dx / a;
-				sdotg += U[sx_i + dim][j] * g[dim];
+				//			sdotg += U[sx_i + dim][j] * g[dim];
 			}
 			std::vector<double> this_s(opts.nhydro, 0.0);
 			for (int dim = 0; dim < NDIM; dim++) {
 				this_s[sx_i + dim] += std::pow(a, NDIM + 1) * U[rho_i][j] * g[dim];
 			}
-			this_s[egas_i] += std::pow(a, opts.gamma * NDIM) * sdotg;
+//			this_s[egas_i] += std::pow(a, opts.gamma * NDIM) * sdotg;
+			this_s[egas_i] -= std::pow(a, opts.gamma * NDIM - 1) * phi[j] * drho_dt[j];
 			for (int f = 0; f < opts.nhydro; f++) {
 				S[f][j] = (1.0 - opts.beta[rk]) * S[f][j] + opts.beta[rk] * this_s[f];
 			}
-		}
-	}
-	for (int dim = 0; dim < NDIM; dim++) {
-		for (multi_iterator i(fbox[dim]); !i.end(); i++) {
-			F[dim][rho_i][i] *= std::pow(a, NDIM - 1);
-			F[dim][tau_i][i] *= std::pow(a, NDIM - 1);
-			for (int dim2 = 0; dim2 < NDIM; dim2++) {
-				F[dim][sx_i + dim2][i] *= std::pow(a, NDIM);
-			}
-			F[dim][egas_i][i] *= std::pow(a, NDIM * opts.gamma - 1);
 		}
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
@@ -258,7 +268,7 @@ void hydro_grid::resize(double dx_, multi_range box_) {
 	U0.resize(opts.nhydro);
 	U.resize(opts.nhydro);
 	S.resize(opts.nhydro);
-	phi.resize(box_.pad(1));
+	phi.resize(box);
 	error.resize(box_.pad(1));
 	for (int f = 0; f < opts.nhydro; f++) {
 		U0[f].resize(box);
@@ -352,7 +362,7 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 				continue;
 			}
 			for (multi_iterator k(box.pad(-opts.hbw)); !k.end(); k++) {
-				if (!R[k]) {
+				if (!R[k] && U[rho_i][k] > 1.0e-6) {
 					constexpr double tau = 0.1;
 					for (int f = 0; f < opts.nhydro; f++) {
 						const auto up = U[f][k.index() + j];
@@ -424,7 +434,7 @@ void hydro_grid::initialize() {
 					}
 					if (box.contains(k)) {
 						//	printf( "%e\n", wt);
-						const auto drho = wt * p.m * opts.omega_b / opts.omega_m / (std::pow(a, NDIM) * dx * dx * dx);
+						const auto drho = wt * p.m * opts.omega_b / opts.omega_m / (std::pow(a * dx, NDIM));
 						U[rho_i][k] += drho;
 						for (int dim = 0; dim < NDIM; dim++) {
 							U[sx_i + dim][k] += p.v[dim] * drho / a;
@@ -558,7 +568,7 @@ void hydro_grid::initialize() {
 				const auto vy = 0.00;
 				U[sx_i][i] = vx * rho;
 				U[sy_i][i] = vy * rho;
-				const auto K = 4.0 * M_PI * cosmos_a() * cosmos_a() * alpha * alpha / (n + 1);
+				const auto K = 4.0 * M_PI * alpha * alpha * cosmos_a() * cosmos_a() / (n + 1);
 				U[egas_i][i] = std::max(1.0e-12, K * std::pow(theta, 1.0 + n) / (opts.gamma - 1.0)); // * std::pow(unit * unit, opts.gamma);
 				U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 				U[egas_i][i] += 0.5 * (vx * vx + vy * vy) * rho;
@@ -1116,6 +1126,7 @@ std::vector<std::string> hydro_grid::field_names() {
 	names.push_back("D");
 	names.push_back("E");
 	names.push_back("tau");
+	names.push_back("pot");
 	for (int dim = 0; dim < NDIM; dim++) {
 		names.push_back(std::string("S") + char('x' + dim));
 	}
