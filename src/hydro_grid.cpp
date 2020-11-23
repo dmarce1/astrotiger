@@ -117,7 +117,7 @@ double hydro_grid::compute_flux(int rk) {
 		V[pot_i][i] = phi[i];
 	}
 	multi_array<double> drho_dt(box);
-	for( multi_iterator i(box); !i.end(); i++) {
+	for (multi_iterator i(box); !i.end(); i++) {
 		drho_dt[i] = 0.0;
 	}
 	for (int dim = 0; dim < NDIM; dim++) {
@@ -969,13 +969,13 @@ std::vector<double> hydro_grid::pack_coarse_flux() {
 	std::vector<double> data;
 	int size = 0;
 	for (int dim = 0; dim < NDIM; dim++) {
-		auto cbox = box.pad(-opts.gbw).half();
+		auto cbox = box.pad(-opts.hbw).half();
 		cbox.max[dim]++;
 		size += cbox.volume();
 	}
 	data.reserve(size);
 	for (int dim = 0; dim < NDIM; dim++) {
-		auto cbox = box.pad(-opts.gbw).half();
+		auto cbox = box.pad(-opts.hbw).half();
 		cbox.max[dim]++;
 		for (int f = 0; f < opts.nhydro; f++) {
 			for (multi_iterator i(cbox); !i.end(); i++) {
@@ -1002,6 +1002,12 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 		for (int f = 0; f < opts.nhydro; f++) {
 			for (multi_iterator i(this_box); !i.end(); i++) {
 				assert(k < data.size());
+				if (f == rho_i) {
+					auto im = i.index();
+					im[dim]--;
+					S[egas_i][i] -= (data[k] - F[dim][f][i]) * phi[i] / dx;
+					S[egas_i][im] += (data[k] - F[dim][f][i]) * phi[im] / dx;
+				}
 				F[dim][f][i] = data[k];
 				k++;
 			}
@@ -1029,6 +1035,10 @@ void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const
 				im[dim]--;
 				U[f][i] += flux;
 				U[f][im] -= flux;
+				if (f == rho_i) {
+					U[egas_i][i] -= flux * phi[i];
+					U[egas_i][im] += flux * phi[im];
+				}
 				k++;
 			}
 		}
