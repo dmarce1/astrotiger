@@ -26,9 +26,9 @@ template<class T>
 inline double hydro_pressure(const std::vector<T> &u) {
 	using namespace std;
 	auto eint = max(T(0), u[egas_i] - hydro_kinetic(u));
-//	if (eint < u[egas_i] * 0.001) {
-//		eint = std::pow(u[tau_i], opts.gamma);
-//	}
+	if (eint < u[egas_i] * 0.001) {
+		eint = std::pow(u[tau_i], opts.gamma);
+	}
 	return (opts.gamma - 1.0) * eint;
 }
 

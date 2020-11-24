@@ -250,6 +250,16 @@ void hydro_grid::substep_update(int rk, double dt, double a0, double a1) {
 				for (multi_iterator i(fbox[dim]); !i.end(); i++) {
 					if (i.index()[dim] % 2 == 0) {
 						const auto j = i.index() / 2;
+//						Fc[dim][f][j] = 0.0;
+					}
+				}
+			}
+		}
+		for (int dim = 0; dim < NDIM; dim++) {
+			for (int f = 0; f < opts.nhydro; f++) {
+				for (multi_iterator i(fbox[dim]); !i.end(); i++) {
+					if (i.index()[dim] % 2 == 0) {
+						const auto j = i.index() / 2;
 						Fc[dim][f][j] += F[dim][f][i] * factor;
 					}
 				}
@@ -338,10 +348,9 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 	}
 	if (opts.particles) {
 		for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
-			R[i] = pcount[i] > (1 << NDIM);
+			R[i] = pcount[i] > 5;
 		}
-	}
-	if (opts.hydro) {
+	} else if (opts.hydro) {
 		multi_range dirs(multi_range(index_type(0)).pad(1));
 		int dirmax = (std::pow(3, NDIM) - 1) / 2;
 		int cnt = 0;
@@ -563,8 +572,8 @@ void hydro_grid::initialize() {
 				const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
 				assert(theta <= 1.0);
 				auto &rho = U[rho_i][i];
-				rho = std::max(1.0e-10, std::pow(theta, n));
-				const auto vx = 0.0;
+				rho = std::max(1.0e-5, std::pow(theta, n));
+				const auto vx = 1.0;
 				const auto vy = 0.00;
 				U[sx_i][i] = vx * rho;
 				U[sy_i][i] = vy * rho;
@@ -1005,8 +1014,8 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 				if (f == rho_i) {
 					auto im = i.index();
 					im[dim]--;
-					S[egas_i][i] -= (data[k] - F[dim][f][i]) * phi[i] / dx;
-					S[egas_i][im] += (data[k] - F[dim][f][i]) * phi[im] / dx;
+					S[egas_i][i] -= (data[k] - F[dim][f][i]) * phi[i] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+					S[egas_i][im] += (data[k] - F[dim][f][i]) * phi[im] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
 				}
 				F[dim][f][i] = data[k];
 				k++;
@@ -1016,7 +1025,7 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 	a = data[k];
 	k++;
 	assert(k == data.size());
-	return a;
+	return 0.0;
 }
 
 void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const multi_range &bbox, double dt, double a0, double a1) {
@@ -1030,21 +1039,45 @@ void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const
 		for (int f = 0; f < opts.nhydro; f++) {
 			for (multi_iterator i(this_box); !i.end(); i++) {
 				assert(k < data.size());
-				const auto flux = data[k] / dx - lambda * F0[dim][f][i];
-				auto im = i.index();
-				im[dim]--;
-				U[f][i] += flux;
-				U[f][im] -= flux;
-				if (f == rho_i) {
-					U[egas_i][i] -= flux * phi[i];
-					U[egas_i][im] += flux * phi[im];
+				if (fbox[dim].contains(i)) {
+					const auto flux = data[k] / dx - lambda * F0[dim][f][i];
+					auto im = i.index();
+					im[dim]--;
+					if (box.contains(im)) {
+						if (f == rho_i && F0[dim][f][i] != 0.0) {
+							//						printf( "%e\n", data[k] / dx / lambda / F0[dim][f][i]);
+						}
+						U[f][im] -= flux;
+						if (f == rho_i) {
+							U[egas_i][im] += flux * phi[im] * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+						}
+					}
+					if (box.contains(i)) {
+						U[f][i] += flux;
+						if (f == rho_i) {
+							U[egas_i][i] -= flux * phi[i] * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+						}
+					}
 				}
 				k++;
 			}
 		}
 	}
+	const auto a = cosmos_a();
 	for (multi_iterator i(box); !i.end(); i++) {
-//		U[tau_i][i] = std::max(0.1 * tau0[i], U[tau_i][i]);
+		if (U[tau_i][i] <= 0.0) {
+
+			double ekin = 0.0;
+			for (int dim = 0; dim < NDIM; dim++) {
+				ekin += 0.5 * std::pow(U[sx_i + dim][i], 2) * std::pow(a, -NDIM - 2) / U[rho_i][i];
+			}
+			const double eint = U[egas_i][i] * std::pow(a, -opts.gamma * NDIM) - ekin;
+			if (eint < 0.0) {
+				U[tau_i][i] = std::max(0.1 * tau0[i], U[tau_i][i]);
+			} else {
+				U[tau_i][i] = std::pow(a, NDIM) * std::pow(eint, 1.0 / opts.gamma);
+			}
+		}
 	}
 	assert(k == data.size());
 }
@@ -1058,7 +1091,6 @@ std::vector<double> hydro_grid::pack_coarse_correction() {
 			}
 		}
 	}
-	reset_coarse_flux_registers();
 	return data;
 }
 

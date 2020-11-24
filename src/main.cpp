@@ -99,12 +99,12 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 	static int base_step = 0;
 	do {
 		cosmos_advance(tm[level]);
-		//	levels_energy_update(level);
+		levels_energy_update(level);
 		if (level == 0) {
 			cosmos_advance(tm[level]);
 			last_e = e;
 			last_a = a;
-			stats = root.get_statistics(opts.max_level, tm[level]).get();
+			stats = root.get_statistics(max_refined, tm[level]).get();
 			mtot = stats.u[rho_i];
 			e = root.get_energy_statistics(mtot).get();
 			a = cosmos_a();
@@ -116,22 +116,27 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		}
 		const auto a = cosmos_a();
 		bool refine = ((nstep == -1) && !already_refined) || (this_step % 2 == 0 && this_step > 0 && level == 0);
+		refine = false;
+//		printf( "%i\n", refine);
 		if (nstep != -1) {
 			coarse_level = level;
 		}
 		last_dt[level] = dt[level];
 		cosmos_advance(tm[level]);
 		if (refine) {
-			for (int l = level; l < opts.max_level; l++) {
+			for (int l = level; l <= opts.max_level; l++) {
 //				printf("Refining level %i\n", l);
-				levels_hydro_initialize(l, refine);
+				levels_hydro_initialize(l, refine, nstep == -1);
 //				levels_show();
 				levels_set_child_families(l);
-				levels_get_hydro_boundaries(l + 1, tm[l + 1]);
+				if (l < opts.max_level) {
+					levels_get_hydro_boundaries(l + 1, tm[l + 1]);
+				}
 			}
 		} else {
-			levels_hydro_initialize(level, false);
+			levels_hydro_initialize(level, false, nstep == -1);
 		}
+//		printf("First step %i\n", nstep == -1);
 		double amax;
 		amax = levels_fine_fluxes(level);
 		if (amax == 0.0) {
@@ -284,7 +289,7 @@ int hpx_main(int argc, char *argv[]) {
 	}
 	output_silo("X.0.silo");
 	int i = 0;
-	double dt = opts.tmax / 10.0;
+	double dt = opts.tmax / 1000.0;
 	levels_show();
 	for (double t = 0.0; t < opts.tmax; t += dt) {
 		i++;

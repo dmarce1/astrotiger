@@ -140,16 +140,16 @@ void levels_show() {
 	}
 }
 
-void levels_hydro_initialize(int level, bool refine) {
+void levels_hydro_initialize(int level, bool refine, bool start) {
 	auto these_levels = levels;
 	std::vector<hpx::future<void>> futs;
 	hpx::future<void> fut;
 	if (hpx::get_locality_id() == 0 && other_localities.size()) {
-		fut = hpx::lcos::broadcast < levels_hydro_initialize_action > (other_localities, level, refine);
+		fut = hpx::lcos::broadcast < levels_hydro_initialize_action > (other_localities, level, refine, start);
 	}
 	for (auto *ptr : these_levels[level]) {
-		futs.push_back(hpx::async([ptr, refine]() {
-			return ptr->hydro_initialize(refine);
+		futs.push_back(hpx::async([ptr, refine, start]() {
+			return ptr->hydro_initialize(refine, start);
 		}));
 	}
 	for (int i = 0; i < futs.size(); i++) {

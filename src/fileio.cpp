@@ -60,7 +60,7 @@ void fileio_init_read() {
 		FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
 		const std::uint64_t total_parts = std::uint64_t(header.npartTotal[1]) + (std::uint64_t(header.npartTotal[2]) << std::uint64_t(32));
 		opts.omega_m = header.Omega0;
-		opts.omega_b = 0.17 * header.Omega0;
+		opts.omega_b = 1.0 * header.Omega0;
 		opts.part_mass = header.mass[1];
 		opts.m_tot = opts.part_mass * total_parts;
 		const auto Gcgs = 6.672e-8;
@@ -150,7 +150,7 @@ void fileio_init_read() {
 		FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
 		fclose(fp);
 	} else if ( NDIM == 2) {
-		const int size = 128;
+		const int size = 129;
 		const int total_parts = size * size;
 		opts.omega_m = 0.3;
 		opts.omega_b = opts.omega_m;

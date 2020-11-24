@@ -179,7 +179,7 @@ public:
 	std::vector<std::vector<double>> get_energy_prolong(std::vector<multi_range>, double);
 	std::pair<std::vector<double>, std::vector<double>> get_hydro_restrict();
 	void hydro_substep(int, double, bool, double, double);
-	void hydro_initialize(bool);
+	void hydro_initialize(bool,bool);
 	output_return output(DBfile *db, int) const;
 	multi_range get_box() const;
 	tree_client truncate(tree_client, multi_range box);
