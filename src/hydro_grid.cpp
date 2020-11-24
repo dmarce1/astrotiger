@@ -73,7 +73,7 @@ double hydro_grid::positivity_limit() const {
 }
 
 double hydro_grid::compute_flux(int rk) {
-	double amax = 0.0;
+	amax = 0.0;
 	const double a = cosmos_a();
 	std::vector<multi_array<double>> VR(opts.nhydro);
 	std::vector<multi_array<double>> VL(opts.nhydro);
@@ -963,7 +963,6 @@ std::vector<double> hydro_grid::pack_restrict(multi_range bbox) const {
 }
 
 std::vector<double> hydro_grid::pack_coarse_flux() {
-	const double a = compute_flux(0);
 	const auto inv = 1.0 / (1 << (NDIM - 1));
 	std::vector<double> data;
 	int size = 0;
@@ -988,7 +987,7 @@ std::vector<double> hydro_grid::pack_coarse_flux() {
 			}
 		}
 	}
-	data.push_back(a);
+	data.push_back(amax);
 	return data;
 }
 
@@ -1000,18 +999,20 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 		this_box.max[dim]++;
 		for (int f = 0; f < opts.nhydro; f++) {
 			for (multi_iterator i(this_box); !i.end(); i++) {
-				assert(k < data.size());
-				if (f == rho_i) {
-					auto im = i.index();
-					im[dim]--;
-					if (box.pad(-opts.hbw).contains(i)) {
-						S[egas_i][i] -= (data[k] - F[dim][f][i]) * phi[i] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+				if (fbox[dim].contains(i)) {
+					assert(k < data.size());
+					if (f == rho_i) {
+						auto im = i.index();
+						im[dim]--;
+						if (box.pad(-opts.hbw).contains(i)) {
+							S[egas_i][i] -= (data[k] - F[dim][f][i]) * phi[i] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+						}
+						if (box.pad(-opts.hbw).contains(im)) {
+							S[egas_i][im] += (data[k] - F[dim][f][i]) * phi[im] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+						}
 					}
-					if (box.pad(-opts.hbw).contains(im)) {
-						S[egas_i][im] += (data[k] - F[dim][f][i]) * phi[im] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
-					}
+					F[dim][f][i] = data[k];
 				}
-				F[dim][f][i] = data[k];
 				k++;
 			}
 		}
@@ -1019,7 +1020,7 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 	a = data[k];
 	k++;
 	assert(k == data.size());
-	return 0.0;
+	return a;
 }
 
 void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const multi_range &bbox, double dt, double a0, double a1) {

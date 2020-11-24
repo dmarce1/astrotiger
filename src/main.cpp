@@ -109,11 +109,15 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		}
 		last_dt[level] = dt[level];
 		cosmos_advance(tm[level]);
+		double amax;
 		if (refine) {
 			for (int l = level; l <= opts.max_level; l++) {
 //				printf("Refining level %i\n", l);
-				levels_hydro_initialize(l, refine, nstep == -1);
-	//			levels_show();
+				double this_amax = levels_hydro_initialize(l, refine, nstep == -1);
+				if (l == level) {
+					amax = this_amax;
+				}
+				//			levels_show();
 				levels_set_child_families(l);
 				if (l < opts.max_level) {
 					levels_get_hydro_boundaries(l + 1, tm[l + 1]);
@@ -123,11 +127,15 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 				solve_gravity(l, tm[l], mtot, max_refined);
 			}
 		} else {
-			levels_hydro_initialize(level, false, nstep == -1);
+			amax = levels_hydro_initialize(level, false, nstep == -1);
 		}
 //		printf("First step %i\n", nstep == -1);
-		double amax;
+		if (level < opts.max_level) {
+			levels_get_hydro_boundaries(level + 1, tm[level]);
+			amax = levels_compute_fluxes(level + 1, 0);
+		}
 		amax = levels_fine_fluxes(level);
+		printf("%e\n", amax);
 		if (amax == 0.0) {
 			tm[level] = tm[level - 1];
 			master(level + 1, coarse_level, tm[level]);

@@ -72,6 +72,12 @@ HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
 
+
+double tree::compute_flux(int rk) {
+	return hydro.compute_flux(rk);
+}
+
+
 double tree::get_average_phi(int lev) const {
 	if (level == lev) {
 		return grav.get_phi_tot();
@@ -700,7 +706,7 @@ std::vector<double> tree::restrict_all() {
 }
 
 std::vector<double> tree::get_fine_flux() {
-	get_hydro_boundaries(t);
+//	get_hydro_boundaries(t);
 	return hydro.pack_coarse_flux();
 }
 
@@ -767,7 +773,7 @@ void tree::energy_update() {
 	get_energy_boundaries(t);
 }
 
-void tree::hydro_initialize(bool refine, bool start) {
+double tree::hydro_initialize(bool refine, bool start) {
 	hydro_step = 0;
 	energy_step = 0;
 	std::vector<multi_range> force_refine_boxes;
@@ -903,25 +909,48 @@ void tree::hydro_initialize(bool refine, bool start) {
 		}
 		hpx::wait_all(void_futs.begin(), void_futs.end());
 	}
+	get_hydro_boundaries(t);
+	return hydro.compute_flux(0);
 }
 
 double tree::apply_fine_fluxes() {
+//	printf( "fine flux a\n");
 	get_hydro_boundaries(t);
+//	printf( "fine flux b\n");
+	std::vector<hpx::future<std::vector<tree_client>>> sfuts;
+	auto these_children = children;
+	std::vector<multi_range> boxes;
+	for (const auto &c : children) {
+		boxes.push_back(c.get_box().half());
+	}
+	for (const auto &s : siblings) {
+		sfuts.push_back(s.client.get_children());
+	}
+	for (int si = 0; si < siblings.size(); si++) {
+		auto tmp = sfuts[si].get();
+		for (int i = 0; i < tmp.size(); i++) {
+			const auto this_box = tmp[i].get_box().half().shift(siblings[si].shift);
+			if (box.pad(1).intersection(this_box).volume()) {
+				boxes.push_back(this_box);
+				these_children.push_back(tmp[i]);
+			}
+		}
+	}
+//	printf( "fine flux c\n");
 	double amax = 0.0;
 	std::vector<hpx::future<std::vector<double>>> cfuts;
-	for (const auto &c : children) {
+	for (const auto &c : these_children) {
 		cfuts.push_back(c.get_fine_flux());
 	}
-	const auto alocal = hydro.compute_flux(0);
 	double achild = 0.0;
-	const auto amaxp1 = std::max(amax, hydro.positivity_limit());
-	for (int i = 0; i < children.size(); i++) {
-		achild = std::max(achild, hydro.unpack_fine_flux(cfuts[i].get(), children[i].get_box().half()));
+	const auto amaxp1 = hydro.positivity_limit();
+	for (int i = 0; i < these_children.size(); i++) {
+		achild = std::max(achild, hydro.unpack_fine_flux(cfuts[i].get(), boxes[i]));
 	}
-	const auto amaxp2 = std::max(amax, hydro.positivity_limit());
-	amax = std::max(amaxp1, std::max(achild, alocal));
+	const auto amaxp2 = hydro.positivity_limit();
+	amax = std::max(amaxp1, achild);
 	amax = std::max(amaxp2, amax);
-//	printf( "%e %e %e\n", amaxp1, amaxp2, alocal);
+//	printf("%e %e %e\n", amaxp1, amaxp2, achild);
 	return amax;
 }
 

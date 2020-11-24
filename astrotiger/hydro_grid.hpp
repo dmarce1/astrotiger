@@ -41,6 +41,7 @@ class hydro_grid {
 	multi_array<double> phi;
 	multi_array<double> error;
 	double dx;
+	double amax;
 
 public:
 

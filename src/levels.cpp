@@ -12,6 +12,7 @@ HPX_PLAIN_ACTION (levels_hydro_initialize);
 HPX_PLAIN_ACTION (levels_hydro_substep);
 HPX_PLAIN_ACTION (levels_output_silo);
 HPX_PLAIN_ACTION (levels_fine_fluxes);
+HPX_PLAIN_ACTION (levels_compute_fluxes);
 HPX_PLAIN_ACTION (levels_max_level);
 HPX_PLAIN_ACTION (levels_energy_update);
 HPX_PLAIN_ACTION (levels_apply_coarse_correction);
@@ -140,10 +141,10 @@ void levels_show() {
 	}
 }
 
-void levels_hydro_initialize(int level, bool refine, bool start) {
+double levels_hydro_initialize(int level, bool refine, bool start) {
 	auto these_levels = levels;
-	std::vector<hpx::future<void>> futs;
-	hpx::future<void> fut;
+	std::vector<hpx::future<double>> futs;
+	hpx::future < std::vector<double> > fut;
 	if (hpx::get_locality_id() == 0 && other_localities.size()) {
 		fut = hpx::lcos::broadcast < levels_hydro_initialize_action > (other_localities, level, refine, start);
 	}
@@ -152,12 +153,16 @@ void levels_hydro_initialize(int level, bool refine, bool start) {
 			return ptr->hydro_initialize(refine, start);
 		}));
 	}
+	double a = 0.0;
 	for (int i = 0; i < futs.size(); i++) {
-		futs[i].get();
+		a = std::max(a, futs[i].get());
 	}
 	if (fut.valid()) {
-		fut.get();
+		for (auto &this_a : fut.get()) {
+			a = std::max(a, this_a);
+		}
 	}
+	return a;
 }
 
 double levels_fine_fluxes(int level) {
@@ -170,6 +175,31 @@ double levels_fine_fluxes(int level) {
 	for (auto *ptr : these_levels[level]) {
 		futs.push_back(hpx::async([ptr]() {
 			return ptr->apply_fine_fluxes();
+		}));
+	}
+	double a = 0.0;
+	for (int i = 0; i < futs.size(); i++) {
+		a = std::max(a, futs[i].get());
+	}
+	if (fut.valid()) {
+		auto others = fut.get();
+		for (int i = 0; i < others.size(); i++) {
+			a = std::max(a, others[i]);
+		}
+	}
+	return a;
+}
+
+double levels_compute_fluxes(int level, int rk) {
+	auto these_levels = levels;
+	std::vector<hpx::future<double>> futs;
+	hpx::future<std::vector<double>> fut;
+	if (hpx::get_locality_id() == 0 && other_localities.size()) {
+		fut = hpx::lcos::broadcast < levels_compute_fluxes_action > (other_localities, level, rk);
+	}
+	for (auto *ptr : these_levels[level]) {
+		futs.push_back(hpx::async([ptr, rk]() {
+			return ptr->compute_flux(rk);
 		}));
 	}
 	double a = 0.0;

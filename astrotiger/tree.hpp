@@ -171,6 +171,7 @@ public:
 	void delist();
 	void list();
 	void set_child_family();
+	double compute_flux(int);
 	void set_gravity_boundary(boundary&&, const multi_range&, int);
 	void set_boundary(std::vector<double>&&, const multi_range&, int);
 	std::vector<double> get_energy_boundary(multi_range, int);
@@ -179,7 +180,7 @@ public:
 	std::vector<std::vector<double>> get_energy_prolong(std::vector<multi_range>, double);
 	std::pair<std::vector<double>, std::vector<double>> get_hydro_restrict();
 	void hydro_substep(int, double, bool, double, double);
-	void hydro_initialize(bool,bool);
+	double hydro_initialize(bool,bool);
 	output_return output(DBfile *db, int) const;
 	multi_range get_box() const;
 	tree_client truncate(tree_client, multi_range box);
