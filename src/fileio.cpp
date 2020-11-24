@@ -152,8 +152,8 @@ void fileio_init_read() {
 	} else if ( NDIM == 2) {
 		const int size = 129;
 		const int total_parts = size * size;
-		opts.omega_m = 0.3;
-		opts.omega_b = opts.omega_m;
+		opts.omega_m = 0.3089;
+		opts.omega_b = 0.1573 * opts.omega_m;
 		opts.part_mass = 1.0 / total_parts;
 		opts.m_tot = 1.0;
 		opts.code_to_g = 1.0;

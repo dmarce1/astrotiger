@@ -250,16 +250,6 @@ void hydro_grid::substep_update(int rk, double dt, double a0, double a1) {
 				for (multi_iterator i(fbox[dim]); !i.end(); i++) {
 					if (i.index()[dim] % 2 == 0) {
 						const auto j = i.index() / 2;
-//						Fc[dim][f][j] = 0.0;
-					}
-				}
-			}
-		}
-		for (int dim = 0; dim < NDIM; dim++) {
-			for (int f = 0; f < opts.nhydro; f++) {
-				for (multi_iterator i(fbox[dim]); !i.end(); i++) {
-					if (i.index()[dim] % 2 == 0) {
-						const auto j = i.index() / 2;
 						Fc[dim][f][j] += F[dim][f][i] * factor;
 					}
 				}
@@ -348,7 +338,7 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 	}
 	if (opts.particles) {
 		for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
-			R[i] = pcount[i] > 5;
+			R[i] = pcount[i] > 8;
 		}
 	} else if (opts.hydro) {
 		multi_range dirs(multi_range(index_type(0)).pad(1));
@@ -572,7 +562,7 @@ void hydro_grid::initialize() {
 				const auto theta = lane_emden(r / alpha, dx / alpha / 2.0, n);
 				assert(theta <= 1.0);
 				auto &rho = U[rho_i][i];
-				rho = std::max(1.0e-5, std::pow(theta, n));
+				rho = std::max(1.0e-10, std::pow(theta, n));
 				const auto vx = 1.0;
 				const auto vy = 0.00;
 				U[sx_i][i] = vx * rho;
@@ -1014,8 +1004,12 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 				if (f == rho_i) {
 					auto im = i.index();
 					im[dim]--;
-					S[egas_i][i] -= (data[k] - F[dim][f][i]) * phi[i] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
-					S[egas_i][im] += (data[k] - F[dim][f][i]) * phi[im] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+					if (box.pad(-opts.hbw).contains(i)) {
+						S[egas_i][i] -= (data[k] - F[dim][f][i]) * phi[i] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+					}
+					if (box.pad(-opts.hbw).contains(im)) {
+						S[egas_i][im] += (data[k] - F[dim][f][i]) * phi[im] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+					}
 				}
 				F[dim][f][i] = data[k];
 				k++;

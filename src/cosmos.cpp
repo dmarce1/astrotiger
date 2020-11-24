@@ -90,12 +90,10 @@ double cosmos_set_z(double z, double h0) {
 }
 
 double cosmos_a() {
-	return 1.0e-2;
 	return C.a;
 }
 
 double cosmos_adot() {
-	return 0.0;
 	return C.adot;
 }
 

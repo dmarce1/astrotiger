@@ -9,7 +9,7 @@
 #include <silo.h>
 
 void output_silo(const std::string &filename) {
-	printf( "Output\n");
+	printf( "Output %s\n", filename.c_str());
 	levels_output_silo(filename);
 	printf( "Done output\n");
 }

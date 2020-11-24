@@ -1,6 +1,6 @@
 #pragma once
 
-#define NDIM 3
+#define NDIM 2
 
 
 
