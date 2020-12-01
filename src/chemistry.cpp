@@ -638,7 +638,7 @@ void chemistry_test() {
 		U[nHEPP] = 0.0 * ne;
 		auto U0 = U;
 		const auto eint = 1.0e-8 * ne;
-		double T = 1e8;
+		double T = 1e9;
 		compute(U0, U, T, dt);
 		ne = U[nHP] + U[nHEP] + 2.0 * U[nHEPP] + U[nH2P] - U[nHN];
 		const auto nnuc = U[nH] + U[nHP] + U[nHN] + 2.0 * U[nH2] + 2.0 * U[nH2P] + 4.0 * U[nHE] + 4.0 * U[nHEP] + 4.0 * U[nHEPP];
