@@ -13,6 +13,8 @@
 #include <vector>
 #include <cmath>
 
+#define SIMPLE
+
 template<class T>
 inline double hydro_kinetic(const std::vector<T> &u) {
 	T ekin = T(0.0);
@@ -25,7 +27,7 @@ inline double hydro_kinetic(const std::vector<T> &u) {
 template<class T>
 inline double hydro_pressure(const std::vector<T> &u) {
 	using namespace std;
-	auto eint = max(T(0), u[egas_i] - hydro_kinetic(u));
+	auto eint = std::max(u[egas_i] - hydro_kinetic(u),0.0);
 	if (eint < u[egas_i] * 0.001) {
 		eint = std::pow(u[tau_i], opts.gamma);
 	}
@@ -51,10 +53,45 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 	const auto rholinv = 1.0 / rho_l;
 	const auto vr = ur[sx_i + dim] * rhorinv;
 	const auto vl = ul[sx_i + dim] * rholinv;
+#ifdef ROE
+	const auto c0 = opts.gamma / (opts.gamma - 1.0);
+	const auto hr = (ur[egas_i] + pr) * rhorinv;
+	const auto hl = (ul[egas_i] + pl) * rholinv;
+	const auto wl = std::sqrt(rho_l);
+	const auto wr = std::sqrt(rho_r);
+	const auto wsuminv = 1.0 / (wl + wr);
+	const auto vroe = (wl * vl + wr * vr) * wsuminv;
+	const auto hroe = (wl * hl + wr * hr) * wsuminv;
+	const auto aroe = std::sqrt((opts.gamma - 1.0) * std::max((hroe - 0.5 * vroe * vroe), 0.0));
+	const auto sr = vroe + aroe;
+	const auto sl = vroe - aroe;
+#endif
+#ifdef SIMPLE
 	const auto al = std::sqrt(opts.gamma * std::max(pl / rho_l, 1.0e-20));
 	const auto ar = std::sqrt(opts.gamma * std::max(pr / rho_r, 1.0e-20));
 	const auto sr = std::max(vr + ar, vl + al);
 	const auto sl = std::min(vr - ar, vl - al);
+#endif
+#ifdef TORO
+	const auto ar = std::sqrt(opts.gamma * pr / rho_r);
+	const auto al = std::sqrt(opts.gamma * pl / rho_l);
+	const auto rho_bar = 0.5 * (rho_r + rho_l);
+	const auto abar = 0.5 * (ar + al);
+	const auto pstar = std::max(0.5 * (pr + pl) - 0.5 * (vr - vl) * rho_bar * abar, 0.0);
+	double qr, ql;
+	if (pstar < qr) {
+		qr = 1.0;
+	} else {
+		qr = std::sqrt(1.0 + (opts.gamma + 1.0) / (2.0 * opts.gamma) * (pstar / pr - 1.0));
+	}
+	if (pstar < ql) {
+		ql = 1.0;
+	} else {
+		ql = std::sqrt(1.0 + (opts.gamma + 1.0) / (2.0 * opts.gamma) * (pstar / pl - 1.0));
+	}
+	const auto sl = vl - ql * al;
+	const auto sr = vr + qr * ar;
+#endif
 
 	if (0 <= sl) {
 		physical_flux(flux, ul, vl, pl, dim);

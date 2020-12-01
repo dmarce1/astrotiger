@@ -196,14 +196,14 @@ public:
 	double compute_error();
 	std::vector<double> get_fine_flux();
 	double apply_fine_fluxes();
-	void drift(double);
+	void drift(double, double, double);
 	void finish_drift(std::vector<particle>);
 	void recv_parts(std::vector<particle>);
 	energy_statistics get_energy_statistics(double rho0) const;
 	range<double> range_int_to_double( const multi_range& box );
 	multi_array<int> get_particle_count() const;
 	hpx::future<void> send_child_particles();
-	double max_part_velocity() const;
+	double max_part_velocity(int) const;
 	void kick(int, double, std::vector<double>, std::vector<double>);
 	std::vector<double> compute_cic(const std::vector<double>&, double t, int );
 	void apply_coarse_correction(double a0, double a1);
@@ -225,6 +225,7 @@ public:
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,set_family);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,list);
 	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,delist);
+	/**/HPX_DEFINE_COMPONENT_DIRECT_ACTION(tree,get_fine_flux);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_average_phi);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,set_average_phi);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_energy_statistics);
@@ -234,7 +235,6 @@ public:
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_particle_count);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,finish_drift);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,drift);
-	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_fine_flux);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,restrict_all);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,get_statistics);
 	/**/HPX_DEFINE_COMPONENT_ACTION(tree,gravity_solve);

@@ -13,7 +13,7 @@ struct cosmos {
 		arc & adot;
 	}
 	cosmos();
-	void advance_to_time(double, int = 10000);
+	void advance_to_time(double, int = 100000);
 	void advance_to_scalefactor(double);
 };
 
@@ -31,7 +31,13 @@ double dadt(double adot) {
 }
 
 double dadotdt(double a, double adot) {
-	return H0 * H0 * (-0.5 * opts.omega_m / std::pow(a, NDIM - 1) + a * (1.0 - opts.omega_m));
+	if ( NDIM == 3) {
+		return H0 * H0 * (-0.5 * opts.omega_m / (a * a) + a * (1.0 - opts.omega_m));
+	} else if ( NDIM == 2) {
+		return H0 * H0 * (a * (1.0 - opts.omega_m));
+	} else {
+		printf("1d cosmology not available\n");
+	}
 }
 
 double dtaudt(double a) {
@@ -41,23 +47,25 @@ double dtaudt(double a) {
 void cosmos::advance_to_time(double t2, int Nstep) {
 	double t1 = t;
 	double dt = (t2 - t1) / Nstep;
-
-	for (int i = 0; i < Nstep; i++) {
-		const auto da1 = dadt(adot) * dt;
-		const auto dadot1 = dadotdt(a, adot) * dt;
-		const auto da2 = dadt(adot + dadot1 * 0.5) * dt;
-		const auto dadot2 = dadotdt(a + da1 * 0.5, adot + dadot1 * 0.5) * dt;
-		const auto da3 = dadt(adot + dadot2 * 0.5) * dt;
-		const auto dadot3 = dadotdt(a + da2 * 0.5, adot + dadot2 * 0.5) * dt;
-		const auto da4 = dadt(adot + dadot3) * dt;
-		const auto dadot4 = dadotdt(a + da3, adot + dadot3) * dt;
-		const auto dtau1 = dtaudt(a) * dt;
-		const auto dtau2 = dtaudt(a + da1 * 0.5) * dt;
-		const auto dtau3 = dtaudt(a + da2 * 0.5) * dt;
-		const auto dtau4 = dtaudt(a + da3) * dt;
-		a += (da1 + 2.0 * da2 + 2.0 * da3 + da4) / 6.0;
-		adot += (dadot1 + 2.0 * dadot2 + 2.0 * dadot3 + dadot4) / 6.0;
-		tau += (dtau1 + 2.0 * dtau2 + 2.0 * dtau3 + dtau4) / 6.0;
+	if (dt != 0.0) {
+		for (int i = 0; i < Nstep; i++) {
+			const auto da1 = dadt(adot) * dt;
+			const auto dadot1 = dadotdt(a, adot) * dt;
+			const auto da2 = dadt(adot + dadot1 * 0.5) * dt;
+			const auto dadot2 = dadotdt(a + da1 * 0.5, adot + dadot1 * 0.5) * dt;
+			const auto da3 = dadt(adot + dadot2 * 0.5) * dt;
+			const auto dadot3 = dadotdt(a + da2 * 0.5, adot + dadot2 * 0.5) * dt;
+			const auto da4 = dadt(adot + dadot3) * dt;
+			const auto dadot4 = dadotdt(a + da3, adot + dadot3) * dt;
+			const auto dtau1 = dtaudt(a) * dt;
+			const auto dtau2 = dtaudt(a + da1 * 0.5) * dt;
+			const auto dtau3 = dtaudt(a + da2 * 0.5) * dt;
+			const auto dtau4 = dtaudt(a + da3) * dt;
+			a += (da1 + 2.0 * da2 + 2.0 * da3 + da4) / 6.0;
+			adot += (dadot1 + 2.0 * dadot2 + 2.0 * dadot3 + dadot4) / 6.0;
+			tau += (dtau1 + 2.0 * dtau2 + 2.0 * dtau3 + dtau4) / 6.0;
+		}
+//		printf( "%e   %e\n", Nstep*dt, a );
 	}
 	t = t2;
 
@@ -95,6 +103,14 @@ double cosmos_a() {
 
 double cosmos_adot() {
 	return C.adot;
+}
+
+double cosmos_adotdot() {
+	return dadotdt(C.a, C.adot);
+}
+
+double cosmos_time() {
+	return C.t + opts.tmax;
 }
 
 void cosmos_advance(double t) {

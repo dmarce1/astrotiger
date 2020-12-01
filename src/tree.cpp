@@ -72,11 +72,9 @@ HPX_REGISTER_ACTION (delist_action_type);
 HPX_REGISTER_ACTION (initialize_action_type);
 HPX_REGISTER_ACTION (get_children_action_type);
 
-
 double tree::compute_flux(int rk) {
 	return hydro.compute_flux(rk);
 }
-
 
 double tree::get_average_phi(int lev) const {
 	if (level == lev) {
@@ -189,16 +187,20 @@ void tree::kick(int rung, double tm, std::vector<double> last_dt, std::vector<do
 	hpx::wait_all(futs.begin(), futs.end());
 }
 
-double tree::max_part_velocity() const {
+double tree::max_part_velocity(int lev) const {
 	std::vector<hpx::future<double>> futs;
-	for (const auto &c : children) {
-		futs.push_back(c.max_part_velocity());
+	if (lev < level) {
+		double vmax = 0.0;
+		for (const auto &c : children) {
+			futs.push_back(c.max_part_velocity(lev));
+		}
+		for (auto &f : futs) {
+			vmax = std::max(vmax, f.get());
+		}
+		return vmax;
+	} else {
+		return parts.max_velocity();
 	}
-	double vmax = parts.max_velocity();
-	for (auto &f : futs) {
-		vmax = std::max(vmax, f.get());
-	}
-	return vmax;
 }
 
 void tree::recv_parts(std::vector<particle> these_parts) {
@@ -324,17 +326,17 @@ void tree::finish_drift(std::vector<particle> parent_parts) {
 	hpx::wait_all(futs.begin(), futs.end());
 }
 
-void tree::drift(double dt) {
+void tree::drift(double dt, double a0, double a1) {
 	std::vector<hpx::future<void>> futs;
 	for (const auto &c : children) {
-		futs.push_back(c.drift(dt));
+		futs.push_back(c.drift(dt, a0, a1));
 	}
 	std::vector<multi_range> child_boxes;
 	for (const auto &c : children) {
 		child_boxes.push_back(c.get_box().half());
 	}
 	parts.set_child_boxes(child_boxes);
-	auto escaped = parts.drift(dt);
+	auto escaped = parts.drift(dt, a0, a1);
 	for (int i = 0; i < siblings.size(); i++) {
 		std::vector<particle> sibparts;
 		const auto rbox = range_int_to_double(siblings[i].box());
@@ -1383,7 +1385,7 @@ double tree::initialize(int this_level) {
 		}
 	}
 	if (opts.particles) {
-		amax = std::max(amax, max_part_velocity());
+		amax = std::max(amax, max_part_velocity(level));
 	}
 	return amax;
 }

@@ -52,7 +52,7 @@ public:
 	std::vector<std::vector<double>> pack_output() const;
 	std::vector<std::vector<double>> pack_coords() const;
 	static std::vector<std::string> field_names();
-	std::vector<particle> drift(double dt);
+	std::vector<particle> drift(double dt, double a0, double a1);
 	void add_parts(const std::vector<particle> &parts);
 	void initialize();
 	std::vector<particle> get_particles();

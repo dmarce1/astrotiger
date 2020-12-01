@@ -78,10 +78,10 @@ public:
 	hpx::future<void> set_average_phi(int, double) const;
 	hpx::future<std::vector<double>> compute_cic(const std::vector<double>&, double t, int lev) const;
 	hpx::future<void> kick(int, double, const std::vector<double>&, const std::vector<double>&) const;
-	hpx::future<double> max_part_velocity() const;
+	hpx::future<double> max_part_velocity(int lev) const;
 	hpx::future<multi_array<int>> get_particle_count() const;
 	hpx::future<void> send_parts(std::vector<particle>&&) const;
-	hpx::future<void> drift(double dt) const;
+	hpx::future<void> drift(double dt, double a0, double a1) const;
 	hpx::future<void> finish_drift(std::vector<particle>&&) const;
 	hpx::future<std::vector<double>> get_fine_flux() const;
 	hpx::future<tree_client> truncate(multi_range box) const;

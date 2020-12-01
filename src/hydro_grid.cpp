@@ -338,7 +338,7 @@ void hydro_grid::compute_refinement_criteria(const multi_array<int> &pcount) {
 	}
 	if (opts.particles) {
 		for (multi_iterator i(box.pad(-opts.hbw)); !i.end(); i++) {
-			R[i] = pcount[i] > 8;
+			R[i] = pcount[i] > 7;
 		}
 	} else if (opts.hydro) {
 		multi_range dirs(multi_range(index_type(0)).pad(1));
@@ -401,46 +401,52 @@ void hydro_grid::initialize() {
 	if (opts.problem == "cosmos") {
 		const auto &parts = fileio_get_particles();
 		for (multi_iterator i(box); !i.end(); i++) {
-			U[rho_i][i] = 1.0e-3;
-			U[egas_i][i] = 1.0e-10;
+			U[rho_i][i] = 0.0;
+			U[egas_i][i] = 0.0;
 			for (int dim = 0; dim < NDIM; dim++) {
 				U[sx_i + dim][i] = 0.0;
 			}
-			U[tau_i][i] = std::pow(U[egas_i][i], 1.0 / opts.gamma);
 		}
 		multi_range pbox = multi_range(vect<int>(0)).pad(1);
 		for (multi_iterator q(pbox); !q.end(); q++) {
 			for (const auto &p : parts) {
 				const auto x = p.x + vect<double>(q.index());
 				multi_index j;
-				vect<double> w;
 				for (int dim = 0; dim < NDIM; dim++) {
-					j[dim] = int((x[dim] + 1.0 - 0.5 * dx) / dx) - int((1.0 + 0.1 * dx) / dx);
-					w[dim] = (x[dim] - 0.5 * dx) / dx - j[dim];
+					j[dim] = int((x[dim] + 1.0 - 0.5 * dx) / dx) - int(1.0 / dx);
 				}
 				auto this_box = multi_range(j);
 				for (int dim = 0; dim < NDIM; dim++) {
-					this_box.max[dim]++;
+					this_box.max[dim] += 2;
+					this_box.min[dim] -= 2;
 				}
-				for (multi_iterator k(this_box); !k.end(); k++) {
-					double wt = 1.0;
-					for (int dim = 0; dim < NDIM; dim++) {
-						if (j[dim] == k[dim]) {
-							wt *= 1.0 - w[dim];
-						} else {
-							wt *= w[dim];
+				if (box.intersection(this_box).volume()) {
+					for (multi_iterator k(this_box); !k.end(); k++) {
+						if (box.contains(k)) {
+							double r = 0.0;
+							for (int dim = 0; dim < NDIM; dim++) {
+								r += std::pow(x[dim] - coord(k[dim]), 2);
+							}
+							r = std::sqrt(r);
+							r = r / (2.0 * dx);
+							double wt;
+							if (r < 0.5) {
+								wt = (1.0 - 6.0 * r * r * (1 - r));
+							} else if (r < 1.0) {
+								wt = 2.0 * std::pow(1.0 - r, 3.0);
+							} else {
+								wt = 0.0;
+							}
+							wt *= 8.0 / M_PI;
+							const auto drho = wt * p.m * opts.omega_b / opts.omega_m / (std::pow(2.0 * a * dx, NDIM));
+							U[rho_i][k] += drho;
+							U[egas_i][k] += 0.5 * p.v.dot(p.v) * drho / (a * a);
+							for (int dim = 0; dim < NDIM; dim++) {
+								U[sx_i + dim][k] += p.v[dim] * drho / a;
+							}
 						}
 					}
-					if (box.contains(k)) {
-						//	printf( "%e\n", wt);
-						const auto drho = wt * p.m * opts.omega_b / opts.omega_m / (std::pow(a * dx, NDIM));
-						U[rho_i][k] += drho;
-						for (int dim = 0; dim < NDIM; dim++) {
-							U[sx_i + dim][k] += p.v[dim] * drho / a;
-						}
-					}
 				}
-
 			}
 		}
 		for (multi_iterator i(box); !i.end(); i++) {
@@ -448,7 +454,7 @@ void hydro_grid::initialize() {
 			for (int dim = 0; dim < NDIM; dim++) {
 				ek += 0.5 * U[sx_i + dim][i] * U[sx_i + dim][i] / U[rho_i][i];
 			}
-			U[egas_i][i] += ek;
+			U[tau_i][i] = std::pow(U[egas_i][i] - ek, 1.0 / opts.gamma);
 		}
 	} else {
 		for (multi_iterator i(box); !i.end(); i++) {
@@ -910,11 +916,26 @@ std::vector<std::vector<double>> hydro_grid::pack_output(const multi_array<std::
 	auto bbox = box.pad(-opts.hbw);
 //	auto bbox = box;
 	data.resize(opts.nhydro + 2);
+	double units;
+	const auto a = cosmos_a();
 	for (int f = 0; f <= opts.nhydro + 1; f++) {
+		if (f == rho_i) {
+			units = opts.code_to_g / std::pow(opts.code_to_cm * a, NDIM);
+		} else if (f == tau_i) {
+			units = std::pow(opts.code_to_g / std::pow(opts.code_to_cm, NDIM - 2) / std::pow(opts.code_to_s, 2), 1.0 / opts.gamma) / std::pow(a, NDIM);
+		} else if (f >= sx_i && f <= sz_i) {
+			units = opts.code_to_g / std::pow(opts.code_to_cm, NDIM - 1) / opts.code_to_s / std::pow(a, NDIM + 1);
+		} else if (f == egas_i) {
+			units = opts.code_to_g / std::pow(opts.code_to_cm, NDIM - 2) / std::pow(opts.code_to_s, 2) / std::pow(a, NDIM + 2);
+		} else if (f == pot_i) {
+			units = opts.code_to_g / std::pow(opts.code_to_cm, NDIM - 2) / std::pow(opts.code_to_s, 2);
+		} else {
+			units = 1.0;
+		}
 		const auto &u = f == opts.nhydro ? phi : (f == opts.nhydro + 1 ? error : U[f]);
 		for (multi_iterator i(bbox); !i.end(); i++) {
 			if (mask[i]) {
-				data[f].push_back(u[i]);
+				data[f].push_back(u[i] * units);
 			}
 		}
 	}

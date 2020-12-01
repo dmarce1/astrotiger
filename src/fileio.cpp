@@ -60,7 +60,7 @@ void fileio_init_read() {
 		FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
 		const std::uint64_t total_parts = std::uint64_t(header.npartTotal[1]) + (std::uint64_t(header.npartTotal[2]) << std::uint64_t(32));
 		opts.omega_m = header.Omega0;
-		opts.omega_b = 1.0 * header.Omega0;
+		opts.omega_b = 0.1573 * header.Omega0;
 		opts.part_mass = header.mass[1];
 		opts.m_tot = opts.part_mass * total_parts;
 		const auto Gcgs = 6.672e-8;
@@ -150,32 +150,36 @@ void fileio_init_read() {
 		FREAD_ASSERT(fread(&dummy, sizeof(dummy), 1, fp));
 		fclose(fp);
 	} else if ( NDIM == 2) {
-		const int size = 129;
+		const int size = 128;
 		const int total_parts = size * size;
 		opts.omega_m = 0.3089;
-		opts.omega_b = 0.1573 * opts.omega_m;
+		opts.omega_b = 0.0 * opts.omega_m;
 		opts.part_mass = 1.0 / total_parts;
-		opts.m_tot = 1.0;
+		opts.m_tot = opts.part_mass * total_parts;
+		const auto Gcgs = 6.672e-8;
+		const auto Hcgs = 3.2407789e-18;
+		const auto mtot = opts.part_mass * total_parts;
 		opts.code_to_g = 1.0;
 		opts.code_to_cm_per_s = 1.0;
 		opts.code_to_cm = 1.0;
 		opts.code_to_s = 1.0;
 		opts.H0 = 1.0;
 		opts.G = 1.0;
-		opts.z = 128.0;
-
+		opts.z = 9.0;
 		opts.gamma = 2.0;
 		opts.tmax = cosmos_set_z(opts.z, opts.H0);
-		printf( "Tmax = %e\n", opts.tmax);
+		printf("Tmax = %e\n", opts.tmax);
 		const auto dx = 1.0 / size;
-		const auto a = 1.0 / (1.0+opts.z);
+		const auto a = 1.0 / (1.0 + opts.z);
 		for (int i = 0; i < size; i++) {
 			for (int j = 0; j < size; j++) {
 				particle p;
-				p.x[0] = (i + 0.5) * dx + dx * (2 * rand1() - 1) * 0.1;
-				p.x[1] = (j + 0.5) * dx + dx * (2 * rand1() - 1) * 0.1;
-				p.v[0] = 0.0;
-				p.v[1] = 0.0;
+				const auto x = (i + 0.5) * dx;
+				const auto y = (j + 0.5) * dx;
+				p.x[0] = x + dx * (2.0 * rand1() - 1.0) * 1.0e-12;
+				p.x[1] = y + dx * (2.0 * rand1() - 1.0) * 1.0e-12;
+				p.v[0] = (2.0 * rand1() - 1.0) * 1.0e-3;
+				p.v[1] = (2.0 * rand1() - 1.0) * 1.0e-3;
 				p.rung = 0;
 				p.m = opts.part_mass;
 				parts.push_back(p);

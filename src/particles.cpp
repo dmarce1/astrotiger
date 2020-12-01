@@ -180,7 +180,6 @@ void particles::initialize() {
 void particles::kick(int kick_level, int this_level, const std::vector<double> &dt0, const std::vector<double> &dt1,
 		const std::array<multi_array<double>, NDIM> &g) {
 	const auto a = cosmos_a();
-	const auto adot = cosmos_adot();
 	for (auto &p : parts) {
 		if (p.rung >= kick_level) {
 			multi_index i;
@@ -282,12 +281,13 @@ double particles::max_velocity() const {
 
 std::vector<std::vector<double>> particles::pack_output() const {
 	std::vector<std::vector<double>> data(NDIM + 2);
+	const auto a = cosmos_a();
 	for (const auto &part : parts) {
 		for (int dim = 0; dim < NDIM; dim++) {
-			data[dim].push_back(part.v[dim]);
+			data[dim].push_back(part.v[dim] / a * opts.code_to_cm / opts.code_to_s);
 		}
 		data[NDIM].push_back(part.rung);
-		data[NDIM + 1].push_back(part.m);
+		data[NDIM + 1].push_back(part.m * opts.code_to_g);
 	}
 	return data;
 }
@@ -347,14 +347,14 @@ std::vector<particle> particles::get_particles(const multi_range &bbox) {
 	return rparts;
 }
 
-std::vector<particle> particles::drift(double dt) {
+std::vector<particle> particles::drift(double dt, double a0, double a1) {
 	const auto a = cosmos_a();
 	std::vector<particle> escaped;
 	int i = 0;
 	while (i < parts.size()) {
 		auto &part = parts[i];
 		for (int dim = 0; dim < NDIM; dim++) {
-			part.x[dim] += part.v[dim] * dt / (a * a);
+			part.x[dim] += part.v[dim] * dt * 0.5 * (1.0 / (a0 * a0) + 1.0 / (a1 * a1));
 		}
 		bool leave_box = !rbox.contains(part.x);
 		if (!leave_box) {
