@@ -54,6 +54,8 @@ bool options::process_options(int argc, char *argv[]) {
 	("ngroup", po::value<int>(&ngroup)->default_value(1), "number of frequency groups") //
 			;
 
+	species = false;
+	nspecies = 0;
 	boost::program_options::variables_map vm;
 	po::store(po::parse_command_line(argc, argv, command_opts), vm);
 	po::notify(vm);
@@ -109,13 +111,15 @@ bool options::process_options(int argc, char *argv[]) {
 		gravity = self_gravity = true;
 	} else if (problem == "cosmos") {
 		hydro = gravity = self_gravity = particles = true;
+		nspecies = 8;
+		species = true;
 		opts = *this;
 		fileio_init_read();
 		*this = opts;
 		set(*this);
 	}
 
-	nhydro = 4 + NDIM;
+	nhydro = 4 + NDIM + nspecies;
 	hbw = 2;
 	gbw = 2;
 	max_bw = std::max(hbw, window);

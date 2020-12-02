@@ -12,6 +12,8 @@ using bc_type = int;
 
 class options {
 public:
+	int nspecies;
+	bool species;
 	double code_to_s;
 	double H0;
 	double clight;

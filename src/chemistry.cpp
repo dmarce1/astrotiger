@@ -3,6 +3,7 @@
 #include <vector>
 #include <array>
 #include <cassert>
+#include <astrotiger/chemistry.hpp>
 
 #define KperEv (11604.525)
 
@@ -377,7 +378,7 @@ double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, dou
 		for (int n = 0; n < 5; n++) {
 			for (int m = 0; m < 5; m++) {
 				U1[n] -= invAdetA[n][m] * f[m] / detA;
-	//			U1[n] = std::max(U1[n], 0.0);
+				//			U1[n] = std::max(U1[n], 0.0);
 			}
 		}
 		U = U1;
@@ -450,7 +451,7 @@ double compute(const std::array<double, NS> U0, std::array<double, NS> &U, doubl
 	return (1.5 * nmon + 2.5 * ndia) * kb * T + eion;
 }
 
-double compute_thermo_properties(std::array<double, NS> U0, std::array<double, NS> &U, double energy, double dt) {
+double compute_next_chemistry(std::array<double, NS> U0, std::array<double, NS> &U, double energy, double dt) {
 	const auto evtoerg = 1.60218e-12;
 	const auto Hion = -13.6 * evtoerg;
 	const auto Hnion = -0.755 * evtoerg;
@@ -480,36 +481,85 @@ double compute_thermo_properties(std::array<double, NS> U0, std::array<double, N
 	return T;
 }
 
+
+double ion_energy(species s) {
+	const auto evtoerg = 1.60218e-12;
+	const auto Hion = -13.6 * evtoerg;
+	const auto Hnion = -0.755 * evtoerg;
+	const auto Heion = -(24.6 + 13.6 * 4) * evtoerg;
+	const auto Hepion = -24.6 * evtoerg;
+	const auto H2ion = -15.42 * evtoerg;
+	return s.H * Hion + s.Hn * Hnion + s.He * Heion + s.Hep * Hepion + s.H2 * H2ion;
+}
+
+thermo_props compute_thermo_properties(const species s, double energy) {
+	thermo_props p;
+	const double ne = s.Hp - s.Hn + s.H2p + s.Hep + 2 * s.Hepp;
+	const double nA = s.H + s.Hp + s.Hn + 2.0 * s.H2 + 2.0 * s.H2p + 4.0 * s.He + 4.0 * s.Hep + 4.0 * s.Hepp;
+	p.rho = nA * 1.6605e-24;
+	const double nmon = ne + s.H + s.Hp + s.Hn + s.He + s.Hep + s.Hepp;
+	const double ndia = s.H2 + s.H2p;
+	const double n = nmon + ndia;
+	const double kb = 1.38e-16;
+	p.eion = ion_energy(s);
+	p.gamma = (5 * nmon + 7 * ndia) / (3 * nmon + 5 * ndia);
+	p.pressure = (p.gamma - 1.0) * std::max(energy - p.eion, 0.0);
+	p.sound_speed = std::sqrt(p.gamma * p.pressure / p.rho);
+	p.T = p.pressure / (kb * n);
+	return p;
+}
+
+species compute_next_species(const species s0, double energy, double dt) {
+	std::array<double, NS> U, U0;
+	species s;
+	U0[nH] = s0.H;
+	U0[nHP] = s0.Hp;
+	U0[nHN] = s0.Hn;
+	U0[nH2] = s0.H2;
+	U0[nH2P] = s0.H2p;
+	U0[nHE] = s0.He;
+	U0[nHEP] = s0.Hep;
+	U0[nHEPP] = s0.Hepp;
+	compute_next_chemistry(U0, U, energy, dt);
+	s.H = U[nH];
+	s.Hp = U[nHP];
+	s.Hn = U[nHN];
+	s.H2 = U[nH2];
+	s.H2p = U[nH2P];
+	s.He = U[nHE];
+	s.Hep = U[nHEP];
+	s.Hepp = U[nHEPP];
+}
+
 void chemistry_test() {
-	std::array<double, NS> U;
-	const auto dt = 1.0;
-	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "time", "T", "A", "AH", "AHe", "N", "Ne", "H", "H+", "H-", "H2",
-			"H2p", "He", "He+", "He++");
-	double T = 1.0e4;
-	for (double dt = 1.0e+3; dt <= 1e+17; dt *= 10) {
-		for (int i = 0; i < NS; i++) {
-			U[i] = 0.0;
-		}
-		double ne = 1e-1;
-		U[nH] = 0.01 * ne;
-		U[nHP] = 0.91 * ne;
-		U[nH2P] = 0.00 * ne;
-		U[nHE] = 0.00 * ne;
-		U[nHEP] = 0.08 * ne;
-		U[nHEPP] = 0.0 * ne;
-		auto U0 = U;
-		const auto eint = 1.0e-10 * ne;
-		//	T /= 5.0;
-		T = compute_thermo_properties(U0, U, eint, dt);
-		ne = U[nHP] + U[nHEP] + 2.0 * U[nHEPP] + U[nH2P] - U[nHN];
-		const auto nnuc = U[nH] + U[nHP] + U[nHN] + 2.0 * U[nH2] + 2.0 * U[nH2P] + 4.0 * U[nHE] + 4.0 * U[nHEP] + 4.0 * U[nHEPP];
-		const auto nnucleus = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP];
-		const auto n = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
-		const auto nHnuc = U[nH] + U[nHP] + U[nHN] + 2.0 * U[nH2] + 2.0 * U[nH2P];
-		const auto nHenuc = 4.0 * U[nHE] + 4.0 * U[nHEP] + 4.0 * U[nHEPP];
-		printf("%14.5e %14.5e %14.5e %14.5e %14.5e  %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e\n", (double) dt, (double) T,
-				(double) nnuc, (double) nHnuc, (double) nHenuc, (double) n, (double) ne, (double) U[nH], (double) U[nHP], (double) U[nHN], (double) U[nH2],
-				(double) U[nH2P], (double) U[nHE], (double) U[nHEP], (double) U[nHEPP]);
-		U = U0;
-	}
+//	std::array<double, NS> U;
+//	const auto dt = 1.0;
+//	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "time", "T", "A", "AH", "AHe", "N", "Ne", "H", "H+", "H-", "H2",
+//			"H2p", "He", "He+", "He++");
+//	double T = 1.0e4;
+//	for (double dt = 1.0e+3; dt <= 1e+17; dt *= 10) {
+//		for (int i = 0; i < NS; i++) {
+//			U[i] = 0.0;
+//		}
+//		double ne = 1e-1;
+//		U[nH] = 0.01 * ne;
+//		U[nHP] = 0.91 * ne;
+//		U[nH2P] = 0.00 * ne;
+//		U[nHE] = 0.00 * ne;
+//		U[nHEP] = 0.08 * ne;
+//		U[nHEPP] = 0.0 * ne;
+//		auto U0 = U;
+//		const auto eint = 1.0e-10 * ne;
+//		T = compute_thermo_properties(U0, U, eint, dt);
+//		ne = U[nHP] + U[nHEP] + 2.0 * U[nHEPP] + U[nH2P] - U[nHN];
+//		const auto nnuc = U[nH] + U[nHP] + U[nHN] + 2.0 * U[nH2] + 2.0 * U[nH2P] + 4.0 * U[nHE] + 4.0 * U[nHEP] + 4.0 * U[nHEPP];
+//		const auto nnucleus = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP];
+//		const auto n = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
+//		const auto nHnuc = U[nH] + U[nHP] + U[nHN] + 2.0 * U[nH2] + 2.0 * U[nH2P];
+//		const auto nHenuc = 4.0 * U[nHE] + 4.0 * U[nHEP] + 4.0 * U[nHEPP];
+//		printf("%14.5e %14.5e %14.5e %14.5e %14.5e  %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e\n", (double) dt, (double) T,
+//				(double) nnuc, (double) nHnuc, (double) nHenuc, (double) n, (double) ne, (double) U[nH], (double) U[nHP], (double) U[nHN], (double) U[nH2],
+//				(double) U[nH2P], (double) U[nHE], (double) U[nHEP], (double) U[nHEPP]);
+//		U = U0;
+//	}
 }

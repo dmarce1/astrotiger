@@ -24,6 +24,15 @@ class energy_statistics;
 #define sx_i 4
 #define sy_i 5
 #define sz_i 6
+#define spc_i (sx_i+NDIM)
+#define h_i (spc_i+0)
+#define hp_i (spc_i+1)
+#define hn_i (spc_i+2)
+#define h2_i (spc_i+3)
+#define h2p_i (spc_i+4)
+#define he_i (spc_i+5)
+#define hep_i (spc_i+6)
+#define hepp_i (spc_i+7)
 
 struct statistics;
 
@@ -70,7 +79,7 @@ public:
 	void reset_coarse_flux_registers();
 	double compute_flux(int rk);
 	void initialize();
-	void compute_refinement_criteria(const multi_array<int>& pcount);
+	void compute_refinement_criteria(const multi_array<int> &pcount);
 	std::vector<multi_range> refined_ranges(const std::vector<multi_range>&, const std::vector<multi_range> &forced) const;
 	double coord(index_type i) const;
 	std::vector<std::vector<double>> pack_output(const multi_array<std::uint8_t>&) const;
@@ -93,7 +102,7 @@ public:
 	void to_array(multi_array<double>&, const multi_range &bbox, int, double) const;
 	std::vector<double> pack_coarse_flux();
 	double unpack_fine_flux(const std::vector<double>&, const multi_range&);
-	energy_statistics get_energy_statistics(const multi_array<double> &phi, const std::vector<multi_range>& exclude, double rho0) const;
+	energy_statistics get_energy_statistics(const multi_array<double> &phi, const std::vector<multi_range> &exclude, double rho0) const;
 
 	template<class A>
 	void serialize(A &&arc, unsigned) {

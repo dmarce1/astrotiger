@@ -27,7 +27,7 @@ inline double hydro_kinetic(const std::vector<T> &u) {
 template<class T>
 inline double hydro_pressure(const std::vector<T> &u) {
 	using namespace std;
-	auto eint = std::max(u[egas_i] - hydro_kinetic(u),0.0);
+	auto eint = std::max(u[egas_i] - hydro_kinetic(u), 0.0);
 	if (eint < u[egas_i] * 0.001) {
 		eint = std::pow(u[tau_i], opts.gamma);
 	}
@@ -45,6 +45,7 @@ void physical_flux(std::vector<T> &flux, const std::vector<T> u, T v, T p, int d
 
 template<class T>
 double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vector<T> &ur, int dim) {
+
 	const auto pr = hydro_pressure(ur);
 	const auto pl = hydro_pressure(ul);
 	const auto rho_r = ur[rho_i];
@@ -53,45 +54,10 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 	const auto rholinv = 1.0 / rho_l;
 	const auto vr = ur[sx_i + dim] * rhorinv;
 	const auto vl = ul[sx_i + dim] * rholinv;
-#ifdef ROE
-	const auto c0 = opts.gamma / (opts.gamma - 1.0);
-	const auto hr = (ur[egas_i] + pr) * rhorinv;
-	const auto hl = (ul[egas_i] + pl) * rholinv;
-	const auto wl = std::sqrt(rho_l);
-	const auto wr = std::sqrt(rho_r);
-	const auto wsuminv = 1.0 / (wl + wr);
-	const auto vroe = (wl * vl + wr * vr) * wsuminv;
-	const auto hroe = (wl * hl + wr * hr) * wsuminv;
-	const auto aroe = std::sqrt((opts.gamma - 1.0) * std::max((hroe - 0.5 * vroe * vroe), 0.0));
-	const auto sr = vroe + aroe;
-	const auto sl = vroe - aroe;
-#endif
-#ifdef SIMPLE
 	const auto al = std::sqrt(opts.gamma * std::max(pl / rho_l, 1.0e-20));
 	const auto ar = std::sqrt(opts.gamma * std::max(pr / rho_r, 1.0e-20));
 	const auto sr = std::max(vr + ar, vl + al);
 	const auto sl = std::min(vr - ar, vl - al);
-#endif
-#ifdef TORO
-	const auto ar = std::sqrt(opts.gamma * pr / rho_r);
-	const auto al = std::sqrt(opts.gamma * pl / rho_l);
-	const auto rho_bar = 0.5 * (rho_r + rho_l);
-	const auto abar = 0.5 * (ar + al);
-	const auto pstar = std::max(0.5 * (pr + pl) - 0.5 * (vr - vl) * rho_bar * abar, 0.0);
-	double qr, ql;
-	if (pstar < qr) {
-		qr = 1.0;
-	} else {
-		qr = std::sqrt(1.0 + (opts.gamma + 1.0) / (2.0 * opts.gamma) * (pstar / pr - 1.0));
-	}
-	if (pstar < ql) {
-		ql = 1.0;
-	} else {
-		ql = std::sqrt(1.0 + (opts.gamma + 1.0) / (2.0 * opts.gamma) * (pstar / pl - 1.0));
-	}
-	const auto sl = vl - ql * al;
-	const auto sr = vr + qr * ar;
-#endif
 
 	if (0 <= sl) {
 		physical_flux(flux, ul, vl, pl, dim);
@@ -107,6 +73,11 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 			u0[sx_i + dim] = rho0 * s0;
 			u0[tau_i] = rho0 / rho_l * ul[tau_i];
 			u0[pot_i] = rho0 / rho_l * ul[pot_i];
+			if (opts.species) {
+				for (int si = 0; si < opts.nspecies; si++) {
+					u0[spc_i + si] = rho0 / rho_l * ul[spc_i + si];
+				}
+			}
 			for (int dim2 = 0; dim2 < NDIM; dim2++) {
 				if (dim != dim2) {
 					u0[sx_i + dim2] = rho0 * ul[sx_i + dim2] / rho_l;
@@ -123,6 +94,11 @@ double hydro_flux(std::vector<T> &flux, const std::vector<T> &ul, const std::vec
 			u0[sx_i + dim] = rho0 * s0;
 			u0[tau_i] = rho0 / rho_r * ur[tau_i];
 			u0[pot_i] = rho0 / rho_r * ur[pot_i];
+			if (opts.species) {
+				for (int si = 0; si < opts.nspecies; si++) {
+					u0[spc_i + si] = rho0 / rho_r * ur[spc_i + si];
+				}
+			}
 			for (int dim2 = 0; dim2 < NDIM; dim2++) {
 				if (dim != dim2) {
 					u0[sx_i + dim2] = rho0 * ur[sx_i + dim2] / rho_r;

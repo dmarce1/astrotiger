@@ -13,6 +13,7 @@
 #include <astrotiger/tree.hpp>
 #include <astrotiger/rand.hpp>
 #include <astrotiger/fileio.hpp>
+#include <astrotiger/chemistry.hpp>
 #include <vector>
 
 hydro_grid::hydro_grid() {
@@ -82,11 +83,16 @@ double hydro_grid::compute_flux(int rk) {
 	std::vector<multi_array<double>> V(opts.nhydro);
 	for (multi_iterator i(box); !i.end(); i++) {
 		U[rho_i][i] /= std::pow(a, NDIM);
+		if (opts.species) {
+			for (int si = 0; si < opts.nspecies; si++) {
+				U[spc_i + si][i] /= std::pow(a, NDIM);
+			}
+		}
 		U[tau_i][i] /= std::pow(a, NDIM);
 		for (int dim = 0; dim < NDIM; dim++) {
 			U[sx_i + dim][i] /= std::pow(a, NDIM + 1);
 		}
-		U[egas_i][i] /= std::pow(a, NDIM * opts.gamma);
+		U[egas_i][i] /= std::pow(a, (NDIM + 2));
 		U[pot_i][i] = U[rho_i][i] * phi[i];
 	}
 	for (int i = 0; i < opts.nhydro; i++) {
@@ -108,6 +114,11 @@ double hydro_grid::compute_flux(int rk) {
 		const auto rhoinv = 1.0 / U[rho_i][i];
 		double ek = 0.0;
 		V[rho_i][i] = U[rho_i][i];
+		if (opts.species) {
+			for (int si = 0; si < opts.nspecies; si++) {
+				V[spc_i + si][i] = U[spc_i + si][i] * amu / U[rho_i][i];
+			}
+		}
 		for (int dim = 0; dim < NDIM; dim++) {
 			ek += 0.5 * std::pow(U[sx_i + dim][i], 2) * rhoinv;
 			V[sx_i + dim][i] = U[sx_i + dim][i] * rhoinv;
@@ -140,6 +151,12 @@ double hydro_grid::compute_flux(int rk) {
 			}
 			ur[rho_i] = vr[rho_i];
 			ul[rho_i] = vl[rho_i];
+			if (opts.species) {
+				for (int si = 0; si < opts.nspecies; si++) {
+					ur[spc_i + si] = vr[spc_i + si] * vr[rho_i] / amu;
+					ul[spc_i + si] = vl[spc_i + si] * vl[rho_i] / amu;
+				}
+			}
 			ur[pot_i] = vr[rho_i] * vr[pot_i];
 			ul[pot_i] = vl[rho_i] * vl[pot_i];
 			double ekr = 0.0;
@@ -164,10 +181,15 @@ double hydro_grid::compute_flux(int rk) {
 			flux[pot_i] = 0.0;
 			flux[rho_i] *= std::pow(a, NDIM - 1);
 			flux[tau_i] *= std::pow(a, NDIM - 1);
+			if (opts.species) {
+				for (int si = 0; si < opts.nspecies; si++) {
+					flux[spc_i + si] *= std::pow(a, NDIM - 1);
+				}
+			}
 			for (int dim2 = 0; dim2 < NDIM; dim2++) {
 				flux[sx_i + dim2] *= std::pow(a, NDIM);
 			}
-			flux[egas_i] *= std::pow(a, NDIM * opts.gamma - 1);
+			flux[egas_i] *= std::pow(a, (NDIM + 2) - 1);
 			for (int f = 0; f < opts.nhydro; f++) {
 				F[dim][f][j] = (1.0 - opts.beta[rk]) * F[dim][f][j] + opts.beta[rk] * flux[f];
 			}
@@ -189,8 +211,8 @@ double hydro_grid::compute_flux(int rk) {
 			for (int dim = 0; dim < NDIM; dim++) {
 				this_s[sx_i + dim] += std::pow(a, NDIM + 1) * U[rho_i][j] * g[dim];
 			}
-//			this_s[egas_i] += std::pow(a, opts.gamma * NDIM) * sdotg;
-			this_s[egas_i] -= std::pow(a, opts.gamma * NDIM - 1) * phi[j] * drho_dt[j];
+//			this_s[egas_i] += std::pow(a, (NDIM + 2)) * sdotg;
+			this_s[egas_i] -= std::pow(a, (NDIM + 2) - 1) * phi[j] * drho_dt[j];
 			for (int f = 0; f < opts.nhydro; f++) {
 				S[f][j] = (1.0 - opts.beta[rk]) * S[f][j] + opts.beta[rk] * this_s[f];
 			}
@@ -199,10 +221,15 @@ double hydro_grid::compute_flux(int rk) {
 	for (multi_iterator i(box); !i.end(); i++) {
 		U[rho_i][i] *= std::pow(a, NDIM);
 		U[tau_i][i] *= std::pow(a, NDIM);
+		if (opts.species) {
+			for (int si = 0; si < opts.nspecies; si++) {
+				U[spc_i + si][i] *= std::pow(a, NDIM);
+			}
+		}
 		for (int dim = 0; dim < NDIM; dim++) {
 			U[sx_i + dim][i] *= std::pow(a, NDIM + 1);
 		}
-		U[egas_i][i] *= std::pow(a, NDIM * opts.gamma);
+		U[egas_i][i] *= std::pow(a, (NDIM + 2));
 	}
 	return amax;
 }
@@ -233,7 +260,7 @@ void hydro_grid::substep_update(int rk, double dt, double a0, double a1) {
 			for (int dim = 0; dim < NDIM; dim++) {
 				ekin += 0.5 * std::pow(U[sx_i + dim][i], 2) * std::pow(a, -NDIM - 2) / U[rho_i][i];
 			}
-			const double eint = U[egas_i][i] * std::pow(a, -opts.gamma * NDIM) - ekin;
+			const double eint = U[egas_i][i] * std::pow(a, -(NDIM + 2)) - ekin;
 
 			printf("substep_update %i: tau is less than zero %e %e\n", rk, U[tau_i][i], eint);
 			if (eint < 0.0) {
@@ -455,6 +482,21 @@ void hydro_grid::initialize() {
 				ek += 0.5 * U[sx_i + dim][i] * U[sx_i + dim][i] / U[rho_i][i];
 			}
 			U[tau_i][i] = std::pow(U[egas_i][i] - ek, 1.0 / opts.gamma);
+			if (opts.species) {
+				const auto A = U[rho_i][i] / amu;
+				const auto nH = 0.92 * A;
+				const auto nHe = 0.08 * A;
+				U[h_i][i] = 0.0 * nH;
+				U[hp_i][i] = 1.0 * nH;
+				U[hn_i][i] = 0.0 * nH;
+				U[h2_i][i] = 0.0 * nH;
+				U[h2p_i][i] = 0.0 * nH;
+				U[he_i][i] = 0.0 * nHe;
+				U[hep_i][i] = 0.0 * nHe;
+				U[hepp_i][i] = 1.0 * nHe;
+				species s = { U[h_i][i], U[hp_i][i], U[hn_i][i], U[h2_i][i], U[h2p_i][i], U[he_i][i], U[hep_i][i], U[hepp_i][i] };
+				U[egas_i][i] += ion_energy(s);
+			}
 		}
 	} else {
 		for (multi_iterator i(box); !i.end(); i++) {
@@ -586,11 +628,16 @@ void hydro_grid::initialize() {
 	}
 	for (multi_iterator i(box); !i.end(); i++) {
 		U[rho_i][i] *= std::pow(a, NDIM);
+		if (opts.species) {
+			for (int si = 0; si < opts.nspecies; si++) {
+				U[spc_i + si][i] *= std::pow(a, NDIM);
+			}
+		}
 		U[tau_i][i] *= std::pow(a, NDIM);
 		for (int dim = 0; dim < NDIM; dim++) {
 			U[sx_i + dim][i] *= std::pow(a, NDIM + 1);
 		}
-		U[egas_i][i] *= std::pow(a, NDIM * opts.gamma);
+		U[egas_i][i] *= std::pow(a, (NDIM + 2));
 	}
 }
 
@@ -646,11 +693,11 @@ void hydro_grid::update_energy() {
 		for (multi_iterator d(multi_range(0).pad(1)); !d.end(); d++) {
 			max_egas = std::max(max_egas, U[egas_i][i]);
 		}
-		max_egas *= std::pow(a, -opts.gamma * NDIM);
+		max_egas *= std::pow(a, -(NDIM + 2));
 		for (int dim = 0; dim < NDIM; dim++) {
 			ekin += 0.5 * std::pow(U[sx_i + dim][i], 2) * std::pow(a, -NDIM - 2) / U[rho_i][i];
 		}
-		const double eint = U[egas_i][i] * std::pow(a, -opts.gamma * NDIM) - ekin;
+		const double eint = U[egas_i][i] * std::pow(a, -(NDIM + 2)) - ekin;
 		if (eint > max_egas * 0.1) {
 			U[tau_i][i] = std::pow(a, NDIM) * std::pow(eint, 1.0 / opts.gamma);
 		}
@@ -929,6 +976,8 @@ std::vector<std::vector<double>> hydro_grid::pack_output(const multi_array<std::
 			units = opts.code_to_g / std::pow(opts.code_to_cm, NDIM - 2) / std::pow(opts.code_to_s, 2) / std::pow(a, NDIM + 2);
 		} else if (f == pot_i) {
 			units = opts.code_to_g / std::pow(opts.code_to_cm, NDIM - 2) / std::pow(opts.code_to_s, 2);
+		} else if (f == spc_i && f < spc_i + opts.nspecies) {
+			units = 1.0 / std::pow(opts.code_to_cm, NDIM);
 		} else {
 			units = 1.0;
 		}
@@ -1026,10 +1075,10 @@ double hydro_grid::unpack_fine_flux(const std::vector<double> &data, const multi
 						auto im = i.index();
 						im[dim]--;
 						if (box.pad(-opts.hbw).contains(i)) {
-							S[egas_i][i] -= (data[k] - F[dim][f][i]) * phi[i] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+							S[egas_i][i] -= (data[k] - F[dim][f][i]) * phi[i] / dx * std::pow(cosmos_a(), (NDIM + 2) - NDIM);
 						}
 						if (box.pad(-opts.hbw).contains(im)) {
-							S[egas_i][im] += (data[k] - F[dim][f][i]) * phi[im] / dx * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+							S[egas_i][im] += (data[k] - F[dim][f][i]) * phi[im] / dx * std::pow(cosmos_a(), (NDIM + 2) - NDIM);
 						}
 					}
 					F[dim][f][i] = data[k];
@@ -1065,13 +1114,13 @@ void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const
 						}
 						U[f][im] -= flux;
 						if (f == rho_i) {
-							U[egas_i][im] += flux * phi[im] * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+							U[egas_i][im] += flux * phi[im] * std::pow(cosmos_a(), (NDIM + 2) - NDIM);
 						}
 					}
 					if (box.contains(i)) {
 						U[f][i] += flux;
 						if (f == rho_i) {
-							U[egas_i][i] -= flux * phi[i] * std::pow(cosmos_a(), opts.gamma * NDIM - NDIM);
+							U[egas_i][i] -= flux * phi[i] * std::pow(cosmos_a(), (NDIM + 2) - NDIM);
 						}
 					}
 				}
@@ -1087,7 +1136,7 @@ void hydro_grid::unpack_coarse_correction(const std::vector<double> &data, const
 			for (int dim = 0; dim < NDIM; dim++) {
 				ekin += 0.5 * std::pow(U[sx_i + dim][i], 2) * std::pow(a, -NDIM - 2) / U[rho_i][i];
 			}
-			const double eint = U[egas_i][i] * std::pow(a, -opts.gamma * NDIM) - ekin;
+			const double eint = U[egas_i][i] * std::pow(a, -(NDIM + 2)) - ekin;
 			if (eint < 0.0) {
 				U[tau_i][i] = std::max(0.1 * tau0[i], U[tau_i][i]);
 			} else {
