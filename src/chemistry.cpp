@@ -16,9 +16,8 @@
 #define nHEPP 7
 #define NS  8
 
-void rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k6, double &k7, double &k8,
-		double &k9, double &k10, double &k11, double &k12, double &k13, double &k14, double &k15, double &k16,
-		double &k17, double &k18, double &k19, double T, bool caseb) {
+void rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k6, double &k7, double &k8, double &k9, double &k10, double &k11, double &k12,
+		double &k13, double &k14, double &k15, double &k16, double &k17, double &k18, double &k19, double T, bool caseb) {
 	const auto tev = T / KperEv;
 	const auto logtev = std::log(T);
 	const auto tiny = std::numeric_limits<double>::min();
@@ -378,7 +377,7 @@ double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, dou
 		for (int n = 0; n < 5; n++) {
 			for (int m = 0; m < 5; m++) {
 				U1[n] -= invAdetA[n][m] * f[m] / detA;
-				U1[n] = std::max(U1[n], 0.0);
+	//			U1[n] = std::max(U1[n], 0.0);
 			}
 		}
 		U = U1;
@@ -397,10 +396,11 @@ double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, dou
 		Ht2 = std::max(Ht1, H2p);
 		H = H1;
 		Hp = Hp1;
+		Hn = Hn1;
 		H2 = H21;
+		H2p = H2p1;
 		err = std::abs(std::log(std::abs(Ht1 / Ht2)));
 	} while (err > 1.0e-10);
-	Hn = K7 * H * ne / (K8 * H + K16 * Hp + K14 * ne);
 	return ne;
 }
 
@@ -418,6 +418,7 @@ double compute(const std::array<double, NS> U0, std::array<double, NS> &U, doubl
 	auto nemin = 0.0;
 	double nemid;
 	auto U1 = U;
+	int iter = 0;
 	do {
 		nemid = 0.5 * (nemax + nemin);
 		auto ne = Hp - Hn + Hep + 2.0 * Hepp + H2p;
@@ -430,10 +431,53 @@ double compute(const std::array<double, NS> U0, std::array<double, NS> &U, doubl
 		} else {
 			nemin = nemid;
 		}
-	} while (nemin / nemax < 0.99999);
+		iter++;
+
+	} while (nemin / nemax < 0.999);
 	U = U1;
-//	printf( "%e %e\n", U[nH], U[nHP]);
-	return nemid;
+	double ne = nemid;
+	const auto evtoerg = 1.60218e-12;
+	const auto Hion = -13.6 * evtoerg;
+	const auto Hnion = -0.755 * evtoerg;
+	const auto Heion = -(24.6 + 13.6 * 4) * evtoerg;
+	const auto Hepion = -24.6 * evtoerg;
+	const auto H2ion = -15.42 * evtoerg;
+	const auto kb = 1.38e-16;
+	double n = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
+	double eion = Hion * U[nH] + Hnion * U[nHN] + Heion * U[nHE] + Hepion * U[nHEP] + H2ion * U[nH2];
+	double nmon = U[nH] + U[nHP] + U[nHN] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
+	double ndia = U[nH2] + U[nH2P];
+	return (1.5 * nmon + 2.5 * ndia) * kb * T + eion;
+}
+
+double compute_thermo_properties(std::array<double, NS> U0, std::array<double, NS> &U, double energy, double dt) {
+	const auto evtoerg = 1.60218e-12;
+	const auto Hion = -13.6 * evtoerg;
+	const auto Hnion = -0.755 * evtoerg;
+	const auto Heion = -(24.6 + 13.6 * 4) * evtoerg;
+	const auto Hepion = -24.6 * evtoerg;
+	const auto H2ion = -15.42 * evtoerg;
+	const auto kb = 1.38e-16;
+	double ne = U[nHP] - U[nHN] + U[nH2P] + U[nHEP] + 2.0 * U[nHEPP];
+	double n = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
+	double eion = Hion * U[nH] + Hnion * U[nHN] + Heion * U[nHE] + Hepion * U[nHEP] + H2ion * U[nH2];
+	double nmon = U[nH] + U[nHP] + U[nHN] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
+	double ndia = U[nH2] + U[nH2P];
+	double T = (energy - eion) / kb / (nmon * 1.5 + ndia * 2.5);
+	double T0;
+	auto U1 = U;
+	do {
+		T0 = T;
+		const auto dT = T * 0.0001;
+		U1 = U;
+		const auto f1 = compute(U0, U1, T, dt) - energy;
+		U1 = U;
+		const auto f2 = compute(U0, U1, T + dT, dt) - energy;
+		const auto dfdT = (f2 - f1) / dT;
+		T -= (f1 / dfdT);
+	} while (std::abs(std::log(T / T0)) > 1.0e-3);
+	U = U1;
+	return T;
 }
 
 void chemistry_test() {
@@ -454,9 +498,9 @@ void chemistry_test() {
 		U[nHEP] = 0.08 * ne;
 		U[nHEPP] = 0.0 * ne;
 		auto U0 = U;
-		const auto eint = 1.0e-8 * ne;
+		const auto eint = 1.0e-10 * ne;
 		//	T /= 5.0;
-		compute(U0, U, T, dt);
+		T = compute_thermo_properties(U0, U, eint, dt);
 		ne = U[nHP] + U[nHEP] + 2.0 * U[nHEPP] + U[nH2P] - U[nHN];
 		const auto nnuc = U[nH] + U[nHP] + U[nHN] + 2.0 * U[nH2] + 2.0 * U[nH2P] + 4.0 * U[nHE] + 4.0 * U[nHEP] + 4.0 * U[nHEPP];
 		const auto nnucleus = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP];
@@ -466,6 +510,6 @@ void chemistry_test() {
 		printf("%14.5e %14.5e %14.5e %14.5e %14.5e  %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e\n", (double) dt, (double) T,
 				(double) nnuc, (double) nHnuc, (double) nHenuc, (double) n, (double) ne, (double) U[nH], (double) U[nHP], (double) U[nHN], (double) U[nH2],
 				(double) U[nH2P], (double) U[nHE], (double) U[nHEP], (double) U[nHEPP]);
-//		U0 = U;
+		U = U0;
 	}
 }
