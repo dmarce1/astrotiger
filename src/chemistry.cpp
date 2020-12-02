@@ -16,339 +16,153 @@
 #define nHEPP 7
 #define NS  8
 
-double k1(double T) {
-	T /= KperEv;
-	const auto c0 = -32.71396786;
-	const auto c1 = 13.536556;
-	const auto c2 = -5.73932875;
-	const auto c3 = 1.56315498;
-	const auto c4 = -0.2877056;
-	const auto c5 = 3.48255977e-2;
-	const auto c6 = -2.63197617e-3;
-	const auto c7 = 1.11954395e-4;
-	const auto c8 = -2.03914985e-6;
-	const auto lnT = std::log(T);
-	double k = c8;
-	k = k * lnT + c7;
-	k = k * lnT + c6;
-	k = k * lnT + c5;
-	k = k * lnT + c4;
-	k = k * lnT + c3;
-	k = k * lnT + c2;
-	k = k * lnT + c1;
-	k = k * lnT + c0;
-	return std::exp(k);
-}
+void rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k6, double &k7, double &k8,
+		double &k9, double &k10, double &k11, double &k12, double &k13, double &k14, double &k15, double &k16,
+		double &k17, double &k18, double &k19, double T, bool caseb) {
+	const auto tev = T / KperEv;
+	const auto logtev = std::log(T);
+	const auto tiny = std::numeric_limits<double>::min();
+	if (tev > 0.8) {
+		k1 = exp(
+				-32.71396786375 + 13.53655609057 * logtev - 5.739328757388 * std::pow(logtev, 2) + 1.563154982022 * std::pow(logtev, 3)
+						- 0.2877056004391 * std::pow(logtev, 4) + 0.03482559773736999 * std::pow(logtev, 5) - 0.00263197617559 * std::pow(logtev, 6)
+						+ 0.0001119543953861 * std::pow(logtev, 7) - 2.039149852002e-6 * std::pow(logtev, 8));
 
-double k2(double T) {
-	T /= KperEv;
-	const auto c0 = -28.6130338;
-	const auto c1 = -0.72411256;
-	const auto c2 = -2.02604473e-2;
-	const auto c3 = -2.38086188e-3;
-	const auto c4 = -3.21260521e-4;
-	const auto c5 = -1.42150291e-5;
-	const auto c6 = 4.98910892e-6;
-	const auto c7 = 5.75561414e-7;
-	const auto c8 = -1.85676704e-8;
-	const auto c9 = -3.07113524e-9;
-	const auto lnT = std::log(T);
-	double k = c9;
-	k = k * lnT + c8;
-	k = k * lnT + c7;
-	k = k * lnT + c6;
-	k = k * lnT + c5;
-	k = k * lnT + c4;
-	k = k * lnT + c3;
-	k = k * lnT + c2;
-	k = k * lnT + c1;
-	k = k * lnT + c0;
-	return std::exp(k);
-}
+		k3 = exp(
+				-44.09864886561001 + 23.91596563469 * logtev - 10.75323019821 * std::pow(logtev, 2) + 3.058038757198 * std::pow(logtev, 3)
+						- 0.5685118909884001 * std::pow(logtev, 4) + 0.06795391233790001 * std::pow(logtev, 5) - 0.005009056101857001 * std::pow(logtev, 6)
+						+ 0.0002067236157507 * std::pow(logtev, 7) - 3.649161410833d - 6 * std::pow(logtev, 8));
 
-double k3(double T) {
-	T /= KperEv;
-	const auto c0 = -44.09864886;
-	const auto c1 = 23.91596563;
-	const auto c2 = -10.7532302;
-	const auto c3 = 3.05803875;
-	const auto c4 = -0.56851189;
-	const auto c5 = 6.79539123e-2;
-	const auto c6 = -5.00905610e-3;
-	const auto c7 = 2.06723616e-4;
-	const auto c8 = -3.64916141e-6;
-	const auto lnT = std::log(T);
-	double k = c8;
-	k = k * lnT + c7;
-	k = k * lnT + c6;
-	k = k * lnT + c5;
-	k = k * lnT + c4;
-	k = k * lnT + c3;
-	k = k * lnT + c2;
-	k = k * lnT + c1;
-	k = k * lnT + c0;
-	return std::exp(k);
+		k4 = (1.54e-9 * (1. + 0.3 / exp(8.099328789667 / tev)) / (exp(40.49664394833662 / tev) * std::pow(tev, 1.5)) + 3.92d - 13 / std::pow(tev, 0.6353));
 
-}
-
-double k4r(double T) {
-
-	T /= KperEv;
-	return 3.925E-13 * std::pow(T, -0.6353);
-}
-
-double k4d(double T) {
-
-	T /= KperEv;
-	return 1.544E-9 * std::pow(T, -1.5) * std::exp(-48.596 / T) * (0.3 + std::exp(8.10 / T));
-}
-
-double k4(double T) {
-
-	return k4r(T) + k4d(T);
-}
-
-double k5(double T) {
-
-	T /= KperEv;
-	const auto c0 = -68.71040990;
-	const auto c1 = 43.93347633;
-	const auto c2 = -18.4806699;
-	const auto c3 = 4.70162649;
-	const auto c4 = -0.76924663;
-	const auto c5 = 8.113042E-2;
-	const auto c6 = -5.32402063E-3;
-	const auto c7 = 1.97570531E-4;
-	const auto c8 = -3.16558106E-6;
-	const auto lnT = std::log(T);
-	double k = c8;
-	k = k * lnT + c7;
-	k = k * lnT + c6;
-	k = k * lnT + c5;
-	k = k * lnT + c4;
-	k = k * lnT + c3;
-	k = k * lnT + c2;
-	k = k * lnT + c1;
-	k = k * lnT + c0;
-	return std::exp(k);
-}
-
-double k6(double T) {
-
-	return 3.36e-10 * std::pow(T, -0.5) * std::pow(T / 1000, -0.2) / (1.0 + std::pow(T / 1e6, 0.7));
-}
-
-double k7(double T) {
-// VERIFIED
-	if (T < 6000) {
-		const auto logT = std::log10(T);
-		const auto c0 = 1.429e-18;
-		const auto c1 = std::pow(T, 0.762);
-		const auto c2 = std::pow(T, 0.1523 * logT);
-		const auto c3 = std::pow(T, -3.247e-2 * logT * logT);
-		return c0 * c1 * c2 * c3;
+		k5 = exp(
+				-68.71040990212001 + 43.93347632635 * logtev - 18.48066993568 * std::pow(logtev, 2) + 4.701626486759002 * std::pow(logtev, 3)
+						- 0.7692466334492 * std::pow(logtev, 4) + 0.08113042097303 * std::pow(logtev, 5) - 0.005324020628287001 * std::pow(logtev, 6)
+						+ 0.0001975705312221 * std::pow(logtev, 7) - 3.165581065665e-6 * std::pow(logtev, 8));
 	} else {
-		const auto logT = std::log10(T);
-		const auto c0 = 3.802e-17;
-		const auto c1 = std::pow(T, 0.1998 * logT);
-		const auto c2 = std::pow(10, 4.0415e-5 * std::pow(logT, 6));
-		const auto c3 = std::pow(10, -5.447e-3 * std::pow(logT, 4));
-		return c0 * c1 * c2 * c3;
-	}
-}
-
-double k8(double T) {
-
-	T /= KperEv;
-	if (T > 0.1) {
-		const auto c0 = -20.06913897;
-		const auto c1 = 0.22898;
-		const auto c2 = 3.5998377E-2;
-		const auto c3 = -4.55512E-3;
-		const auto c4 = -3.10511544E-4;
-		const auto c5 = 1.0732940E-4;
-		const auto c6 = -8.36671960E-6;
-		const auto c7 = 2.23830623E-7;
-		const auto lnT = std::log(T);
-		double k = c7;
-		k = k * lnT + c6;
-		k = k * lnT + c5;
-		k = k * lnT + c4;
-		k = k * lnT + c3;
-		k = k * lnT + c2;
-		k = k * lnT + c1;
-		k = k * lnT + c0;
-		return std::exp(k);
-	} else {
-		return 1.428e-9;
-	}
-}
-
-double k11(double T) {
-
-	T /= KperEv;
-	const auto c0 = -24.24914687;
-	const auto c1 = 3.40082444;
-	const auto c2 = -3.89800396;
-	const auto c3 = 2.04558782;
-	const auto c4 = -0.541618285;
-	const auto c5 = 8.41077503E-2;
-	const auto c6 = -7.87902615E-3;
-	const auto c7 = 4.13839842E-4;
-	const auto c8 = -9.36345888E-6;
-	const auto lnT = std::log(T);
-	double k = c8;
-	k = k * lnT + c7;
-	k = k * lnT + c6;
-	k = k * lnT + c5;
-	k = k * lnT + c4;
-	k = k * lnT + c3;
-	k = k * lnT + c2;
-	k = k * lnT + c1;
-	k = k * lnT + c0;
-	return std::exp(k);
-
-}
-
-double k12(double T) {
-
-	auto rc = 5.6e-11 * std::sqrt(T) * std::exp(-102124 / T);
-	return rc;
-}
-
-double k14(double T) {
-
-	T /= KperEv;
-	const auto c0 = -18.01849334;
-	const auto c1 = 2.3608522;
-	const auto c2 = -0.28274430;
-	const auto c3 = 1.62331664E-2;
-	const auto c4 = -3.36501203E-2;
-	const auto c5 = 1.17832978E-2;
-	const auto c6 = -1.65619470E-3;
-	const auto c7 = 1.06827520E-4;
-	const auto c8 = -2.63128581E-6;
-	const auto lnT = std::log(T);
-	double k = c8;
-	k = k * lnT + c7;
-	k = k * lnT + c6;
-	k = k * lnT + c5;
-	k = k * lnT + c4;
-	k = k * lnT + c3;
-	k = k * lnT + c2;
-	k = k * lnT + c1;
-	k = k * lnT + c0;
-	return std::exp(k);
-}
-
-double k16(double T) {
-	return 7e-8 * std::pow(T / 100, -0.5);
-}
-
-double k9(double T) {
-	;
-
-	T = 6700;
-	if (T < 6700) {
-		return 1.85e-23 * std::pow(T, 1.8);
-	} else {
-		return 5.81e-16 * std::pow(T / 56200.0, -0.6657 * std::log10(T / 56200.0));
-	}
-}
-
-double k10(double T) {
-
-	;
-	return 6.4E-10;
-}
-
-double k13(double T) {
-	;
-
-	T /= KperEv;
-	return 1.067e-10 * std::pow(T, 2.012) * std::exp(-(4.463 / T) * std::pow(1 + 0.2472 * T, 3.512));
-}
-
-double k15(double T) {
-	;
-
-	T /= KperEv;
-	if (T > 0.1) {
-		const auto c0 = -20.37260896;
-		const auto c1 = 1.13944933;
-		const auto c2 = -0.14210135;
-		const auto c3 = 8.4644554E-3;
-		const auto c4 = -1.4327641E-3;
-		const auto c5 = 2.0122503E-4;
-		const auto c6 = 8.6639632E-5;
-		const auto c7 = -2.5850097E-5;
-		const auto c8 = 2.4555012E-6;
-		const auto c9 = -8.0683825E-8;
-		const auto lnT = std::log(T);
-		double k = c9;
-		k = k * lnT + c9;
-		k = k * lnT + c7;
-		k = k * lnT + c6;
-		k = k * lnT + c5;
-		k = k * lnT + c4;
-		k = k * lnT + c3;
-		k = k * lnT + c2;
-		k = k * lnT + c1;
-		k = k * lnT + c0;
-		return std::exp(k);
-	} else {
-		return 2.5634E-9 * std::pow(T, 1.78186);
+		k1 = tiny;
+		k3 = tiny;
+		k4 = 3.92e-13 / std::pow(tev, 0.6353);
+		k5 = tiny;
 	}
 
-}
-
-double k17(double T) {
-	;
-
-	T /= KperEv;
-	if (T < 1.719) {
-		return 2.291e-10 * std::pow(T, -0.4);
-	} else {
-		return 8.4258e-10 * std::pow(T, -1.4) * std::exp(-1.301 / T);
+	if (caseb) {
+		k4 = 1.26e-14 * std::pow((5.7067e5 / T), (0.75));
 	}
-}
 
-double k18(double T) {
-	;
-
-	if (T < 617) {
-		return 1e-8;
+	if (caseb) {
+		if (T < 1.0e9) {
+			k2 = 4.881357e-6 * std::pow(T, -1.5) * std::pow((1. + 1.14813e2 * std::pow(T, (-0.407))), (-2.242));
+		} else {
+			k2 = tiny;
+		}
 	} else {
-		return 1.32e-6 * std::pow(T, -0.76);
+		if (T > 5500.) {
+			k2 = exp(
+					-28.61303380689232 - 0.7241125657826851 * logtev - 0.02026044731984691 * std::pow(logtev, 2) - 0.002380861877349834 * std::pow(logtev, 3)
+							- 0.0003212605213188796 * std::pow(logtev, 4) - 0.00001421502914054107 * std::pow(logtev, 5)
+							+ 4.989108920299513e-6 * std::pow(logtev, 6) + 5.755614137575758d - 7 * std::pow(logtev, 7)
+							- 1.856767039775261e-8 * std::pow(logtev, 8) - 3.071135243196595e-9 * std::pow(logtev, 9));
+		} else {
+			k2 = k4;
+		}
 	}
-}
+	if (caseb) {
+		if (T < 1.0e9) {
+			k6 = 7.8155e-5 * std::pow(T, -1.5) * std::pow((1. + 2.0189e2 * std::pow(T, -0.407)), (-2.242));
+		} else {
+			k6 = tiny;
+		}
+	} else {
+		k6 = 3.36e-10 / sqrt(T) / std::pow((T / 1.e3), 0.2) / (1. + std::pow((T / 1.e6), 0.7));
+	}
+	k7 = 6.77e-15 * std::pow(tev, 0.8779);
 
-double k19(double T) {
-	;
+	if (tev > 0.1) {
+		k8 = exp(
+				-20.06913897587003 + 0.2289800603272916 * logtev + 0.03599837721023835 * std::pow(logtev, 2) - 0.004555120027032095 * std::pow(logtev, 3)
+						- 0.0003105115447124016 * std::pow(logtev, 4) + 0.0001073294010367247 * std::pow(logtev, 5) - 8.36671960467864e-6 * std::pow(logtev, 6)
+						+ 2.238306228891639d - 7 * std::pow(logtev, 7));
+	} else {
+		k8 = 1.43e-9;
+	}
 
-	return 5e-7 * std::sqrt(100 / T);
+	if (T > 6.7e3) {
+		k9 = 5.81e-16 * std::pow(T / 56200., (-0.6657 * std::log10(T / 56200.)));
+	} else {
+		k9 = 1.85e-23 * std::pow(T, 1.8);
+	}
+
+	k10 = 6.0e-10;
+
+	if (tev > 0.3) {
+		k13 = 1.0670825e-10 * std::pow(tev, 2.012) / (exp(4.463 / tev) * std::pow((1. + 0.2472 * tev), 3.512));
+
+		k11 = exp(
+				-24.24914687731536 + 3.400824447095291 * logtev - 3.898003964650152 * std::pow(logtev, 2) + 2.045587822403071 * std::pow(logtev, 3)
+						- 0.5416182856220388 * std::pow(logtev, 4) + 0.0841077503763412 * std::pow(logtev, 5) - 0.007879026154483455 * std::pow(logtev, 6)
+						+ 0.0004138398421504563 * std::pow(logtev, 7) - 9.36345888928611e-6 * std::pow(logtev, 8));
+
+		k12 = 4.38e-10 * exp(-102000. / T) * std::pow(T, 0.35);
+	} else {
+		k13 = tiny;
+		k11 = tiny;
+		k12 = tiny;
+	}
+
+	if (tev > 0.04) {
+		k14 = exp(
+				-18.01849334273 + 2.360852208681 * logtev - 0.2827443061704 * std::pow(logtev, 2) + 0.01623316639567 * std::pow(logtev, 3)
+						- 0.03365012031362999 * std::pow(logtev, 4) + 0.01178329782711 * std::pow(logtev, 5) - 0.001656194699504 * std::pow(logtev, 6)
+						+ 0.0001068275202678 * std::pow(logtev, 7) - 2.631285809207e-6 * std::pow(logtev, 8));
+	} else {
+		k14 = tiny;
+	}
+
+	if (tev > 0.1) {
+		k15 = exp(
+				-20.37260896533324 + 1.139449335841631 * logtev - 0.1421013521554148 * std::pow(logtev, 2) + 0.00846445538663 * std::pow(logtev, 3)
+						- 0.0014327641212992 * std::pow(logtev, 4) + 0.0002012250284791 * std::pow(logtev, 5) + 0.0000866396324309 * std::pow(logtev, 6)
+						- 0.00002585009680264 * std::pow(logtev, 7) + 2.4555011970392e-6 * std::pow(logtev, 8) - 8.06838246118e-8 * std::pow(logtev, 9));
+	} else {
+		k15 = 2.56e-9 * std::pow(tev, 1.78186);
+	}
+
+	k16 = 6.5e-9 / sqrt(tev);
+
+	if (T > 1.0e4) {
+		k17 = 4.0e-4 * std::pow(T, (-1.4)) * exp(-15100. / T);
+	} else {
+		k17 = 1.0e-8 * std::pow(T, (-0.4));
+
+	}
+
+	k18 = 5.56396e-8 / std::pow(tev, 0.6035);
+	k19 = 4.64e-8 / sqrt(tev);
+
 }
 
 double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, double ne, double T, double dt) {
-	const auto K1 = k1(T);
-	const auto K2 = k2(T);
-	const auto K3 = k3(T);
-	const auto K4 = k4(T);
-	const auto K5 = k5(T);
-	const auto K6 = k6(T);
-	const auto K7 = k7(T);
-	const auto K8 = k8(T);
-	const auto K9 = k9(T);
-	const auto K10 = k10(T);
-	const auto K11 = k11(T);
-	const auto K12 = k12(T);
-	const auto K13 = k13(T);
-	const auto K14 = k14(T);
-	const auto K15 = k15(T);
-	const auto K16 = k16(T);
-	const auto K17 = k17(T);
-	const auto K18 = k18(T);
-	const auto K19 = k19(T);
+	double K1;
+	double K2;
+	double K3;
+	double K4;
+	double K5;
+	double K6;
+	double K7;
+	double K8;
+	double K9;
+	double K10;
+	double K11;
+	double K12;
+	double K13;
+	double K14;
+	double K15;
+	double K16;
+	double K17;
+	double K18;
+	double K19;
+	rates(K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19, T, false);
 	auto &H0 = U0[nH];
 	auto &Hp0 = U0[nHP];
 	auto &Hn0 = U0[nHN];
@@ -546,6 +360,7 @@ double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, dou
 				+ a01 * a14 * a20 * a32 * a43 - a00 * a14 * a21 * a32 * a43 - a01 * a10 * a24 * a32 * a43 + a00 * a11 * a24 * a32 * a43
 				+ a02 * a11 * a20 * a34 * a43 - a01 * a12 * a20 * a34 * a43 - a02 * a10 * a21 * a34 * a43 + a00 * a12 * a21 * a34 * a43
 				+ a01 * a10 * a22 * a34 * a43 - a00 * a11 * a22 * a34 * a43
+
 				+ a04
 						* (a33 * (a12 * a21 * a40 - a11 * a22 * a40 - a12 * a20 * a41 + a10 * a22 * a41 + a11 * a20 * a42 - a10 * a21 * a42)
 								+ a13 * (a22 * a31 * a40 - a21 * a32 * a40 - a22 * a30 * a41 + a20 * a32 * a41 + a21 * a30 * a42 - a20 * a31 * a42)
@@ -563,6 +378,7 @@ double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, dou
 		for (int n = 0; n < 5; n++) {
 			for (int m = 0; m < 5; m++) {
 				U1[n] -= invAdetA[n][m] * f[m] / detA;
+				U1[n] = std::max(U1[n], 0.0);
 			}
 		}
 		U = U1;
@@ -625,20 +441,21 @@ void chemistry_test() {
 	const auto dt = 1.0;
 	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "time", "T", "A", "AH", "AHe", "N", "Ne", "H", "H+", "H-", "H2",
 			"H2p", "He", "He+", "He++");
-	for (double dt = 1.0; dt <= 1e+17; dt *= 1.5) {
+	double T = 1.0e4;
+	for (double dt = 1.0e+3; dt <= 1e+17; dt *= 10) {
 		for (int i = 0; i < NS; i++) {
 			U[i] = 0.0;
 		}
-		double ne = 0.1;
-		U[nH] = 0.04 * ne;
-		U[nHP] = 0.70 * ne;
+		double ne = 1e-1;
+		U[nH] = 0.01 * ne;
+		U[nHP] = 0.91 * ne;
 		U[nH2P] = 0.00 * ne;
-		U[nHE] = 0.25 * ne;
-		U[nHEP] = 0.00 * ne;
+		U[nHE] = 0.00 * ne;
+		U[nHEP] = 0.08 * ne;
 		U[nHEPP] = 0.0 * ne;
 		auto U0 = U;
 		const auto eint = 1.0e-8 * ne;
-		double T = 1e9;
+		//	T /= 5.0;
 		compute(U0, U, T, dt);
 		ne = U[nHP] + U[nHEP] + 2.0 * U[nHEPP] + U[nH2P] - U[nHN];
 		const auto nnuc = U[nH] + U[nHP] + U[nHN] + 2.0 * U[nH2] + 2.0 * U[nH2P] + 4.0 * U[nHE] + 4.0 * U[nHEP] + 4.0 * U[nHEPP];
@@ -646,7 +463,9 @@ void chemistry_test() {
 		const auto n = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
 		const auto nHnuc = U[nH] + U[nHP] + U[nHN] + 2.0 * U[nH2] + 2.0 * U[nH2P];
 		const auto nHenuc = 4.0 * U[nHE] + 4.0 * U[nHEP] + 4.0 * U[nHEPP];
-		printf("%14.5e %14.5e %14.5e %14.5e %14.5e  %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e\n", dt, T, nnuc, nHnuc, nHenuc, n, ne,
-				U[nH], U[nHP], U[nHN], U[nH2], U[nH2P], U[nHE], U[nHEP], U[nHEPP]);
+		printf("%14.5e %14.5e %14.5e %14.5e %14.5e  %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e\n", (double) dt, (double) T,
+				(double) nnuc, (double) nHnuc, (double) nHenuc, (double) n, (double) ne, (double) U[nH], (double) U[nHP], (double) U[nHN], (double) U[nH2],
+				(double) U[nH2P], (double) U[nHE], (double) U[nHEP], (double) U[nHEPP]);
+//		U0 = U;
 	}
 }
