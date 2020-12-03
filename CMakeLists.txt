@@ -38,6 +38,7 @@ set(astrotiger_source_files
 	src/particles.cpp
 	src/polytrope.cpp
 	src/output.cpp
+	src/opacity.cpp
 	src/options.cpp
 	src/rand.cpp
 	src/tree.cpp

@@ -32,6 +32,6 @@ struct thermo_props {
 
 double ion_energy(species s);
 thermo_props compute_thermo_properties(const species s, double energy);
-species compute_next_species(const species s0, double energy, double dt);
+species compute_next_species(const species s0, double energy, double Trad, double dt);
 
 #endif /* ASTROTIGER_CHEMISTRY_HPP_ */

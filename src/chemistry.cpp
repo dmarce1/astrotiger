@@ -5,6 +5,9 @@
 #include <cassert>
 #include <astrotiger/chemistry.hpp>
 
+#include <functional>
+#include <limits>
+
 #define KperEv (11604.525)
 
 #define nH   0
@@ -142,7 +145,197 @@ void rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k
 
 }
 
-double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, double ne, double T, double dt) {
+const double hplanck = 6.6261e-27;
+const double clight = 2.99792458e10;
+const double kb = 1.3807e-16;
+const double ergtoev = 6.242e+11;
+const double evtoerg = 1.0 / ergtoev;
+
+const double Bp(double T) {
+	return (2 * std::pow(kb * M_PI * T, 4) / (15 * clight * clight * hplanck * hplanck * hplanck));
+}
+
+const double Bp_nu(double nu, double T) {
+	const auto c0 = 2.0 * hplanck * std::pow(nu, 3) / (clight * clight);
+	const auto x = hplanck * nu / (kb * T);
+	double c1;
+	if (x < 1.0e-3) {
+		c1 = x;
+		return c0 / c1;
+	} else if (x > 1000.0) {
+		return 0.0;
+	} else {
+		c1 = std::exp(x) - 1.0;
+		return c0 / c1;
+	}
+}
+
+double grey_cross_section(const std::function<double(double, double)> &sigma, double T) {
+	const int N = 129;
+	double numax = kb * T / hplanck;
+	const double dnu = numax / (N - 1);
+	const double lambdamax = clight * hplanck / (kb * T);
+	const double dlambda = lambdamax / (N - 1);
+	double sum = 0.0;
+	for (int i = 1; i < N; i++) {
+		const auto nu = i * dnu;
+		const auto lambda = i * dlambda;
+		const auto bnu = Bp_nu(nu, T) * sigma(nu, T);
+		const auto blambda = Bp_nu(clight / lambda, T) * clight / (lambda * lambda) * sigma(clight / lambda, T);
+		double c0;
+		if (i == N - 1) {
+			c0 = 1.0 / 3.0;
+		} else if (i % 2 == 1) {
+			c0 = 4.0 / 3.0;
+		} else {
+			c0 = 2.0 / 3.0;
+		}
+		sum += c0 * (bnu * dnu + blambda * dlambda);
+	}
+	return sum / Bp(T);
+}
+
+double sigma_to_rate(const std::function<double(double)> &sigma, double T) {
+	const int N = 129;
+	double numax = kb * T / hplanck;
+	const double dnu = numax / (N - 1);
+	const double lambdamax = clight * hplanck / (kb * T);
+	const double dlambda = lambdamax / (N - 1);
+	double sum = 0.0;
+	for (int i = 1; i < N; i++) {
+		const auto nu = i * dnu;
+		const auto lambda = i * dlambda;
+		const auto bnu = Bp_nu(nu, T) * sigma(nu) / (hplanck * nu);
+		const auto blambda = Bp_nu(clight / lambda, T) * clight / (lambda * lambda) / (hplanck * nu) * sigma(clight / lambda);
+		double c0;
+		if (i == N - 1) {
+			c0 = 1.0 / 3.0;
+		} else if (i % 2 == 1) {
+			c0 = 4.0 / 3.0;
+		} else {
+			c0 = 2.0 / 3.0;
+		}
+		sum += c0 * (bnu * dnu + blambda * dlambda);
+	}
+	return 4.0 * M_PI * sum;
+}
+
+double sigma20_22(double nu, double Z) {
+	const double A0 = 6.30e-15 / (Z * Z);
+	const double nuth = 13.6 * evtoerg * Z * Z / hplanck;
+	if (nu > nuth) {
+		const auto c0 = std::pow(nu / nuth, 4);
+		const auto c1 = std::sqrt(nu / nuth - 1.0);
+		const auto c2 = std::exp(4.0 - 4.0 * std::atan(c1) / c1);
+		const auto c3 = 1.0 - std::exp(-2.0 * M_PI * c1);
+		return A0 * c0 * c2 / c3;
+	} else {
+		return 0.0;
+	}
+}
+
+double sigma20(double nu) {
+	return sigma20_22(nu, 1.0);
+}
+
+double sigma21(double nu) {
+	const double nuth = 24.6 * evtoerg / hplanck;
+	if (nu > nuth) {
+		return 7.42e-18 * (1.66 * std::pow(nu / nuth, -2.05) - 0.66 * std::pow(nu / nuth, -3.05));
+	} else {
+		return 0.0;
+	}
+}
+
+double sigma22(double nu) {
+	return sigma20_22(nu, 2.0);
+}
+
+double sigma23(double nu) {
+	const auto nuth = 0.755 / hplanck * evtoerg;
+	if (nu > nuth) {
+		return 7.928e5 * std::pow(nu - nuth, 1.5) / (nu * nu * nu);
+	} else {
+		return 0.0;
+	}
+}
+
+double sigma24(double nu) {
+	const auto hnu = hplanck * nu * ergtoev;
+	if (hnu < 15.42) {
+		return 0.0;
+	} else if (hnu < 16.50) {
+		return 6.2e-18 * hnu - 9.4e-17;
+	} else if (hnu < 17.7) {
+		return 1.4e-18 * hnu - 1.48e-17;
+	} else {
+		return 2.5e-14 * std::pow(hnu, -2.71);
+	}
+}
+
+double sigma25(double nu) {
+	return std::pow(10,
+			-1.6547717e6 + 1.8660333e5 * std::log(nu) - 7.8986431e3 * std::pow(std::log(nu), 2) + 148.73693 * std::pow(std::log(nu), 3)
+					- 1.0513032 * std::pow(std::log(nu), 4));
+}
+
+double sigma26(double nu) {
+	const auto hnu = hplanck * nu * ergtoev;
+	if (hnu > 30.0 && hnu < 90.0) {
+		return std::pow(10, -16.926 - 4.528e-2 * hnu + 2.238e-4 * hnu * hnu + 4.245e-7 * hnu * hnu * hnu);
+	} else {
+		return 0.0;
+	}
+}
+
+double sigma28(double nu) {
+	const auto hnu = nu * hplanck * ergtoev;
+	double sigmaL0, sigmaW0, sigmaL1, sigmaW1;
+	if (hnu > 14.675 && hnu < 16.820) {
+		sigmaL0 = 1e-18 * std::pow(10, 15.1289 - 1.05139 * hnu);
+	} else if (hnu >= 16.820 && hnu < 17.6) {
+		sigmaL0 = 1e-18 * std::pow(10, -31.41 + 1.8042e-2 * std::pow(hnu, 3)) - 4.339e-5 * std::pow(hnu, 5);
+	} else {
+		sigmaL0 = 0.0;
+	}
+	if (hnu > 14.675 && hnu < 17.7) {
+		sigmaW0 = 1e-18 * std::pow(10, 13.5331 - 0.9182618 * hnu);
+	} else {
+		sigmaW0 = 0.0;
+	}
+	if (hnu > 14.159 && hnu < 15.302) {
+		sigmaL1 = 1e-18 * std::pow(10, 12.0218406 - 0.819429 * hnu);
+	} else if (hnu > 15.302 && hnu < 17.2) {
+		sigmaL1 = 1e-18 * std::pow(10, 16.04644 - 1.082438 * hnu);
+	} else {
+		sigmaL1 = 0.0;
+	}
+	if (hnu > 14.159 && hnu < 17.2) {
+		sigmaW1 = 1e-18 * std::pow(10, 12.87367 - 0.85088597 * hnu);
+	} else {
+		sigmaW1 = 0.0;
+	}
+	return 0.25 * (sigmaL0 + sigmaW0) + 0.75 * (sigmaL1 + sigmaW1);
+}
+
+void radiation_rates(double &i20, double &i21, double &i22, double &i23, double &i24, double &i25, double &i26, double &i27, double &i28, double T) {
+	i20 = sigma_to_rate(sigma20, T);
+	i21 = sigma_to_rate(sigma21, T);
+	i22 = sigma_to_rate(sigma22, T);
+	i23 = sigma_to_rate(sigma23, T);
+	i24 = sigma_to_rate(sigma24, T);
+	i25 = sigma_to_rate(sigma25, T);
+	i26 = sigma_to_rate(sigma26, T);
+	i27 = 1.1e8 * Bp_nu(12.27 * evtoerg / hplanck, T);
+	i28 = sigma_to_rate(sigma26, T);
+}
+
+void chemistry_test() {
+	for (double T = 1.0e3; T <= 1e10; T *= 1.5) {
+	}
+}
+
+double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, double ne, double T, double Trad, double dt) {
 	double K1;
 	double K2;
 	double K3;
@@ -162,7 +355,17 @@ double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, dou
 	double K17;
 	double K18;
 	double K19;
+	double I20;
+	double I21;
+	double I22;
+	double I23;
+	double I24;
+	double I25;
+	double I26;
+	double I27;
+	double I28;
 	rates(K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19, T, false);
+	radiation_rates(I20, I21, I22, I23, I24, I25, I26, I27, I28, Trad);
 	auto &H0 = U0[nH];
 	auto &Hp0 = U0[nHP];
 	auto &Hn0 = U0[nHN];
@@ -179,38 +382,40 @@ double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, dou
 	auto &He = U[nHE];
 	auto &Hep = U[nHEP];
 	auto &Hepp = U[nHEPP];
-	const auto den = (1 + dt * K3 * ne + dt * K4 * ne + dt * K5 * ne + dt * K6 * ne + std::pow(dt, 2) * K3 * K5 * std::pow(ne, 2)
-			+ std::pow(dt, 2) * K3 * K6 * std::pow(ne, 2) + std::pow(dt, 2) * K4 * K6 * std::pow(ne, 2));
-	He = -((-(dt * K4 * ne * (dt * Hepp0 * K6 * ne + Hep0 * (1 + dt * K6 * ne)))
-			+ He0 * (std::pow(dt, 2) * K5 * K6 * std::pow(ne, 2) - (1 + dt * K4 * ne + dt * K5 * ne) * (1 + dt * K6 * ne))) / den);
-	Hep = -((-Hep0 - dt * He0 * K3 * ne - dt * Hep0 * K3 * ne - dt * Hep0 * K6 * ne - dt * Hepp0 * K6 * ne - std::pow(dt, 2) * He0 * K3 * K6 * std::pow(ne, 2)
-			- std::pow(dt, 2) * Hep0 * K3 * K6 * std::pow(ne, 2) - std::pow(dt, 2) * Hepp0 * K3 * K6 * std::pow(ne, 2)) / den);
-	Hepp = -((-Hepp0 - dt * Hepp0 * K3 * ne - dt * Hepp0 * K4 * ne - dt * Hep0 * K5 * ne - dt * Hepp0 * K5 * ne
-			- std::pow(dt, 2) * He0 * K3 * K5 * std::pow(ne, 2) - std::pow(dt, 2) * Hep0 * K3 * K5 * std::pow(ne, 2)
-			- std::pow(dt, 2) * Hepp0 * K3 * K5 * std::pow(ne, 2)) / den);
+	const auto den = (1
+			+ dt * (I21 + I22 + dt * I22 * K3 * ne + dt * I21 * (I22 + (K5 + K6) * ne) + ne * (K3 + K4 + K5 + K6 + dt * (K3 * K5 + (K3 + K4) * K6) * ne)));
+	He = (He0 + dt * K4 * ne * (Hep0 + dt * (Hep0 + Hepp0) * K6 * ne) + dt * He0 * (I22 + ne * (K4 + K5 + K6 + dt * K4 * K6 * ne))) / den;
+	Hep = (Hep0 + dt * He0 * I21 + dt * Hep0 * I21 + dt * ((He0 + Hep0) * K3 + (Hep0 + Hepp0 + dt * (He0 + Hep0 + Hepp0) * I21) * K6) * ne
+			+ std::pow(dt, 2) * (He0 + Hep0 + Hepp0) * K3 * K6 * std::pow(ne, 2)) / den;
+	Hepp = (dt * (Hep0 + dt * He0 * I21 + dt * Hep0 * I21 + dt * (He0 + Hep0) * K3 * ne) * (I22 + K5 * ne)
+			+ Hepp0 * (1 + std::pow(dt, 2) * (I21 + K3 * ne) * (I22 + K5 * ne) + dt * (I21 + I22 + (K3 + K4 + K5) * ne))) / den;
 	double err = 0.0;
 #define List(a,b,c,d,e) {a,b,c,d,e}
 	do {
 
-		const std::array<std::array<double, 5>, 5> A = { {
-		List(1 + dt * (H2p * K10 - 2 * H2 * K13 - Hn * K15 + Hn * K8 + Hp * K9 + K1 * ne + K7 * ne),
-				dt * (-(H2 * K11) - 2 * Hn * K16 + H * K9 - K2 * ne), dt * (-(H * K15) - 2 * Hp * K16 - H2p * K19 + H * K8 - K14 * ne),
-				dt * (-(Hp * K11) - 2 * H * K13 - 2 * K12 * ne), dt * (H * K10 - Hn * K19 - 2 * K18 * ne)),
-		List(dt * (-(H2p * K10) + Hp * K9 - K1 * ne), 1 + dt * (H2 * K11 + Hn * K16 + Hn * K17 + H * K9 + K2 * ne), dt * (Hp * K16 + Hp * K17),
-				dt * Hp * K11, -(dt * H * K10)),
-		List(dt*(Hn*K15 + Hn*K8 - K7*ne),dt*(Hn*K16 + Hn*K17),1 + dt*(H*K15 + Hp*K16 + Hp*K17 + H2p*K19 + H*K8 + K14*ne),0,dt*Hn*K19),
-		List(dt*(-(H2p*K10) + H2*K13 - Hn*K8),dt*H2*K11,dt*(-(H2p*K19) - H*K8),1 + dt*(Hp*K11 + H*K13 + K12*ne),dt*(-(H*K10) - Hn*K19)),
-		List(dt*(H2p*K10 - Hp*K9),dt*(-(H2*K11) - Hn*K17 - H*K9),dt*(-(Hp*K17) + H2p*K19),-(dt*Hp*K11),1 + dt*(H*K10 + Hn*K19 + K18*ne)) } };
-
+		const std::array<std::array<double, 5>, 5> A { {
+		List(1 + dt * (I20 + H2p * K10 - 2 * H2 * K13 - Hn * K15 + Hn * K8 + Hp * K9 + K1 * ne + K7 * ne),
+				dt * (-(H2 * K11) - 2 * Hn * K16 + H * K9 - K2 * ne), dt * (-I23 - H * K15 - 2 * Hp * K16 - H2p * K19 + H * K8 - K14 * ne),
+				dt * (-2 * I27 - 2 * I28 - Hp * K11 - 2 * H * K13 - 2 * K12 * ne), dt * (-I25 + H * K10 - Hn * K19 - 2 * K18 * ne)),
+		List(dt * (-I20 - H2p * K10 + Hp * K9 - K1 * ne), 1 + dt * (H2 * K11 + Hn * K16 + Hn * K17 + H * K9 + K2 * ne), dt * (Hp * K16 + Hp * K17),
+				dt * Hp * K11, dt * (-I25 - 2 * I26 - H * K10)),
+		List(dt*(Hn*K15 + Hn*K8 - K7*ne),dt*(Hn*K16 + Hn*K17),1 + dt*(I23 + H*K15 + Hp*K16 + Hp*K17 + H2p*K19 + H*K8 + K14*ne),0,dt*Hn*K19),
+		List(dt * (-(H2p * K10) + H2 * K13 - Hn * K8), dt * H2 * K11, dt * (-(H2p * K19) - H * K8),
+				1 + dt * (I24 + I27 + I28 + Hp * K11 + H * K13 + K12 * ne), dt * (-(H * K10) - Hn * K19)),
+		List(dt * (H2p * K10 - Hp * K9), dt * (-(H2 * K11) - Hn * K17 - H * K9), dt * (-(Hp * K17) + H2p * K19), dt * (-I24 - Hp * K11),
+				1 + dt * (I25 + I26 + H * K10 + Hn * K19 + K18 * ne)) } };
 		const std::array<double, 5> f = { H - H0
 				+ dt
-						* (H * H2p * K10 - H2 * Hp * K11 - 2 * H * H2 * K13 - H * Hn * K15 - 2 * Hn * Hp * K16 - H2p * Hn * K19 + H * Hn * K8 + H * Hp * K9
-								+ H * K1 * ne - 2 * H2 * K12 * ne - Hn * K14 * ne - 2 * H2p * K18 * ne - Hp * K2 * ne + H * K7 * ne), Hp - Hp0
-				+ dt * (-(H * H2p * K10) + H2 * Hp * K11 + Hn * Hp * K16 + Hn * Hp * K17 + H * Hp * K9 - H * K1 * ne + Hp * K2 * ne), Hn - Hn0
-				+ dt * (H * Hn * K15 + Hn * Hp * K16 + Hn * Hp * K17 + H2p * Hn * K19 + H * Hn * K8 + Hn * K14 * ne - H * K7 * ne), H2 - H20
-				+ dt * (-(H * H2p * K10) + H2 * Hp * K11 + H * H2 * K13 - H2p * Hn * K19 - H * Hn * K8 + H2 * K12 * ne), H2p - H2p0
-				+ dt * (H * H2p * K10 - H2 * Hp * K11 - Hn * Hp * K17 + H2p * Hn * K19 - H * Hp * K9 + H2p * K18 * ne) };
-
+						* (H * I20 - Hn * I23 - H2p * I25 - 2 * H2 * I27 - 2 * H2 * I28 + H * H2p * K10 - H2 * Hp * K11 - 2 * H * H2 * K13 - H * Hn * K15
+								- 2 * Hn * Hp * K16 - H2p * Hn * K19 + H * Hn * K8 + H * Hp * K9 + H * K1 * ne - 2 * H2 * K12 * ne - Hn * K14 * ne
+								- 2 * H2p * K18 * ne - Hp * K2 * ne + H * K7 * ne), Hp - Hp0
+				+ dt
+						* (-(H * I20) - H2p * I25 - 2 * H2p * I26 - H * H2p * K10 + H2 * Hp * K11 + Hn * Hp * K16 + Hn * Hp * K17 + H * Hp * K9 - H * K1 * ne
+								+ Hp * K2 * ne), Hn - Hn0
+				+ dt * (Hn * I23 + H * Hn * K15 + Hn * Hp * K16 + Hn * Hp * K17 + H2p * Hn * K19 + H * Hn * K8 + Hn * K14 * ne - H * K7 * ne), H2 - H20
+				+ dt * (H2 * I24 + H2 * I27 + H2 * I28 - H * H2p * K10 + H2 * Hp * K11 + H * H2 * K13 - H2p * Hn * K19 - H * Hn * K8 + H2 * K12 * ne), H2p
+				- H2p0
+				+ dt * (-(H2 * I24) + H2p * I25 + H2p * I26 + H * H2p * K10 - H2 * Hp * K11 - Hn * Hp * K17 + H2p * Hn * K19 - H * Hp * K9 + H2p * K18 * ne) };
 		const auto a00 = A[0][0];
 		const auto a01 = A[0][1];
 		const auto a02 = A[0][2];
@@ -405,7 +610,7 @@ double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, dou
 	return ne;
 }
 
-double compute(const std::array<double, NS> U0, std::array<double, NS> &U, double T, double dt) {
+double compute(const std::array<double, NS> U0, std::array<double, NS> &U, double T, double Trad, double dt) {
 	auto &H = U[nH];
 	auto &Hp = U[nHP];
 	auto &Hn = U[nHN];
@@ -424,9 +629,9 @@ double compute(const std::array<double, NS> U0, std::array<double, NS> &U, doubl
 		nemid = 0.5 * (nemax + nemin);
 		auto ne = Hp - Hn + Hep + 2.0 * Hepp + H2p;
 		U1 = U;
-		const auto fmax = compute_next_ne(U0, U1, nemax, T, dt) - ne;
+		const auto fmax = compute_next_ne(U0, U1, nemax, T, Trad, dt) - ne;
 		U1 = U;
-		const auto fmid = compute_next_ne(U0, U1, nemid, T, dt) - ne;
+		const auto fmid = compute_next_ne(U0, U1, nemid, T, Trad, dt) - ne;
 		if (fmax * fmid > 0.0) {
 			nemax = nemid;
 		} else {
@@ -451,7 +656,7 @@ double compute(const std::array<double, NS> U0, std::array<double, NS> &U, doubl
 	return (1.5 * nmon + 2.5 * ndia) * kb * T + eion;
 }
 
-double compute_next_chemistry(std::array<double, NS> U0, std::array<double, NS> &U, double energy, double dt) {
+double compute_next_chemistry(std::array<double, NS> U0, std::array<double, NS> &U, double energy, double Trad, double dt) {
 	const auto evtoerg = 1.60218e-12;
 	const auto Hion = -13.6 * evtoerg;
 	const auto Hnion = -0.755 * evtoerg;
@@ -471,16 +676,15 @@ double compute_next_chemistry(std::array<double, NS> U0, std::array<double, NS> 
 		T0 = T;
 		const auto dT = T * 0.0001;
 		U1 = U;
-		const auto f1 = compute(U0, U1, T, dt) - energy;
+		const auto f1 = compute(U0, U1, T, Trad, dt) - energy;
 		U1 = U;
-		const auto f2 = compute(U0, U1, T + dT, dt) - energy;
+		const auto f2 = compute(U0, U1, T + dT, Trad, dt) - energy;
 		const auto dfdT = (f2 - f1) / dT;
 		T -= (f1 / dfdT);
 	} while (std::abs(std::log(T / T0)) > 1.0e-3);
 	U = U1;
 	return T;
 }
-
 
 double ion_energy(species s) {
 	const auto evtoerg = 1.60218e-12;
@@ -509,7 +713,7 @@ thermo_props compute_thermo_properties(const species s, double energy) {
 	return p;
 }
 
-species compute_next_species(const species s0, double energy, double dt) {
+species compute_next_species(const species s0, double energy, double Trad, double dt) {
 	std::array<double, NS> U, U0;
 	species s;
 	U0[nH] = s0.H;
@@ -520,7 +724,7 @@ species compute_next_species(const species s0, double energy, double dt) {
 	U0[nHE] = s0.He;
 	U0[nHEP] = s0.Hep;
 	U0[nHEPP] = s0.Hepp;
-	compute_next_chemistry(U0, U, energy, dt);
+	compute_next_chemistry(U0, U, energy, Trad, dt);
 	s.H = U[nH];
 	s.Hp = U[nHP];
 	s.Hn = U[nHN];
@@ -529,9 +733,10 @@ species compute_next_species(const species s0, double energy, double dt) {
 	s.He = U[nHE];
 	s.Hep = U[nHEP];
 	s.Hepp = U[nHEPP];
+	return s;
 }
 
-void chemistry_test() {
+//void chemistry_test() {
 //	std::array<double, NS> U;
 //	const auto dt = 1.0;
 //	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "time", "T", "A", "AH", "AHe", "N", "Ne", "H", "H+", "H-", "H2",
@@ -562,4 +767,4 @@ void chemistry_test() {
 //				(double) U[nH2P], (double) U[nHE], (double) U[nHEP], (double) U[nHEPP]);
 //		U = U0;
 //	}
-}
+//}
