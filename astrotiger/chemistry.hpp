@@ -24,10 +24,12 @@ struct species {
 struct thermo_props {
 	double pressure;
 	double T;
+	double ne;
 	double sound_speed;
 	double gamma;
 	double rho;
 	double eion;
+	double cv;
 };
 
 double ion_energy(species s);

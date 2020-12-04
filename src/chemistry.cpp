@@ -20,11 +20,86 @@
 #define nHEPP 7
 #define NS  8
 
+const double arad = 7.5646e-15;
 const auto tiny = 1.0e+3 * std::numeric_limits<double>::min();
 const auto dhuge = std::numeric_limits<double>::max() / 1.0e+3;
 
-void rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k6, double &k7, double &k8, double &k9, double &k10, double &k11, double &k12,
-		double &k13, double &k14, double &k15, double &k16, double &k17, double &k18, double &k19, double T, bool caseb) {
+template<int N>
+std::array<std::array<double, N>, N> matrix_inverse(std::array<std::array<double, N>, N> A) {
+	std::array<std::array<double, N>, N> Ainv;
+	for (int n = 0; n < N; n++) {
+		for (int m = 0; m < N; m++) {
+			Ainv[n][m] = n == m ? 1.0 : 0.0;
+		}
+	}
+
+	const auto print = [](std::array<std::array<double, N>, N> A, std::array<std::array<double, N>, N> Ainv) {
+		printf("\n");
+		for (int n = 0; n < N; n++) {
+			for (int m = 0; m < N; m++) {
+				printf("%10.2e ", A[n][m]);
+			}
+			printf(" | ");
+			for (int m = 0; m < N; m++) {
+				printf("%10.2e ", Ainv[n][m]);
+			}
+			printf("\n");
+		}
+	};
+	print(A, Ainv);
+	for (int q = 0; q < N; q++) {
+		for (int n = q; n < N; n++) {
+			if (A[n][q] != 0.0) {
+				std::swap(A[n], A[q]);
+				std::swap(Ainv[n], Ainv[q]);
+				print(A, Ainv);
+				break;
+			}
+		}
+		for (int n = q; n < N; n++) {
+			if (A[n][q] != 0.0) {
+				const auto inv = 1.0 / A[n][q];
+				for (int k = 0; k < q; k++) {
+					A[n][k] *= inv;
+				}
+				A[n][q] = 1.0;
+				for (int k = q + 1; k < N; k++) {
+					A[n][k] *= inv;
+				}
+				for (int k = 0; k < N; k++) {
+					Ainv[n][k] *= inv;
+				}
+			}
+		}
+		for (int n = q + 1; n < N; n++) {
+			if (A[n][q] != 0.0) {
+				A[n][q] -= A[q][q];
+				for (int l = q + 1; l < N; l++) {
+					A[n][l] -= A[q][l];
+				}
+				for (int l = 0; l < N; l++) {
+					Ainv[n][l] -= Ainv[q][l];
+				}
+			}
+		}
+	}
+	for (int q = N - 1; q >= 0; q--) {
+		for (int n = q - 1; n >= 0; n--) {
+			for (int k = 0; k < N; k++) {
+				Ainv[n][k] -= Ainv[q][k] * A[n][q];
+			}
+			A[n][q] = 0.0;
+		}
+	}
+	print(A, Ainv);
+	return Ainv;
+}
+
+void chemical_rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k6, double &k7, double &k8, double &k9, double &k10, double &k11,
+		double &k12, double &k13, double &k14, double &k15, double &k16, double &k17, double &k18, double &k19, double &dk1dT, double &dk2dT, double &dk3dT,
+		double &dk4dT, double &dk5dT, double &dk6dT, double &dk7dT, double &dk8dT, double &dk9dT, double &dk10dT, double &dk11dT, double &dk12dT,
+		double &dk13dT, double &dk14dT, double &dk15dT, double &dk16dT, double &dk17dT, double &dk18dT, double &dk19dT, double T) {
+
 	const auto tev = T / KperEv;
 	const auto logtev = std::log(T);
 	if (tev > 0.8) {
@@ -33,86 +108,118 @@ void rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k
 						- 0.2877056004391 * std::pow(logtev, 4) + 0.03482559773736999 * std::pow(logtev, 5) - 0.00263197617559 * std::pow(logtev, 6)
 						+ 0.0001119543953861 * std::pow(logtev, 7) - 2.039149852002e-6 * std::pow(logtev, 8));
 
+		dk1dT = (1 * 13.53655609057 - 2 * 5.739328757388 * logtev + 3 * 1.563154982022 * std::pow(logtev, 2) - 4 * 0.2877056004391 * std::pow(logtev, 3)
+				+ 5 * 0.03482559773736999 * std::pow(logtev, 4) - 6 * 0.00263197617559 * std::pow(logtev, 5) + 7 * 0.0001119543953861 * std::pow(logtev, 6)
+				- 8 * 2.039149852002e-6 * std::pow(logtev, 7)) * k1 / tev / KperEv;
+
 		k3 = exp(
 				-44.09864886561001 + 23.91596563469 * logtev - 10.75323019821 * std::pow(logtev, 2) + 3.058038757198 * std::pow(logtev, 3)
 						- 0.5685118909884001 * std::pow(logtev, 4) + 0.06795391233790001 * std::pow(logtev, 5) - 0.005009056101857001 * std::pow(logtev, 6)
-						+ 0.0002067236157507 * std::pow(logtev, 7) - 3.649161410833d - 6 * std::pow(logtev, 8));
+						+ 0.0002067236157507 * std::pow(logtev, 7) - 3.649161410833e-6 * std::pow(logtev, 8));
 
-		k4 = (1.54e-9 * (1. + 0.3 / exp(8.099328789667 / tev)) / (exp(40.49664394833662 / tev) * std::pow(tev, 1.5)) + 3.92d - 13 / std::pow(tev, 0.6353));
+		dk3dT = (1 * 23.91596563469 - 2 * 10.75323019821 * logtev + 3 * 3.058038757198 * std::pow(logtev, 2) - 4 * 0.5685118909884001 * std::pow(logtev, 3)
+				+ 5 * 0.06795391233790001 * std::pow(logtev, 4) - 6 * 0.005009056101857001 * std::pow(logtev, 5) + 7 * 0.0002067236157507 * std::pow(logtev, 6)
+				- 8 * 3.649161410833e-6 * std::pow(logtev, 7)) * k3 / tev / KperEv;
+
+		k4 = (1.54e-9 * (1. + 0.3 / exp(8.099328789667 / tev)) / (exp(40.49664394833662 / tev) * std::pow(tev, 1.5)) + 3.92e-13 / std::pow(tev, 0.6353));
+
+		dk4dT = ((6.23648316804384e-8 / std::pow(tev, 3.5) - 2.31e-9 / std::pow(tev, 2.5)) / std::exp(40.49664394833662 / tev)
+				+ (2.2451339404957677e-8 / std::pow(tev, 3.5) - 6.93e-10 / std::pow(tev, 2.5)) / std::exp(48.59597273800362 / tev)
+				- 2.490376e-13 / std::pow(tev, 1.6353)) / KperEv;
 
 		k5 = exp(
 				-68.71040990212001 + 43.93347632635 * logtev - 18.48066993568 * std::pow(logtev, 2) + 4.701626486759002 * std::pow(logtev, 3)
 						- 0.7692466334492 * std::pow(logtev, 4) + 0.08113042097303 * std::pow(logtev, 5) - 0.005324020628287001 * std::pow(logtev, 6)
 						+ 0.0001975705312221 * std::pow(logtev, 7) - 3.165581065665e-6 * std::pow(logtev, 8));
+
+		dk5dT = (1 * 43.93347632635 - 2 * 18.48066993568 * logtev + 3 * 4.701626486759002 * std::pow(logtev, 2) - 4 * 0.7692466334492 * std::pow(logtev, 3)
+				+ 5 * 0.08113042097303 * std::pow(logtev, 4) - 6 * 0.005324020628287001 * std::pow(logtev, 5) + 7 * 0.0001975705312221 * std::pow(logtev, 6)
+				- 8 * 3.165581065665e-6 * std::pow(logtev, 7)) * k5 / tev / KperEv;
 	} else {
 		k1 = tiny;
+		dk1dT = 0.0;
 		k3 = tiny;
+		dk3dT = 0.0;
 		k4 = 3.92e-13 / std::pow(tev, 0.6353);
+		dk4dT = (-0.6353) * k4 / T / KperEv;
 		k5 = tiny;
+		dk5dT = 0.0;
 	}
 
-	if (caseb) {
-		k4 = 1.26e-14 * std::pow((5.7067e5 / T), (0.75));
+	if (T > 5500.) {
+		k2 = exp(
+				-28.61303380689232 - 0.7241125657826851 * logtev - 0.02026044731984691 * std::pow(logtev, 2) - 0.002380861877349834 * std::pow(logtev, 3)
+						- 0.0003212605213188796 * std::pow(logtev, 4) - 0.00001421502914054107 * std::pow(logtev, 5)
+						+ 4.989108920299513e-6 * std::pow(logtev, 6) + 5.755614137575758d - 7 * std::pow(logtev, 7) - 1.856767039775261e-8 * std::pow(logtev, 8)
+						- 3.071135243196595e-9 * std::pow(logtev, 9));
+
+		dk2dT = (-1 * 0.7241125657826851 - 2 * 0.02026044731984691 * logtev - 3 * 0.002380861877349834 * std::pow(logtev, 2)
+				- 4 * 0.0003212605213188796 * std::pow(logtev, 3) - 5 * 0.00001421502914054107 * std::pow(logtev, 4)
+				+ 6 * 4.989108920299513e-6 * std::pow(logtev, 5) + 7 * 5.755614137575758e-7 * std::pow(logtev, 6)
+				- 8 * 1.856767039775261e-8 * std::pow(logtev, 7) - 9 * 3.071135243196595e-9 * std::pow(logtev, 8)) * k2 / tev / KperEv;
+	} else {
+		k2 = k4;
+		dk2dT = dk4dT;
 	}
 
-	if (caseb) {
-		if (T < 1.0e9) {
-			k2 = 4.881357e-6 * std::pow(T, -1.5) * std::pow((1. + 1.14813e2 * std::pow(T, (-0.407))), (-2.242));
-		} else {
-			k2 = tiny;
-		}
-	} else {
-		if (T > 5500.) {
-			k2 = exp(
-					-28.61303380689232 - 0.7241125657826851 * logtev - 0.02026044731984691 * std::pow(logtev, 2) - 0.002380861877349834 * std::pow(logtev, 3)
-							- 0.0003212605213188796 * std::pow(logtev, 4) - 0.00001421502914054107 * std::pow(logtev, 5)
-							+ 4.989108920299513e-6 * std::pow(logtev, 6) + 5.755614137575758d - 7 * std::pow(logtev, 7)
-							- 1.856767039775261e-8 * std::pow(logtev, 8) - 3.071135243196595e-9 * std::pow(logtev, 9));
-		} else {
-			k2 = k4;
-		}
-	}
-	if (caseb) {
-		if (T < 1.0e9) {
-			k6 = 7.8155e-5 * std::pow(T, -1.5) * std::pow((1. + 2.0189e2 * std::pow(T, -0.407)), (-2.242));
-		} else {
-			k6 = tiny;
-		}
-	} else {
-		k6 = 3.36e-10 / sqrt(T) / std::pow((T / 1.e3), 0.2) / (1. + std::pow((T / 1.e6), 0.7));
-	}
+	k6 = 3.36e-10 / sqrt(T) / std::pow((T / 1.e3), 0.2) / (1. + std::pow((T / 1.e6), 0.7));
+
+	dk6dT = (-0.2352 * T - 0.000029680233484348277 * std::pow(T, 1.7)) / (std::pow(15848.931924611126 + std::pow(T, 0.7), 2) * std::pow(T, 2.7));
+
 	k7 = 6.77e-15 * std::pow(tev, 0.8779);
+
+	dk7dT = 0.8779 * k7 / tev / KperEv;
 
 	if (tev > 0.1) {
 		k8 = exp(
 				-20.06913897587003 + 0.2289800603272916 * logtev + 0.03599837721023835 * std::pow(logtev, 2) - 0.004555120027032095 * std::pow(logtev, 3)
 						- 0.0003105115447124016 * std::pow(logtev, 4) + 0.0001073294010367247 * std::pow(logtev, 5) - 8.36671960467864e-6 * std::pow(logtev, 6)
-						+ 2.238306228891639d - 7 * std::pow(logtev, 7));
+						+ 2.238306228891639e-7 * std::pow(logtev, 7));
+
+		dk8dT = (1 * 0.2289800603272916 + 2 * 0.03599837721023835 * logtev - 3 * 0.004555120027032095 * std::pow(logtev, 2)
+				- 4 * 0.0003105115447124016 * std::pow(logtev, 3) + 5 * 0.0001073294010367247 * std::pow(logtev, 4)
+				- 6 * 8.36671960467864e-6 * std::pow(logtev, 5) + 7 * 2.238306228891639e-7 * std::pow(logtev, 6)) * k8 / T / KperEv;
 	} else {
 		k8 = 1.43e-9;
+		dk8dT = 0.0;
 	}
 
 	if (T > 6.7e3) {
 		k9 = 5.81e-16 * std::pow(T / 56200., (-0.6657 * std::log10(T / 56200.)));
+		dk9dT = std::pow(T, 5.323798930548646 - 0.28910983660299466 * std::log(T)) * (3.523428547804109e-30 - 3.2216642651843293e-31 * std::log(T));
 	} else {
 		k9 = 1.85e-23 * std::pow(T, 1.8);
+		dk9dT = 1.8 * k9 / T;
 	}
 
 	k10 = 6.0e-10;
+	dk10dT = 0.0;
 
 	if (tev > 0.3) {
 		k13 = 1.0670825e-10 * std::pow(tev, 2.012) / (exp(4.463 / tev) * std::pow((1. + 0.2472 * tev), 3.512));
+		dk13dT = ((-9.26405172528e-11 * std::pow(tev, 2.012)) / std::pow(1. + 0.2472 * tev, 4.512)
+				+ (4.7623891975e-10 * std::pow(tev, 0.012) + 2.14697e-10 * std::pow(tev, 1.012)) / std::pow(1. + 0.2472 * tev, 3.512))
+				/ std::exp(4.463 / tev) / KperEv;
 
 		k11 = exp(
 				-24.24914687731536 + 3.400824447095291 * logtev - 3.898003964650152 * std::pow(logtev, 2) + 2.045587822403071 * std::pow(logtev, 3)
 						- 0.5416182856220388 * std::pow(logtev, 4) + 0.0841077503763412 * std::pow(logtev, 5) - 0.007879026154483455 * std::pow(logtev, 6)
 						+ 0.0004138398421504563 * std::pow(logtev, 7) - 9.36345888928611e-6 * std::pow(logtev, 8));
 
+		dk11dT = (1 * 3.400824447095291 - 2 * 3.898003964650152 * logtev + 3 * 2.045587822403071 * std::pow(logtev, 2)
+				- 4 * 0.5416182856220388 * std::pow(logtev, 3) + 5 * 0.0841077503763412 * std::pow(logtev, 4) - 6 * 0.007879026154483455 * std::pow(logtev, 5)
+				+ 7 * 0.0004138398421504563 * std::pow(logtev, 6) - 8 * 9.36345888928611e-6 * std::pow(logtev, 7)) * k11 / tev / KperEv;
+
 		k12 = 4.38e-10 * exp(-102000. / T) * std::pow(T, 0.35);
+
+		dk12dT = (0.000044676 * std::pow(T, 0.65) + 1.533e-10 * std::pow(T, 1.65)) / (std::exp(102000. / T) * std::pow(T, 2.3));
 	} else {
 		k13 = tiny;
 		k11 = tiny;
 		k12 = tiny;
+		dk13dT = 0.0;
+		dk11dT = 0.0;
+		dk12dT = 0.0;
 	}
 
 	if (tev > 0.04) {
@@ -120,8 +227,12 @@ void rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k
 				-18.01849334273 + 2.360852208681 * logtev - 0.2827443061704 * std::pow(logtev, 2) + 0.01623316639567 * std::pow(logtev, 3)
 						- 0.03365012031362999 * std::pow(logtev, 4) + 0.01178329782711 * std::pow(logtev, 5) - 0.001656194699504 * std::pow(logtev, 6)
 						+ 0.0001068275202678 * std::pow(logtev, 7) - 2.631285809207e-6 * std::pow(logtev, 8));
+		dk14dT = (1 * 2.360852208681 - 2 * 0.2827443061704 * logtev + 3 * 0.01623316639567 * std::pow(logtev, 2) - 4 * 0.03365012031362999 * std::pow(logtev, 3)
+				+ 5 * 0.01178329782711 * std::pow(logtev, 4) - 6 * 0.001656194699504 * std::pow(logtev, 5) + 7 * 0.0001068275202678 * std::pow(logtev, 6)
+				- 8 * 2.631285809207e-6 * std::pow(logtev, 7)) * k14 / tev / KperEv;
 	} else {
 		k14 = tiny;
+		dk14dT = 0.0;
 	}
 
 	if (tev > 0.1) {
@@ -129,21 +240,32 @@ void rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k
 				-20.37260896533324 + 1.139449335841631 * logtev - 0.1421013521554148 * std::pow(logtev, 2) + 0.00846445538663 * std::pow(logtev, 3)
 						- 0.0014327641212992 * std::pow(logtev, 4) + 0.0002012250284791 * std::pow(logtev, 5) + 0.0000866396324309 * std::pow(logtev, 6)
 						- 0.00002585009680264 * std::pow(logtev, 7) + 2.4555011970392e-6 * std::pow(logtev, 8) - 8.06838246118e-8 * std::pow(logtev, 9));
+		dk15dT = exp(
+				1 * 1.139449335841631 - 2 * 0.1421013521554148 * logtev + 3 * 0.00846445538663 * std::pow(logtev, 2)
+						- 4 * 0.0014327641212992 * std::pow(logtev, 3) + 5 * 0.0002012250284791 * std::pow(logtev, 4)
+						+ 6 * 0.0000866396324309 * std::pow(logtev, 5) - 7 * 0.00002585009680264 * std::pow(logtev, 6)
+						+ 8 * 2.4555011970392e-6 * std::pow(logtev, 7) - 9 * 8.06838246118e-8 * std::pow(logtev, 8)) * k15 / tev / KperEv;
 	} else {
 		k15 = 2.56e-9 * std::pow(tev, 1.78186);
+		dk15dT = 1.78186 * k15 / tev / KperEv;
 	}
 
 	k16 = 6.5e-9 / sqrt(tev);
 
+	dk16dT = -0.5 * k16 / T;
+
 	if (T > 1.0e4) {
 		k17 = 4.0e-4 * std::pow(T, (-1.4)) * exp(-15100. / T);
+		dk17dT = (6.04 * std::pow(T, 2.4) - 0.00056 * std::pow(T, 3.4)) / (std::exp(15100. / T) * std::pow(T, 5.8));
 	} else {
 		k17 = 1.0e-8 * std::pow(T, (-0.4));
-
+		dk17dT = -0.4 * k17 / T;
 	}
 
 	k18 = 5.56396e-8 / std::pow(tev, 0.6035);
+	dk18dT = -0.6035 * k18 / T;
 	k19 = 4.64e-8 / sqrt(tev);
+	dk19dT = -0.5 * k19 / T;
 
 }
 
@@ -164,7 +286,7 @@ double Bp_nu(double nu, double T) {
 	if (x < 1.0e-3) {
 		c1 = x;
 		return c0 / c1;
-	} else if (x > 1000.0) {
+	} else if (x > 100.0) {
 		return 0.0;
 	} else {
 		c1 = std::exp(x) - 1.0;
@@ -180,18 +302,23 @@ double dBp_nu_dT(double nu, double T) {
 	return hplanck * hplanck * nu * nu * nu * nu / (clight * clight * kb * T * T * (std::cosh((hplanck * nu) / (kb * T)) - 1.0));
 }
 
-double grey_cross_section(const std::function<double(double, double)> &sigma, double T) {
+double radiation_heating_rate(const std::function<double(double)> &sigma, double &J, double &dJdT, double hnuth, double T) {
 	const int N = 129;
 	double numax = kb * T / hplanck;
 	const double dnu = numax / (N - 1);
 	const double lambdamax = clight * hplanck / (kb * T);
 	const double dlambda = lambdamax / (N - 1);
-	double sum = 0.0;
 	for (int i = 1; i < N; i++) {
 		const auto nu = i * dnu;
 		const auto lambda = i * dlambda;
-		const auto bnu = Bp_nu(nu, T) * sigma(nu, T);
-		const auto blambda = Bp_nu(clight / lambda, T) * clight / (lambda * lambda) * sigma(clight / lambda, T);
+		const auto sigma_nu = sigma(nu);
+		const auto sigma_lambda = sigma(clight / lambda);
+		const auto c0_nu = 1.0 / (hplanck * nu) * std::max(1.0 - hplanck * nu / hnuth, 0.0);
+		const auto c0_lambda = 1.0 / (hplanck * lambda) * std::max(1.0 - hplanck * clight / hnuth / lambda, 0.0);
+		const auto bnu = Bp_nu(nu, T) * sigma_nu * c0_nu;
+		const auto blambda = Bp_nu(clight / lambda, T) * c0_lambda * sigma_lambda;
+		const auto Dbnu = dBp_nu_dT(nu, T) * sigma_nu * c0_nu;
+		const auto Dblambda = dBp_nu_dT(clight / lambda, T) * c0_lambda * sigma_lambda;
 		double c0;
 		if (i == N - 1) {
 			c0 = 1.0 / 3.0;
@@ -200,23 +327,31 @@ double grey_cross_section(const std::function<double(double, double)> &sigma, do
 		} else {
 			c0 = 2.0 / 3.0;
 		}
-		sum += c0 * (bnu * dnu + blambda * dlambda);
+		J += c0 * (bnu * dnu + blambda * dlambda);
+		dJdT += c0 * (Dbnu * dnu + Dblambda * dlambda);
 	}
-	return sum / Bp(T);
+	J *= 4.0 * M_PI;
+	dJdT *= 4.0 * M_PI;
+
 }
 
-double sigma_to_rate(const std::function<double(double)> &sigma, double T) {
+void sigma_to_rate(const std::function<double(double)> &sigma, double &I, double &dIdT, double T) {
 	const int N = 129;
 	double numax = kb * T / hplanck;
 	const double dnu = numax / (N - 1);
 	const double lambdamax = clight * hplanck / (kb * T);
 	const double dlambda = lambdamax / (N - 1);
-	double sum = 0.0;
 	for (int i = 1; i < N; i++) {
 		const auto nu = i * dnu;
 		const auto lambda = i * dlambda;
-		const auto bnu = Bp_nu(nu, T) * sigma(nu) / (hplanck * nu);
-		const auto blambda = Bp_nu(clight / lambda, T) * clight / (lambda * lambda) / (hplanck * nu) * sigma(clight / lambda);
+		const auto sigma_nu = sigma(nu);
+		const auto sigma_lambda = sigma(clight / lambda);
+		const auto c0_nu = 1.0 / (hplanck * nu);
+		const auto c0_lambda = 1.0 / (hplanck * lambda);
+		const auto bnu = Bp_nu(nu, T) * sigma_nu * c0_nu;
+		const auto blambda = Bp_nu(clight / lambda, T) * c0_lambda * sigma_lambda;
+		const auto Dbnu = dBp_nu_dT(nu, T) * sigma_nu * c0_nu;
+		const auto Dblambda = dBp_nu_dT(clight / lambda, T) * c0_lambda * sigma_lambda;
 		double c0;
 		if (i == N - 1) {
 			c0 = 1.0 / 3.0;
@@ -225,9 +360,11 @@ double sigma_to_rate(const std::function<double(double)> &sigma, double T) {
 		} else {
 			c0 = 2.0 / 3.0;
 		}
-		sum += c0 * (bnu * dnu + blambda * dlambda);
+		I += c0 * (bnu * dnu + blambda * dlambda);
+		dIdT += c0 * (Dbnu * dnu + Dblambda * dlambda);
 	}
-	return 4.0 * M_PI * sum;
+	I *= 4.0 * M_PI;
+	dIdT *= 4.0 * M_PI;
 }
 
 double sigma20_22(double nu, double Z) {
@@ -332,384 +469,24 @@ double sigma28(double nu) {
 	return 0.25 * (sigmaL0 + sigmaW0) + 0.75 * (sigmaL1 + sigmaW1);
 }
 
-double sigma_compton(double nu) {
-	const auto me = 9.10938e-28;
-	const auto mr = 2.81794e-13;
-	const auto x = hplanck * nu / (clight * clight * me);
-	double sigma;
-	if (x < 0.001) {
-		sigma = (8.0 * M_PI / 3.0) * (1.0 - 7.0 / 5.0 * x + 163.0 / 35.0 * x * x);
-	} else {
-		const auto c0 = std::atan(2.0 * std::sqrt(x));
-		const auto c1 = std::log(1.0 + 4.0 * x);
-		const auto c2 = M_PI * std::pow(1 - x, 2) * c0 * std::pow(x, -1.5);
-		const auto c3 = M_PI * (4.0 * (1.0 + x * x + x * x * x) - (2 + x * x) * c1) / (2.0 * x);
-		sigma = c2 + c3;
-	}
-	return mr * mr * sigma;
+void radiation_rates(double &I20, double &I21, double &I22, double &I23, double &I24, double &I25, double &I26, double &I27, double &I28, double &dI20dT,
+		double &dI21dT, double &dI22dT, double &dI23dT, double &dI24dT, double &dI25dT, double &dI26dT, double &dI27dT, double &dI28dT, double T) {
+	sigma_to_rate(sigma20, I20, dI20dT, T);
+	sigma_to_rate(sigma21, I21, dI21dT, T);
+	sigma_to_rate(sigma22, I22, dI22dT, T);
+	sigma_to_rate(sigma23, I23, dI23dT, T);
+	sigma_to_rate(sigma24, I24, dI24dT, T);
+	sigma_to_rate(sigma25, I25, dI25dT, T);
+	sigma_to_rate(sigma26, I26, dI26dT, T);
+	I27 = 1.1e8 * Bp_nu(12.27 * evtoerg / hplanck, T);
+	dI27dT = 1.1e8 * dBp_nu_dT(12.27 * evtoerg / hplanck, T);
+	sigma_to_rate(sigma28, I28, dI28dT, T);
 }
 
-void radiation_rates(double &i20, double &i21, double &i22, double &i23, double &i24, double &i25, double &i26, double &i27, double &i28, double T) {
-	i20 = sigma_to_rate(sigma20, T);
-	i21 = sigma_to_rate(sigma21, T);
-	i22 = sigma_to_rate(sigma22, T);
-	i23 = sigma_to_rate(sigma23, T);
-	i24 = sigma_to_rate(sigma24, T);
-	i25 = sigma_to_rate(sigma25, T);
-	i26 = sigma_to_rate(sigma26, T);
-	i27 = 1.1e8 * Bp_nu(12.27 * evtoerg / hplanck, T);
-	i28 = sigma_to_rate(sigma26, T);
-}
-
-double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, double ne, double T, double Trad, double dt) {
-	double K1;
-	double K2;
-	double K3;
-	double K4;
-	double K5;
-	double K6;
-	double K7;
-	double K8;
-	double K9;
-	double K10;
-	double K11;
-	double K12;
-	double K13;
-	double K14;
-	double K15;
-	double K16;
-	double K17;
-	double K18;
-	double K19;
-	double I20;
-	double I21;
-	double I22;
-	double I23;
-	double I24;
-	double I25;
-	double I26;
-	double I27;
-	double I28;
-	rates(K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19, T, false);
-	radiation_rates(I20, I21, I22, I23, I24, I25, I26, I27, I28, Trad);
-	auto &H0 = U0[nH];
-	auto &Hp0 = U0[nHP];
-	auto &Hn0 = U0[nHN];
-	auto &H20 = U0[nH2];
-	auto &H2p0 = U0[nH2P];
-	auto &He0 = U0[nHE];
-	auto &Hep0 = U0[nHEP];
-	auto &Hepp0 = U0[nHEPP];
-	auto &H = U[nH];
-	auto &Hp = U[nHP];
-	auto &Hn = U[nHN];
-	auto &H2 = U[nH2];
-	auto &H2p = U[nH2P];
-	auto &He = U[nHE];
-	auto &Hep = U[nHEP];
-	auto &Hepp = U[nHEPP];
-	const auto den = (1
-			+ dt * (I21 + I22 + dt * I22 * K3 * ne + dt * I21 * (I22 + (K5 + K6) * ne) + ne * (K3 + K4 + K5 + K6 + dt * (K3 * K5 + (K3 + K4) * K6) * ne)));
-	He = (He0 + dt * K4 * ne * (Hep0 + dt * (Hep0 + Hepp0) * K6 * ne) + dt * He0 * (I22 + ne * (K4 + K5 + K6 + dt * K4 * K6 * ne))) / den;
-	Hep = (Hep0 + dt * He0 * I21 + dt * Hep0 * I21 + dt * ((He0 + Hep0) * K3 + (Hep0 + Hepp0 + dt * (He0 + Hep0 + Hepp0) * I21) * K6) * ne
-			+ std::pow(dt, 2) * (He0 + Hep0 + Hepp0) * K3 * K6 * std::pow(ne, 2)) / den;
-	Hepp = (dt * (Hep0 + dt * He0 * I21 + dt * Hep0 * I21 + dt * (He0 + Hep0) * K3 * ne) * (I22 + K5 * ne)
-			+ Hepp0 * (1 + std::pow(dt, 2) * (I21 + K3 * ne) * (I22 + K5 * ne) + dt * (I21 + I22 + (K3 + K4 + K5) * ne))) / den;
-	double err = 0.0;
-#define List(a,b,c,d,e) {a,b,c,d,e}
-	do {
-
-		const std::array<std::array<double, 5>, 5> A { {
-		List(1 + dt * (I20 + H2p * K10 - 2 * H2 * K13 - Hn * K15 + Hn * K8 + Hp * K9 + K1 * ne + K7 * ne),
-				dt * (-(H2 * K11) - 2 * Hn * K16 + H * K9 - K2 * ne), dt * (-I23 - H * K15 - 2 * Hp * K16 - H2p * K19 + H * K8 - K14 * ne),
-				dt * (-2 * I27 - 2 * I28 - Hp * K11 - 2 * H * K13 - 2 * K12 * ne), dt * (-I25 + H * K10 - Hn * K19 - 2 * K18 * ne)),
-		List(dt * (-I20 - H2p * K10 + Hp * K9 - K1 * ne), 1 + dt * (H2 * K11 + Hn * K16 + Hn * K17 + H * K9 + K2 * ne), dt * (Hp * K16 + Hp * K17),
-				dt * Hp * K11, dt * (-I25 - 2 * I26 - H * K10)),
-		List(dt*(Hn*K15 + Hn*K8 - K7*ne),dt*(Hn*K16 + Hn*K17),1 + dt*(I23 + H*K15 + Hp*K16 + Hp*K17 + H2p*K19 + H*K8 + K14*ne),0,dt*Hn*K19),
-		List(dt * (-(H2p * K10) + H2 * K13 - Hn * K8), dt * H2 * K11, dt * (-(H2p * K19) - H * K8),
-				1 + dt * (I24 + I27 + I28 + Hp * K11 + H * K13 + K12 * ne), dt * (-(H * K10) - Hn * K19)),
-		List(dt * (H2p * K10 - Hp * K9), dt * (-(H2 * K11) - Hn * K17 - H * K9), dt * (-(Hp * K17) + H2p * K19), dt * (-I24 - Hp * K11),
-				1 + dt * (I25 + I26 + H * K10 + Hn * K19 + K18 * ne)) } };
-		const std::array<double, 5> f = { H - H0
-				+ dt
-						* (H * I20 - Hn * I23 - H2p * I25 - 2 * H2 * I27 - 2 * H2 * I28 + H * H2p * K10 - H2 * Hp * K11 - 2 * H * H2 * K13 - H * Hn * K15
-								- 2 * Hn * Hp * K16 - H2p * Hn * K19 + H * Hn * K8 + H * Hp * K9 + H * K1 * ne - 2 * H2 * K12 * ne - Hn * K14 * ne
-								- 2 * H2p * K18 * ne - Hp * K2 * ne + H * K7 * ne), Hp - Hp0
-				+ dt
-						* (-(H * I20) - H2p * I25 - 2 * H2p * I26 - H * H2p * K10 + H2 * Hp * K11 + Hn * Hp * K16 + Hn * Hp * K17 + H * Hp * K9 - H * K1 * ne
-								+ Hp * K2 * ne), Hn - Hn0
-				+ dt * (Hn * I23 + H * Hn * K15 + Hn * Hp * K16 + Hn * Hp * K17 + H2p * Hn * K19 + H * Hn * K8 + Hn * K14 * ne - H * K7 * ne), H2 - H20
-				+ dt * (H2 * I24 + H2 * I27 + H2 * I28 - H * H2p * K10 + H2 * Hp * K11 + H * H2 * K13 - H2p * Hn * K19 - H * Hn * K8 + H2 * K12 * ne), H2p
-				- H2p0
-				+ dt * (-(H2 * I24) + H2p * I25 + H2p * I26 + H * H2p * K10 - H2 * Hp * K11 - Hn * Hp * K17 + H2p * Hn * K19 - H * Hp * K9 + H2p * K18 * ne) };
-		const auto a00 = A[0][0];
-		const auto a01 = A[0][1];
-		const auto a02 = A[0][2];
-		const auto a03 = A[0][3];
-		const auto a04 = A[0][4];
-		const auto a10 = A[1][0];
-		const auto a11 = A[1][1];
-		const auto a12 = A[1][2];
-		const auto a13 = A[1][3];
-		const auto a14 = A[1][4];
-		const auto a20 = A[2][0];
-		const auto a21 = A[2][1];
-		const auto a22 = A[2][2];
-		const auto a23 = A[2][3];
-		const auto a24 = A[2][4];
-		const auto a30 = A[3][0];
-		const auto a31 = A[3][1];
-		const auto a32 = A[3][2];
-		const auto a33 = A[3][3];
-		const auto a34 = A[3][4];
-		const auto a40 = A[4][0];
-		const auto a41 = A[4][1];
-		const auto a42 = A[4][2];
-		const auto a43 = A[4][3];
-		const auto a44 = A[4][4];
-
-		const std::array<std::array<double, 5>, 5> invAdetA = { {
-		List(
-				a12 * a24 * a33 * a41 - a11 * a24 * a33 * a42 - a12 * a24 * a31 * a43 + a11 * a24 * a32 * a43 + a12 * a21 * a34 * a43
-				- a11 * a22 * a34 * a43 + a14 * (-(a22 * a33 * a41) + a21 * a33 * a42 + a22 * a31 * a43 - a21 * a32 * a43)
-				- a12 * a21 * a33 * a44 + a11 * a22 * a33 * a44
-				+ a13 * (-(a24 * a32 * a41) + a22 * a34 * a41 + a24 * a31 * a42 - a21 * a34 * a42 - a22 * a31 * a44 + a21 * a32 * a44),
-				-(a02 * a24 * a33 * a41) + a01 * a24 * a33 * a42 + a02 * a24 * a31 * a43 - a01 * a24 * a32 * a43 - a02 * a21 * a34 * a43
-				+ a01 * a22 * a34 * a43 + a04 * (a22 * a33 * a41 - a21 * a33 * a42 - a22 * a31 * a43 + a21 * a32 * a43) + a02 * a21 * a33 * a44
-				- a01 * a22 * a33 * a44
-				+ a03 * (a24 * a32 * a41 - a22 * a34 * a41 - a24 * a31 * a42 + a21 * a34 * a42 + a22 * a31 * a44 - a21 * a32 * a44),
-				a02 * a14 * a33 * a41 - a02 * a13 * a34 * a41 - a01 * a14 * a33 * a42 + a01 * a13 * a34 * a42 - a02 * a14 * a31 * a43
-				+ a01 * a14 * a32 * a43 + a02 * a11 * a34 * a43 - a01 * a12 * a34 * a43
-				+ a04 * (a13 * a32 * a41 - a12 * a33 * a41 - a13 * a31 * a42 + a11 * a33 * a42 + a12 * a31 * a43 - a11 * a32 * a43)
-				+ (a02 * a13 * a31 - a01 * a13 * a32 - a02 * a11 * a33 + a01 * a12 * a33) * a44
-				+ a03 * (-(a14 * a32 * a41) + a12 * a34 * a41 + a14 * a31 * a42 - a11 * a34 * a42 - a12 * a31 * a44 + a11 * a32 * a44),
-				a02 * a13 * a24 * a41 - a01 * a13 * a24 * a42 + a02 * a14 * a21 * a43 - a01 * a14 * a22 * a43 - a02 * a11 * a24 * a43
-				+ a01 * a12 * a24 * a43 + a04 * (-(a13 * a22 * a41) + a13 * a21 * a42 - a12 * a21 * a43 + a11 * a22 * a43)
-				- a02 * a13 * a21 * a44 + a01 * a13 * a22 * a44
-				+ a03 * (a14 * a22 * a41 - a12 * a24 * a41 - a14 * a21 * a42 + a11 * a24 * a42 + a12 * a21 * a44 - a11 * a22 * a44),
-				-(a02 * a13 * a24 * a31) + a01 * a13 * a24 * a32 - a02 * a14 * a21 * a33 + a01 * a14 * a22 * a33 + a02 * a11 * a24 * a33
-				- a01 * a12 * a24 * a33 + a04 * (a13 * a22 * a31 - a13 * a21 * a32 + a12 * a21 * a33 - a11 * a22 * a33) + a02 * a13 * a21 * a34
-				- a01 * a13 * a22 * a34
-				+ a03 * (-(a14 * a22 * a31) + a12 * a24 * a31 + a14 * a21 * a32 - a11 * a24 * a32 - a12 * a21 * a34 + a11 * a22 * a34)),
-		List(
-				-(a12 * a24 * a33 * a40) + a10 * a24 * a33 * a42 + a12 * a24 * a30 * a43 - a10 * a24 * a32 * a43 - a12 * a20 * a34 * a43
-				+ a10 * a22 * a34 * a43 + a14 * (a22 * a33 * a40 - a20 * a33 * a42 - a22 * a30 * a43 + a20 * a32 * a43) + a12 * a20 * a33 * a44
-				- a10 * a22 * a33 * a44
-				+ a13 * (a24 * a32 * a40 - a22 * a34 * a40 - a24 * a30 * a42 + a20 * a34 * a42 + a22 * a30 * a44 - a20 * a32 * a44),
-				a02 * a24 * a33 * a40 - a00 * a24 * a33 * a42 - a02 * a24 * a30 * a43 + a00 * a24 * a32 * a43 + a02 * a20 * a34 * a43
-				- a00 * a22 * a34 * a43 + a04 * (-(a22 * a33 * a40) + a20 * a33 * a42 + a22 * a30 * a43 - a20 * a32 * a43)
-				- a02 * a20 * a33 * a44 + a00 * a22 * a33 * a44
-				+ a03 * (-(a24 * a32 * a40) + a22 * a34 * a40 + a24 * a30 * a42 - a20 * a34 * a42 - a22 * a30 * a44 + a20 * a32 * a44),
-				-(a02 * a14 * a33 * a40) + a02 * a13 * a34 * a40 + a00 * a14 * a33 * a42 - a00 * a13 * a34 * a42 + a02 * a14 * a30 * a43
-				- a00 * a14 * a32 * a43 - a02 * a10 * a34 * a43 + a00 * a12 * a34 * a43
-				+ a04 * (-(a13 * a32 * a40) + a12 * a33 * a40 + a13 * a30 * a42 - a10 * a33 * a42 - a12 * a30 * a43 + a10 * a32 * a43)
-				- a02 * a13 * a30 * a44 + a00 * a13 * a32 * a44 + a02 * a10 * a33 * a44 - a00 * a12 * a33 * a44
-				+ a03 * (a14 * a32 * a40 - a12 * a34 * a40 - a14 * a30 * a42 + a10 * a34 * a42 + a12 * a30 * a44 - a10 * a32 * a44),
-				-(a02 * a13 * a24 * a40) + a00 * a13 * a24 * a42 - a02 * a14 * a20 * a43 + a00 * a14 * a22 * a43 + a02 * a10 * a24 * a43
-				- a00 * a12 * a24 * a43 + a04 * (a13 * a22 * a40 - a13 * a20 * a42 + a12 * a20 * a43 - a10 * a22 * a43) + a02 * a13 * a20 * a44
-				- a00 * a13 * a22 * a44
-				+ a03 * (-(a14 * a22 * a40) + a12 * a24 * a40 + a14 * a20 * a42 - a10 * a24 * a42 - a12 * a20 * a44 + a10 * a22 * a44),
-				a02 * a13 * a24 * a30 - a00 * a13 * a24 * a32 + a02 * a14 * a20 * a33 - a00 * a14 * a22 * a33 - a02 * a10 * a24 * a33
-				+ a00 * a12 * a24 * a33 + a04 * (-(a13 * a22 * a30) + a13 * a20 * a32 - a12 * a20 * a33 + a10 * a22 * a33)
-				- a02 * a13 * a20 * a34 + a00 * a13 * a22 * a34
-				+ a03 * (a14 * a22 * a30 - a12 * a24 * a30 - a14 * a20 * a32 + a10 * a24 * a32 + a12 * a20 * a34 - a10 * a22 * a34)),
-		List(
-				a11 * a24 * a33 * a40 - a10 * a24 * a33 * a41 - a11 * a24 * a30 * a43 + a10 * a24 * a31 * a43 + a11 * a20 * a34 * a43
-				- a10 * a21 * a34 * a43 + a14 * (-(a21 * a33 * a40) + a20 * a33 * a41 + a21 * a30 * a43 - a20 * a31 * a43)
-				- a11 * a20 * a33 * a44 + a10 * a21 * a33 * a44
-				+ a13 * (-(a24 * a31 * a40) + a21 * a34 * a40 + a24 * a30 * a41 - a20 * a34 * a41 - a21 * a30 * a44 + a20 * a31 * a44),
-				-(a01 * a24 * a33 * a40) + a00 * a24 * a33 * a41 + a01 * a24 * a30 * a43 - a00 * a24 * a31 * a43 - a01 * a20 * a34 * a43
-				+ a00 * a21 * a34 * a43 + a04 * (a21 * a33 * a40 - a20 * a33 * a41 - a21 * a30 * a43 + a20 * a31 * a43) + a01 * a20 * a33 * a44
-				- a00 * a21 * a33 * a44
-				+ a03 * (a24 * a31 * a40 - a21 * a34 * a40 - a24 * a30 * a41 + a20 * a34 * a41 + a21 * a30 * a44 - a20 * a31 * a44),
-				a01 * a14 * a33 * a40 - a01 * a13 * a34 * a40 - a00 * a14 * a33 * a41 + a00 * a13 * a34 * a41 - a01 * a14 * a30 * a43
-				+ a00 * a14 * a31 * a43 + a01 * a10 * a34 * a43 - a00 * a11 * a34 * a43
-				+ a04 * (a13 * a31 * a40 - a11 * a33 * a40 - a13 * a30 * a41 + a10 * a33 * a41 + a11 * a30 * a43 - a10 * a31 * a43)
-				+ (a01 * a13 * a30 - a00 * a13 * a31 - a01 * a10 * a33 + a00 * a11 * a33) * a44
-				+ a03 * (-(a14 * a31 * a40) + a11 * a34 * a40 + a14 * a30 * a41 - a10 * a34 * a41 - a11 * a30 * a44 + a10 * a31 * a44),
-				a01 * a13 * a24 * a40 - a00 * a13 * a24 * a41 + a01 * a14 * a20 * a43 - a00 * a14 * a21 * a43 - a01 * a10 * a24 * a43
-				+ a00 * a11 * a24 * a43 + a04 * (-(a13 * a21 * a40) + a13 * a20 * a41 - a11 * a20 * a43 + a10 * a21 * a43)
-				- a01 * a13 * a20 * a44 + a00 * a13 * a21 * a44
-				+ a03 * (a14 * a21 * a40 - a11 * a24 * a40 - a14 * a20 * a41 + a10 * a24 * a41 + a11 * a20 * a44 - a10 * a21 * a44),
-				-(a01 * a13 * a24 * a30) + a00 * a13 * a24 * a31 - a01 * a14 * a20 * a33 + a00 * a14 * a21 * a33 + a01 * a10 * a24 * a33
-				- a00 * a11 * a24 * a33 + a04 * (a13 * a21 * a30 - a13 * a20 * a31 + a11 * a20 * a33 - a10 * a21 * a33) + a01 * a13 * a20 * a34
-				- a00 * a13 * a21 * a34
-				+ a03 * (-(a14 * a21 * a30) + a11 * a24 * a30 + a14 * a20 * a31 - a10 * a24 * a31 - a11 * a20 * a34 + a10 * a21 * a34)),
-		List(
-				-(a11 * a24 * a32 * a40) + a11 * a22 * a34 * a40 + a10 * a24 * a32 * a41 - a10 * a22 * a34 * a41 + a11 * a24 * a30 * a42
-				- a10 * a24 * a31 * a42 - a11 * a20 * a34 * a42 + a10 * a21 * a34 * a42
-				+ a14 * (-(a22 * a31 * a40) + a21 * a32 * a40 + a22 * a30 * a41 - a20 * a32 * a41 - a21 * a30 * a42 + a20 * a31 * a42)
-				- a11 * a22 * a30 * a44 + a10 * a22 * a31 * a44 + a11 * a20 * a32 * a44 - a10 * a21 * a32 * a44
-				+ a12 * (a24 * a31 * a40 - a21 * a34 * a40 - a24 * a30 * a41 + a20 * a34 * a41 + a21 * a30 * a44 - a20 * a31 * a44),
-				a01 * a24 * a32 * a40 - a01 * a22 * a34 * a40 - a00 * a24 * a32 * a41 + a00 * a22 * a34 * a41 - a01 * a24 * a30 * a42
-				+ a00 * a24 * a31 * a42 + a01 * a20 * a34 * a42 - a00 * a21 * a34 * a42
-				+ a04 * (a22 * a31 * a40 - a21 * a32 * a40 - a22 * a30 * a41 + a20 * a32 * a41 + a21 * a30 * a42 - a20 * a31 * a42)
-				+ (a01 * a22 * a30 - a00 * a22 * a31 - a01 * a20 * a32 + a00 * a21 * a32) * a44
-				+ a02 * (-(a24 * a31 * a40) + a21 * a34 * a40 + a24 * a30 * a41 - a20 * a34 * a41 - a21 * a30 * a44 + a20 * a31 * a44),
-				-(a01 * a14 * a32 * a40) + a01 * a12 * a34 * a40 + a00 * a14 * a32 * a41 - a00 * a12 * a34 * a41 + a01 * a14 * a30 * a42
-				- a00 * a14 * a31 * a42 - a01 * a10 * a34 * a42 + a00 * a11 * a34 * a42
-				+ a04 * (-(a12 * a31 * a40) + a11 * a32 * a40 + a12 * a30 * a41 - a10 * a32 * a41 - a11 * a30 * a42 + a10 * a31 * a42)
-				- a01 * a12 * a30 * a44 + a00 * a12 * a31 * a44 + a01 * a10 * a32 * a44 - a00 * a11 * a32 * a44
-				+ a02 * (a14 * a31 * a40 - a11 * a34 * a40 - a14 * a30 * a41 + a10 * a34 * a41 + a11 * a30 * a44 - a10 * a31 * a44),
-				a01 * a14 * a22 * a40 - a01 * a12 * a24 * a40 - a00 * a14 * a22 * a41 + a00 * a12 * a24 * a41 - a01 * a14 * a20 * a42
-				+ a00 * a14 * a21 * a42 + a01 * a10 * a24 * a42 - a00 * a11 * a24 * a42
-				+ a04 * (a12 * a21 * a40 - a11 * a22 * a40 - a12 * a20 * a41 + a10 * a22 * a41 + a11 * a20 * a42 - a10 * a21 * a42)
-				+ (a01 * a12 * a20 - a00 * a12 * a21 - a01 * a10 * a22 + a00 * a11 * a22) * a44
-				+ a02 * (-(a14 * a21 * a40) + a11 * a24 * a40 + a14 * a20 * a41 - a10 * a24 * a41 - a11 * a20 * a44 + a10 * a21 * a44),
-				-(a01 * a14 * a22 * a30) + a01 * a12 * a24 * a30 + a00 * a14 * a22 * a31 - a00 * a12 * a24 * a31 + a01 * a14 * a20 * a32
-				- a00 * a14 * a21 * a32 - a01 * a10 * a24 * a32 + a00 * a11 * a24 * a32
-				+ a04 * (-(a12 * a21 * a30) + a11 * a22 * a30 + a12 * a20 * a31 - a10 * a22 * a31 - a11 * a20 * a32 + a10 * a21 * a32)
-				- a01 * a12 * a20 * a34 + a00 * a12 * a21 * a34 + a01 * a10 * a22 * a34 - a00 * a11 * a22 * a34
-				+ a02 * (a14 * a21 * a30 - a11 * a24 * a30 - a14 * a20 * a31 + a10 * a24 * a31 + a11 * a20 * a34 - a10 * a21 * a34)),
-		List(
-				a33 * (a12 * a21 * a40 - a11 * a22 * a40 - a12 * a20 * a41 + a10 * a22 * a41 + a11 * a20 * a42 - a10 * a21 * a42)
-				+ a13 * (a22 * a31 * a40 - a21 * a32 * a40 - a22 * a30 * a41 + a20 * a32 * a41 + a21 * a30 * a42 - a20 * a31 * a42)
-				+ (-(a12 * a21 * a30) + a11 * a22 * a30 + a12 * a20 * a31 - a10 * a22 * a31 - a11 * a20 * a32 + a10 * a21 * a32) * a43,
-				a33 * (-(a02 * a21 * a40) + a01 * a22 * a40 + a02 * a20 * a41 - a00 * a22 * a41 - a01 * a20 * a42 + a00 * a21 * a42)
-				+ a03 * (-(a22 * a31 * a40) + a21 * a32 * a40 + a22 * a30 * a41 - a20 * a32 * a41 - a21 * a30 * a42 + a20 * a31 * a42)
-				+ (a02 * a21 * a30 - a01 * a22 * a30 - a02 * a20 * a31 + a00 * a22 * a31 + a01 * a20 * a32 - a00 * a21 * a32) * a43,
-				a01 * a13 * a32 * a40 - a01 * a12 * a33 * a40 - a00 * a13 * a32 * a41 + a00 * a12 * a33 * a41 - a01 * a13 * a30 * a42
-				+ a00 * a13 * a31 * a42 + a01 * a10 * a33 * a42 - a00 * a11 * a33 * a42
-				+ a03 * (a12 * a31 * a40 - a11 * a32 * a40 - a12 * a30 * a41 + a10 * a32 * a41 + a11 * a30 * a42 - a10 * a31 * a42)
-				+ (a01 * a12 * a30 - a00 * a12 * a31 - a01 * a10 * a32 + a00 * a11 * a32) * a43
-				+ a02 * (-(a13 * a31 * a40) + a11 * a33 * a40 + a13 * a30 * a41 - a10 * a33 * a41 - a11 * a30 * a43 + a10 * a31 * a43),
-				a13 * (a02 * a21 * a40 - a01 * a22 * a40 - a02 * a20 * a41 + a00 * a22 * a41 + a01 * a20 * a42 - a00 * a21 * a42)
-				+ a03 * (-(a12 * a21 * a40) + a11 * a22 * a40 + a12 * a20 * a41 - a10 * a22 * a41 - a11 * a20 * a42 + a10 * a21 * a42)
-				+ (a02 * a11 * a20 - a01 * a12 * a20 - a02 * a10 * a21 + a00 * a12 * a21 + a01 * a10 * a22 - a00 * a11 * a22) * a43,
-				a13 * (-(a02 * a21 * a30) + a01 * a22 * a30 + a02 * a20 * a31 - a00 * a22 * a31 - a01 * a20 * a32 + a00 * a21 * a32)
-				+ a03 * (a12 * a21 * a30 - a11 * a22 * a30 - a12 * a20 * a31 + a10 * a22 * a31 + a11 * a20 * a32 - a10 * a21 * a32)
-				+ (-(a02 * a11 * a20) + a01 * a12 * a20 + a02 * a10 * a21 - a00 * a12 * a21 - a01 * a10 * a22 + a00 * a11 * a22) * a33) } };
-
-		const auto detA = -(a02 * a13 * a24 * a31 * a40) + a01 * a13 * a24 * a32 * a40 - a02 * a14 * a21 * a33 * a40 + a01 * a14 * a22 * a33 * a40
-				+ a02 * a11 * a24 * a33 * a40 - a01 * a12 * a24 * a33 * a40 + a02 * a13 * a21 * a34 * a40 - a01 * a13 * a22 * a34 * a40
-				+ a02 * a13 * a24 * a30 * a41 - a00 * a13 * a24 * a32 * a41 + a02 * a14 * a20 * a33 * a41 - a00 * a14 * a22 * a33 * a41
-				- a02 * a10 * a24 * a33 * a41 + a00 * a12 * a24 * a33 * a41 - a02 * a13 * a20 * a34 * a41 + a00 * a13 * a22 * a34 * a41
-				- a01 * a13 * a24 * a30 * a42 + a00 * a13 * a24 * a31 * a42 - a01 * a14 * a20 * a33 * a42 + a00 * a14 * a21 * a33 * a42
-				+ a01 * a10 * a24 * a33 * a42 - a00 * a11 * a24 * a33 * a42 + a01 * a13 * a20 * a34 * a42 - a00 * a13 * a21 * a34 * a42
-				+ a02 * a14 * a21 * a30 * a43 - a01 * a14 * a22 * a30 * a43 - a02 * a11 * a24 * a30 * a43 + a01 * a12 * a24 * a30 * a43
-				- a02 * a14 * a20 * a31 * a43 + a00 * a14 * a22 * a31 * a43 + a02 * a10 * a24 * a31 * a43 - a00 * a12 * a24 * a31 * a43
-				+ a01 * a14 * a20 * a32 * a43 - a00 * a14 * a21 * a32 * a43 - a01 * a10 * a24 * a32 * a43 + a00 * a11 * a24 * a32 * a43
-				+ a02 * a11 * a20 * a34 * a43 - a01 * a12 * a20 * a34 * a43 - a02 * a10 * a21 * a34 * a43 + a00 * a12 * a21 * a34 * a43
-				+ a01 * a10 * a22 * a34 * a43 - a00 * a11 * a22 * a34 * a43
-
-				+ a04
-						* (a33 * (a12 * a21 * a40 - a11 * a22 * a40 - a12 * a20 * a41 + a10 * a22 * a41 + a11 * a20 * a42 - a10 * a21 * a42)
-								+ a13 * (a22 * a31 * a40 - a21 * a32 * a40 - a22 * a30 * a41 + a20 * a32 * a41 + a21 * a30 * a42 - a20 * a31 * a42)
-								+ (-(a12 * a21 * a30) + a11 * a22 * a30 + a12 * a20 * a31 - a10 * a22 * a31 - a11 * a20 * a32 + a10 * a21 * a32) * a43)
-				+ a13 * (-(a02 * a21 * a30) + a01 * a22 * a30 + a02 * a20 * a31 - a00 * a22 * a31 - a01 * a20 * a32 + a00 * a21 * a32) * a44
-				+ (-(a02 * a11 * a20) + a01 * a12 * a20 + a02 * a10 * a21 - a00 * a12 * a21 - a01 * a10 * a22 + a00 * a11 * a22) * a33 * a44
-				+ a03
-						* (a12 * a24 * a31 * a40 - a11 * a24 * a32 * a40 - a12 * a21 * a34 * a40 + a11 * a22 * a34 * a40 - a12 * a24 * a30 * a41
-								+ a10 * a24 * a32 * a41 + a12 * a20 * a34 * a41 - a10 * a22 * a34 * a41 + a11 * a24 * a30 * a42 - a10 * a24 * a31 * a42
-								- a11 * a20 * a34 * a42 + a10 * a21 * a34 * a42
-								+ a14 * (-(a22 * a31 * a40) + a21 * a32 * a40 + a22 * a30 * a41 - a20 * a32 * a41 - a21 * a30 * a42 + a20 * a31 * a42)
-								+ (a12 * a21 * a30 - a11 * a22 * a30 - a12 * a20 * a31 + a10 * a22 * a31 + a11 * a20 * a32 - a10 * a21 * a32) * a44);
-
-		auto U1 = U;
-		for (int n = 0; n < 5; n++) {
-			for (int m = 0; m < 5; m++) {
-				U1[n] -= invAdetA[n][m] * f[m] / detA;
-				//			U1[n] = std::max(U1[n], 0.0);
-			}
-		}
-		U = U1;
-		auto &H1 = U1[nH];
-		auto &Hp1 = U1[nHP];
-		auto &H21 = U1[nH2];
-		auto &H2p1 = U1[nH2P];
-		auto &Hn1 = U1[nHN];
-		auto Ht1 = std::max(H1, Hp1);
-		Ht1 = std::max(Ht1, Hn1);
-		Ht1 = std::max(Ht1, H21);
-		Ht1 = std::max(Ht1, H2p1);
-		auto Ht2 = std::max(H1, Hp);
-		Ht2 = std::max(Ht1, Hn);
-		Ht2 = std::max(Ht1, H2);
-		Ht2 = std::max(Ht1, H2p);
-		H = H1;
-		Hp = Hp1;
-		Hn = Hn1;
-		H2 = H21;
-		H2p = H2p1;
-		err = std::abs(std::log(std::abs(Ht1 / Ht2)));
-	} while (err > 1.0e-10);
-	return ne;
-}
-
-double compute(const std::array<double, NS> U0, std::array<double, NS> &U, double T, double Trad, double dt) {
-	auto &H = U[nH];
-	auto &Hp = U[nHP];
-	auto &Hn = U[nHN];
-	auto &H2 = U[nH2];
-	auto &H2p = U[nH2P];
-	auto &He = U[nHE];
-	auto &Hep = U[nHEP];
-	auto &Hepp = U[nHEPP];
-
-	auto nemax = H + Hp + 2.0 * Hn + 2.0 * H2 + 2.0 * H2p + 2.0 * He + 2.0 * Hep + 2.0 * Hepp;
-	auto nemin = 0.0;
-	double nemid;
-	auto U1 = U;
-	int iter = 0;
-	do {
-		nemid = 0.5 * (nemax + nemin);
-		auto ne = Hp - Hn + Hep + 2.0 * Hepp + H2p;
-		U1 = U;
-		const auto fmax = compute_next_ne(U0, U1, nemax, T, Trad, dt) - ne;
-		U1 = U;
-		const auto fmid = compute_next_ne(U0, U1, nemid, T, Trad, dt) - ne;
-		if (fmax * fmid > 0.0) {
-			nemax = nemid;
-		} else {
-			nemin = nemid;
-		}
-		iter++;
-
-	} while (nemin / nemax < 0.999);
-	U = U1;
-	double ne = nemid;
-	const auto evtoerg = 1.60218e-12;
-	const auto Hion = -13.6 * evtoerg;
-	const auto Hnion = -0.755 * evtoerg;
-	const auto Heion = -(24.6 + 13.6 * 4) * evtoerg;
-	const auto Hepion = -24.6 * evtoerg;
-	const auto H2ion = -15.42 * evtoerg;
-	const auto kb = 1.38e-16;
-	double n = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
-	double eion = Hion * U[nH] + Hnion * U[nHN] + Heion * U[nHE] + Hepion * U[nHEP] + H2ion * U[nH2];
-	double nmon = U[nH] + U[nHP] + U[nHN] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
-	double ndia = U[nH2] + U[nH2P];
-	return (1.5 * nmon + 2.5 * ndia) * kb * T + eion;
-}
-
-double compute_next_chemistry(std::array<double, NS> U0, std::array<double, NS> &U, double energy, double Trad, double dt) {
-	const auto evtoerg = 1.60218e-12;
-	const auto Hion = -13.6 * evtoerg;
-	const auto Hnion = -0.755 * evtoerg;
-	const auto Heion = -(24.6 + 13.6 * 4) * evtoerg;
-	const auto Hepion = -24.6 * evtoerg;
-	const auto H2ion = -15.42 * evtoerg;
-	const auto kb = 1.38e-16;
-	double ne = U[nHP] - U[nHN] + U[nH2P] + U[nHEP] + 2.0 * U[nHEPP];
-	double n = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
-	double eion = Hion * U[nH] + Hnion * U[nHN] + Heion * U[nHE] + Hepion * U[nHEP] + H2ion * U[nH2];
-	double nmon = U[nH] + U[nHP] + U[nHN] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
-	double ndia = U[nH2] + U[nH2P];
-	double T = (energy - eion) / kb / (nmon * 1.5 + ndia * 2.5);
-	double T0;
-	auto U1 = U;
-	do {
-		T0 = T;
-		const auto dT = T * 0.0001;
-		U1 = U;
-		const auto f1 = compute(U0, U1, T, Trad, dt) - energy;
-		U1 = U;
-		const auto f2 = compute(U0, U1, T + dT, Trad, dt) - energy;
-		const auto dfdT = (f2 - f1) / dT;
-		T -= (f1 / dfdT);
-	} while (std::abs(std::log(T / T0)) > 1.0e-3);
-	U = U1;
-	return T;
+void heating_rates(double &J20, double &J21, double &J22, double &dJ20dT, double &dJ21dT, double &dJ22dT, double T) {
+	radiation_heating_rate(sigma20, J20, dJ20dT, 13.6 * evtoerg, T);
+	radiation_heating_rate(sigma21, J21, dJ21dT, 13.6 * 4.0 * evtoerg, T);
+	radiation_heating_rate(sigma22, J22, dJ22dT, 24.6 * evtoerg, T);
 }
 
 double ion_energy(species s) {
@@ -722,249 +499,148 @@ double ion_energy(species s) {
 	return s.H * Hion + s.Hn * Hnion + s.He * Heion + s.Hep * Hepion + s.H2 * H2ion;
 }
 
-thermo_props compute_thermo_properties(const species s, double energy) {
-	thermo_props p;
-	const double ne = s.Hp - s.Hn + s.H2p + s.Hep + 2 * s.Hepp;
-	const double nA = s.H + s.Hp + s.Hn + 2.0 * s.H2 + 2.0 * s.H2p + 4.0 * s.He + 4.0 * s.Hep + 4.0 * s.Hepp;
-	p.rho = nA * 1.6605e-24;
-	const double nmon = ne + s.H + s.Hp + s.Hn + s.He + s.Hep + s.Hepp;
-	const double ndia = s.H2 + s.H2p;
-	const double n = nmon + ndia;
-	const double kb = 1.38e-16;
-	p.eion = ion_energy(s);
-	p.gamma = (5 * nmon + 7 * ndia) / (3 * nmon + 5 * ndia);
-	p.pressure = (p.gamma - 1.0) * std::max(energy - p.eion, 0.0);
-	p.sound_speed = std::sqrt(p.gamma * p.pressure / p.rho);
-	p.T = p.pressure / (kb * n);
-	return p;
+void cooling_rate2(double &C13, double &dC13dT, double &dC13dH, double &dC13dH2, double H, double H2, double T) {
+	const auto xx = std::log10(T / 1e4);
+	const auto dxx_dT = 1 / (T * std::log(10));
+	double vibha = 1.1e-18 * std::exp(-6744 / T);
+	double dvibha_dT = 1.1e-18 * 6744 / (std::exp(6744 / T) * std::pow(T, 2));
+	double dum1, dum2, ddum2_dT;
+	dum1 = 8.152e-13 * (4.2 / (kb * (T + 1190.)) + 1. / (kb * T));
+	double ddum1_dT = 8.152e-13 * (-1. / std::pow(T, 2) - 4.2 / std::pow(1190. + T, 2)) / kb;
+	double h2k01 = 1.45e-12 * std::sqrt(T) * std::exp(dum1);
+	double dh2k01_dT = 1.45e-12 * (std::exp(dum1) * (1 + 2 * T * ddum1_dT)) / (2. * std::sqrt(T));
+	if (T > 1635.) {
+		dum2 = 1.0e-12 * std::sqrt(T) * std::exp(-1000. / T);
+		ddum2_dT = 1.0e-12 * (0.5 * (2000. + T)) / (std::exp(1000. / T) * std::pow(T, 1.5));
+	} else {
+		dum2 = 1.4e-13 * std::exp((T / 125.) - std::pow(T / 577., 2));
+		ddum2_dT = 1.4e-13 * std::exp((0.008 - 3.003643419467814e-6 * T) * T) * (0.008 - 6.007286838935628e-6 * T);
+	}
+	double hyd01 = dum2 * std::exp(8.152e-13 / (kb * T));
+	double dhyd01_dT = ddum2_dT * hyd01 + dum2 * (-8.152e-13 * std::exp(8.152e-13 / (kb * T))) / (kb * std::pow(T, 2));
+	double vibla = hyd01 * H + h2k01 * H2;
+	double dvibla_dT = dhyd01_dT * H + dh2k01_dT * H2;
+	double dvibla_dH = hyd01;
+	double dvibla_dH2 = h2k01;
+	double rotla0, rotha, drotla0_dT, drotha_dT;
+	if (T > 1087) {
+		rotha = 3.9e-19 * std::exp(-6118 / T);
+		drotha_dT = 3.9e-19 * 6118 / (std::exp(6118 / T) * std::pow(T, 2));
+	} else {
+		rotha = std::pow(10.0, (-19.24 + 0.474 * xx - 1.247 * xx * xx));
+		drotha_dT = (std::pow(T, 9.45) * (8.533285780697259e-41 - 8.844652214438655e-42 * std::log(T)))
+				/ std::exp(0.541565218933355 * std::pow(std::log(T), 2));
+	}
+	if (T > 4031) {
+		rotla0 = 1.38e-22 * exp(-9243 / T);
+		drotla0_dT = 9243 * rotla0 / (T * T);
+	} else {
+		rotla0 = std::pow(10, (-22.9 - 0.553 * xx - 1.148 * xx * xx));
+		drotla0_dT = (-6.961857527221768e-24 - 1.2553250493430911e-23 * std::log(T))
+				/ (std::exp(0.49857006522493297 * std::pow(std::log(T), 2)) * std::pow(T, 1.553));
+	}
+	const auto rotla = rotla0 * (std::pow(H2, 0.77) + 1.2 * std::pow(H, 0.77));
+	const auto drotla_dT = drotla0_dT * (std::pow(H2, 0.77) + 1.2 * std::pow(H, 0.77));
+	const auto drotla_dH2 = rotla0 * 0.77 * std::pow(H2, 0.77 - 1.0);
+	const auto drotla_dH = rotla0 * 1.2 * 0.77 * std::pow(H, 0.77 - 1.0);
+
+	C13 = H2 * ((vibla * vibha) / (vibha + vibla) + (rotla * rotha) / (rotha + rotla));
+	dC13dT = (H2
+			* (rotha * (-(rotla * drotha_dT) + rotha * drotla_dT)
+					+ ((rotha + rotla)
+							* (rotha * (std::pow(vibla, 2) * dvibha_dT + std::pow(vibha, 2) * dvibla_dT)
+									+ rotla
+											* (2 * vibha * vibla * drotha_dT + std::pow(vibla, 2) * (drotha_dT + dvibha_dT)
+													+ std::pow(vibha, 2) * (drotha_dT + dvibla_dT)))) / std::pow(vibha + vibla, 2)))
+			/ std::pow(rotha + rotla, 2);
+	dC13dH = H2 * ((std::pow(rotha, 2) * drotla_dH) / std::pow(rotha + rotla, 2) + (std::pow(vibha, 2) * dvibla_dH) / std::pow(vibha + vibla, 2));
+	dC13dH2 = C13 + H2 * ((std::pow(rotha, 2) * drotla_dH2) / std::pow(rotha + rotla, 2) + (std::pow(vibha, 2) * dvibla_dH2) / std::pow(vibha + vibla, 2));
 }
 
-species compute_next_species(const species s0, double energy, double Trad, double dt) {
-	std::array<double, NS> U, U0;
-	species s;
-	U0[nH] = s0.H;
-	U0[nHP] = s0.Hp;
-	U0[nHN] = s0.Hn;
-	U0[nH2] = s0.H2;
-	U0[nH2P] = s0.H2p;
-	U0[nHE] = s0.He;
-	U0[nHEP] = s0.Hep;
-	U0[nHEPP] = s0.Hepp;
-	compute_next_chemistry(U0, U, energy, Trad, dt);
-	s.H = U[nH];
-	s.Hp = U[nHP];
-	s.Hn = U[nHN];
-	s.H2 = U[nH2];
-	s.H2p = U[nH2P];
-	s.He = U[nHE];
-	s.Hep = U[nHEP];
-	s.Hepp = U[nHEPP];
-	return s;
-}
-
-double cooling_rate(species s, double T) {
-	const auto ne = s.Hp - s.Hn + s.Hep + 2.0 * s.Hepp + s.H2p;
+void cooling_rate1(double &C1, double &C2, double &C3, double &C4, double &C5, double &C6, double &C7, double &C8, double &C9, double &C10, double &C11,
+		double &C12, double &C13, double &dC1dT, double &dC2dT, double &dC3dT, double &dC4dT, double &dC5dT, double &dC6dT, double &dC7dT, double &dC8dT,
+		double &dC9dT, double &dC10dT, double &dC11dT, double &dC12dT, double &dC13dT, double T) {
 	const auto T3 = T / 1e3;
 	const auto T5 = T / 1e5;
 	const auto T6 = T / 1e6;
-	const auto tmp = (1.0 + std::sqrt(T5));
 	const auto tev = T / KperEv;
 	const auto logtev = std::log(T);
 	const auto tiny = std::numeric_limits<double>::min();
+
 	const auto k1 = exp(
 			-32.71396786375 + 13.53655609057 * logtev - 5.739328757388 * std::pow(logtev, 2) + 1.563154982022 * std::pow(logtev, 3)
 					- 0.2877056004391 * std::pow(logtev, 4) + 0.03482559773736999 * std::pow(logtev, 5) - 0.00263197617559 * std::pow(logtev, 6)
 					+ 0.0001119543953861 * std::pow(logtev, 7) - 2.039149852002e-6 * std::pow(logtev, 8));
+
+	const auto dk1dT = (1 * 13.53655609057 - 2 * 5.739328757388 * logtev + 3 * 1.563154982022 * std::pow(logtev, 2) - 4 * 0.2877056004391 * std::pow(logtev, 3)
+			+ 5 * 0.03482559773736999 * std::pow(logtev, 4) - 6 * 0.00263197617559 * std::pow(logtev, 5) + 7 * 0.0001119543953861 * std::pow(logtev, 6)
+			- 8 * 2.039149852002e-6 * std::pow(logtev, 7)) * k1 / tev / KperEv;
 
 	const auto k3 = exp(
 			-44.09864886561001 + 23.91596563469 * logtev - 10.75323019821 * std::pow(logtev, 2) + 3.058038757198 * std::pow(logtev, 3)
 					- 0.5685118909884001 * std::pow(logtev, 4) + 0.06795391233790001 * std::pow(logtev, 5) - 0.005009056101857001 * std::pow(logtev, 6)
 					+ 0.0002067236157507 * std::pow(logtev, 7) - 3.649161410833d - 6 * std::pow(logtev, 8));
 
+	const auto dk3dT = (1 * 23.91596563469 - 2 * 10.75323019821 * logtev + 3 * 3.058038757198 * std::pow(logtev, 2)
+			- 4 * 0.5685118909884001 * std::pow(logtev, 3) + 5 * 0.06795391233790001 * std::pow(logtev, 4) - 6 * 0.005009056101857001 * std::pow(logtev, 5)
+			+ 7 * 0.0002067236157507 * std::pow(logtev, 6) - 8 * 3.649161410833e-6 * std::pow(logtev, 7)) * k3 / tev / KperEv;
+
 	const auto k5 = exp(
 			-68.71040990212001 + 43.93347632635 * logtev - 18.48066993568 * std::pow(logtev, 2) + 4.701626486759002 * std::pow(logtev, 3)
 					- 0.7692466334492 * std::pow(logtev, 4) + 0.08113042097303 * std::pow(logtev, 5) - 0.005324020628287001 * std::pow(logtev, 6)
 					+ 0.0001975705312221 * std::pow(logtev, 7) - 3.165581065665e-6 * std::pow(logtev, 8));
-	const auto c0 = 7.50e-19 * tmp * std::exp(-118348 / T) * s.H * ne;
-	const auto c1 = 9.10e-27 * tmp * std::pow(T, -.1687) * std::exp(-13179 / T) * ne * ne * s.He;
-	const auto c2 = 5.54e-17 * tmp * std::pow(T, -.397) * std::exp(-473638 / T) * ne * s.Hep;
-	const auto c3 = 2.18e-11 * k1 * ne * s.H;
-	const auto c4 = 3.94e-11 * k3 * ne * s.He;
-	const auto c5 = 8.72e-11 * k5 * ne * s.Hep;
-	const auto c6 = 5.01e-27 * tmp * std::pow(T, -.1687) * std::exp(-55338 / T) * ne * ne * s.Hep;
-	const auto c7 = 8.70e-27 * std::sqrt(T) * std::pow(T3, -0.2) / (1.0 + std::pow(T6, 0.7)) * ne * s.Hp;
-	const auto c8 = 1.55e-26 * std::pow(T, 0.3647) * ne * s.Hep;
-	const auto c9 = 1.24e-13 * std::pow(T, -1.5) * (1 + 0.3 * std::exp(-94000 / T)) * std::exp(-470000 / T) * ne * s.Hep;
-	const auto c10 = 3.48e-26 * std::sqrt(T) * std::pow(T3, -0.2) / (1.0 + std::pow(T6, 0.7)) * ne * s.Hepp;
-	const auto c11 = 1.43e-27 * std::sqrt(T) * (1.1 + 0.34 * std::exp(-std::pow(5.50 - std::log10(T), 2) / 3.0)) * ne * (s.Hp + s.Hep + s.Hepp);
+
+	const auto dk5dT = (1 * 43.93347632635 - 2 * 18.48066993568 * logtev + 3 * 4.701626486759002 * std::pow(logtev, 2)
+			- 4 * 0.7692466334492 * std::pow(logtev, 3) + 5 * 0.08113042097303 * std::pow(logtev, 4) - 6 * 0.005324020628287001 * std::pow(logtev, 5)
+			+ 7 * 0.0001975705312221 * std::pow(logtev, 6) - 8 * 3.165581065665e-6 * std::pow(logtev, 7)) * k5 / tev / KperEv;
+
+	C1 = 7.50e-19 * (1.0 + std::sqrt(T / 100000)) * std::exp(-118348 / T);
+	dC1dT = 7.50e-19 * ((118348. + (374.2492365256074 + 0.0015811388300841897 * T) * std::sqrt(T)) / (std::exp(118348 / T) * T * T));
+	C2 = 9.10e-27 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.1687) * std::exp(-13179 / T);
+	dC2dT = 9.10e-27
+			* ((13179 * std::pow(T, 1.8374) + 41.67565728335908 * std::pow(T, 2.3374) - 0.1687 * std::pow(T, 2.8374)
+					+ 0.0010476625888137844 * std::pow(T, 3.3374)) / (std::exp(13179 / T) * std::pow(T, 4.0061)));
+	C3 = 5.54e-17 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.397) * std::exp(-473638 / T);
+	dC3dT =
+			5.54e-17
+					* ((473638. * std::pow(T, 2.294) + 1497.774866406831 * std::pow(T, 2.794) - 0.397 * std::pow(T, 3.294)
+							+ 0.00032571459899734327 * std::pow(T, 3.794)) / (std::exp(473638 / T) * std::pow(T, 4.691)));
+	C4 = 2.18e-11 * k1;
+	dC4dT = 2.18e-11 * dk1dT;
+	C5 = 3.94e-11 * k3;
+	dC5dT = 3.94e-11 * dk3dT;
+	C6 = 8.72e-11 * k5;
+	dC6dT = 8.72e-11 * dk5dT;
+	C7 = 5.01e-27 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.1687) * std::exp(-55338 / T);
+	dC7dT = 5.01e-27
+			* ((55338 * std::pow(T, 1.8374) + 174.9941211583978 * std::pow(T, 2.3374) - 0.1687 * std::pow(T, 2.8374)
+					+ 0.0010476625888137844 * std::pow(T, 3.3374)) / (std::exp(55338 / T) * std::pow(T, 4.0061)));
+	C8 = 8.70e-27 * std::sqrt(T) * std::pow(T3, -0.2) / (1.0 + std::pow(T6, 0.7));
+	dC8dT = 8.70e-27 * (-((25238.293779207717 - 3e8 / std::pow(T, 0.7)) / (2.5118864315095773e8 + 31697.863849222253 * std::pow(T, 0.7) + std::pow(T, 1.4))));
+	C9 = 1.55e-26 * std::pow(T, 0.3647);
+	dC9dT = 0.3647 * C9 / T;
+	C10 = 1.24e-13 * std::pow(T, -1.5) * (1 + 0.3 * std::exp(-94000 / T)) * std::exp(-470000 / T);
+	dC10dT = 1.24e-13
+			* (((169200 + 470000 * std::exp(94000 / T)) * std::pow(T, 2.5) + (-0.45 - 1.5 * std::exp(94000 / T)) * std::pow(T, 3.5))
+					/ (std::exp(564000 / T) * std::pow(T, 6.)));
+	C11 = 3.48e-26 * std::sqrt(T) * std::pow(T / 1000, -0.2) / (1.0 + std::pow(T / 1000000, 0.7));
+	dC11dT = 3.48e-26
+			* (-((25238.293779207717 - 3e8 / std::pow(T, 0.7)) / (2.5118864315095773e8 + 31697.863849222253 * std::pow(T, 0.7) + 1. * std::pow(T, 1.4))));
+	C12 = 1.43e-27 * std::sqrt(T) * (1.1 + 0.34 * std::exp(-std::pow(5.50 - std::log10(T), 2) / 3.0));
+	dC12dT = 1.43e-27
+			* (0.55 / std::pow(T, 0.5)
+					+ (std::pow(T, 1.0924131003119228) * (0.00002971599807934954 - 1.7857483385425343e-6 * std::log(T)))
+							/ std::exp(0.06287056567053795 * std::pow(std::log(T), 2)));
 	const auto z = 0.0;
-	const auto c12 = 5.64e-36 * std::pow(1 + z, 4) * (T - 2.73 * (1 + z)) * ne;
-	const auto xx = std::log10(T / 1e4);
-	double vibha = 1.1e-18 * std::exp(-std::min(std::log(dhuge), 6744 / T));
-	double dum;
-	dum = 8.152e-13 * (4.2 / (kb * (T + 1190.)) + 1. / (kb * T));
-	double h2k01 = 1.45e-12 * std::sqrt(T) * std::exp(-std::min(log(dhuge), dum));
-	if (T > 1635.) {
-		dum = 1.0e-12 * std::sqrt(T) * std::exp(-1000. / T);
-	} else {
-		dum = 1.4e-13 * std::exp((T / 125.) - std::pow(T / 577., 2));
-	}
-	double hyd01 = dum * exp(-std::min(std::log(dhuge), 8.152e-13 / (kb * T)));
-	double vibla = hyd01 * s.H + h2k01 * s.H2;
-	double rotla, rotha;
-	if (T > 1087) {
-		rotha = 3.9e-19 * std::exp(-6118 / T);
-	} else {
-		rotha = std::pow(10.0, (-19.24 + 0.474 * xx - 1.247 * xx * xx));
-	}
-	if (T > 4031) {
-		rotla = 1.38e-22 * exp(-9243 / T);
-	} else {
-		rotla = std::pow(10, (-22.9 - 0.553 * xx - 1.148 * xx * xx));
-	}
-	rotla *= (std::pow(s.H2, 0.77) + 1.2 * std::pow(s.H, 0.77));
-	const auto c13 = s.H2 * ((vibla * vibha) / (vibha + vibla) + (rotla * rotha) / (rotha + rotla));
-	const auto c14 = sigma_to_rate([s](double nu) {
-		return (nu, s.H, s.He, s.Hep);
-	}, T);
-	return c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c11 + c12 + c13 + c14;
-}
-
-double energy_mean_opacity(species s, double T) {
-	const int N = 129;
-	double numax = kb * T / hplanck;
-	const double dnu = numax / (N - 1);
-	const double lambdamax = clight * hplanck / (kb * T);
-	const double dlambda = lambdamax / (N - 1);
-	double sum = 0.0;
-	for (int i = 1; i < N; i++) {
-		const auto nu = i * dnu;
-		const auto lambda = i * dlambda;
-		const auto sigma_nu = s.H * sigma20(nu) + s.He * sigma21(nu) + s.Hep * sigma22(nu) + s.Hn * sigma23(nu) + s.H2 * sigma24(nu) + s.H2p * sigma25(nu)
-				+ s.H2p * sigma26(nu) + s.H2 * sigma28(nu);
-		const auto nu2 = clight / lambda;
-		const auto sigma_lambda = s.H * sigma20(nu2) + s.He * sigma21(nu2) + s.Hep * sigma22(nu2) + s.Hn * sigma23(nu2) + s.H2 * sigma24(nu2)
-				+ s.H2p * sigma25(nu2) + s.H2p * sigma26(nu2) + s.H2 * sigma28(nu2);
-		const auto bnu = Bp_nu(nu, T) * sigma_nu;
-		const auto blambda = Bp_nu(nu2, T) * clight / (lambda * lambda) * sigma_lambda;
-		double c0;
-		if (i == N - 1) {
-			c0 = 1.0 / 3.0;
-		} else if (i % 2 == 1) {
-			c0 = 4.0 / 3.0;
-		} else {
-			c0 = 2.0 / 3.0;
-		}
-		sum += c0 * (bnu * dnu + blambda * dlambda);
-	}
-	return sum / Bp(T);
-
-}
-
-double rossalind_mean_opacity(species s, double T) {
-	const int N = 129;
-	double numax = kb * T / hplanck;
-	const double dnu = numax / (N - 1);
-	const double lambdamax = clight * hplanck / (kb * T);
-	const double dlambda = lambdamax / (N - 1);
-	double sum = 0.0;
-	auto ne = s.Hp - s.Hn + s.Hep + 2.0 * s.Hepp + s.H2p;
-	for (int i = 1; i < N; i++) {
-		const auto nu = i * dnu;
-		const auto lambda = i * dlambda;
-		const auto sigma_nu = s.H * sigma20(nu) + s.He * sigma21(nu) + s.Hep * sigma22(nu) + s.Hn * sigma23(nu) + s.H2 * sigma24(nu) + s.H2p * sigma25(nu)
-				+ s.H2p * sigma26(nu) + s.H2 * sigma28(nu) + ne * sigma_compton(nu);
-		const auto nu2 = clight / lambda;
-		const auto sigma_lambda = s.H * sigma20(nu2) + s.He * sigma21(nu2) + s.Hep * sigma22(nu2) + s.Hn * sigma23(nu2) + s.H2 * sigma24(nu2)
-				+ s.H2p * sigma25(nu2) + s.H2p * sigma26(nu2) + s.H2 * sigma28(nu2) + ne * sigma_compton(nu2);
-		const auto bnu = dBp_nu_dT(nu, T) / sigma_nu;
-		const auto blambda = dBp_nu_dT(nu2, T) * clight / (lambda * lambda) / sigma_lambda;
-		double c0;
-		if (i == N - 1) {
-			c0 = 1.0 / 3.0;
-		} else if (i % 2 == 1) {
-			c0 = 4.0 / 3.0;
-		} else {
-			c0 = 2.0 / 3.0;
-		}
-		sum += c0 * (bnu * dnu + blambda * dlambda);
-	}
-	return dB_dT(T) / sum;
-
-}
-
-double flux_mean_opacity(species s, double Tg, double Tr, double dTgdx) {
-	const int N = 129;
-	const double arad = 7.5646e-15;
-	const auto Tmean = std::sqrt(Tg * Tr);
-	double numax = kb * Tmean / hplanck;
-	const double dnu = numax / (N - 1);
-	const double lambdamax = clight * hplanck / (kb * Tmean);
-	const double dlambda = lambdamax / (N - 1);
-	double sum1 = 0.0;
-	double sum2 = 0.0;
-	auto ne = s.Hp - s.Hn + s.Hep + 2.0 * s.Hepp + s.H2p;
-	for (int i = 1; i < N; i++) {
-		const auto lambda = i * dlambda;
-		const auto nu1 = i * dnu;
-		const auto nu2 = clight / lambda;
-		const auto dBp_nu_dT1 = dBp_nu_dT(nu1, Tg);
-		const auto dBp_nu_dT2 = dBp_nu_dT(nu2, Tg);
-		auto sigma1 = s.H * sigma20(nu1) + s.He * sigma21(nu1) + s.Hep * sigma22(nu1) + s.Hn * sigma23(nu1) + s.H2 * sigma24(nu1) + s.H2p * sigma25(nu1)
-				+ s.H2p * sigma26(nu1) + s.H2 * sigma28(nu1) + ne * sigma_compton(nu1);
-		auto sigma2 = s.H * sigma20(nu2) + s.He * sigma21(nu2) + s.Hep * sigma22(nu2) + s.Hn * sigma23(nu2) + s.H2 * sigma24(nu2) + s.H2p * sigma25(nu2)
-				+ s.H2p * sigma26(nu2) + s.H2 * sigma28(nu2) + ne * sigma_compton(nu2);
-		const auto den1 = sigma1 * Bp_nu(nu1, Tr);
-		const auto den2 = sigma2 * Bp_nu(nu2, Tr);
-		const auto num1 = dBp_nu_dT1 * dTgdx;
-		const auto num2 = dBp_nu_dT2 * dTgdx;
-		const auto Rnu1 = std::min(num1 / den1, 1e+10);
-		const auto Rnu2 = std::min(num2 / den2, 1e+10);
-		const auto lnu1 = (2.0 + Rnu1) / (6.0 + 2.0 * Rnu1 + Rnu1 * Rnu1);
-		const auto lnu2 = (2.0 + Rnu2) / (6.0 + 2.0 * Rnu2 + Rnu2 * Rnu2);
-		const auto b1num = lnu1 * dBp_nu_dT1 * dnu;
-		const auto b2num = lnu2 * dBp_nu_dT2 * clight / (lambda * lambda) * dlambda;
-		const auto b1den = lnu1 * dBp_nu_dT1 / sigma1 * dnu;
-		const auto b2den = lnu2 * dBp_nu_dT2 * clight / (lambda * lambda) / sigma2 * dlambda;
-		double c0;
-		if (i == N - 1) {
-			c0 = 1.0 / 3.0;
-		} else if (i % 2 == 1) {
-			c0 = 4.0 / 3.0;
-		} else {
-			c0 = 2.0 / 3.0;
-		}
-		sum1 += c0 * (b1num + b2num);
-		sum2 += c0 * (b1den + b2den);
-	}
-	return sum1 / sum2;
+	C13 = 5.64e-36 * std::pow(1 + z, 4) * (T - 2.73 * (1 + z));
+	dC13dT = 5.64e-36 * std::pow(1 + z, 4);
 
 }
 
 void chemistry_test() {
-	species s;
-	const auto n = 1.0e+10;
-	s.H = 1e-10 * n;
-	s.Hp = 1e-10 * n;
-	s.Hn = 1e-10 * n;
-	s.H2 = 0.92 * n;
-	s.H2p = 1e-10 * n;
-	s.He = 0.08 * n;
-	s.Hep = 1e-10 * n;
-	s.Hepp = 1e-10 * n;
-	const auto dTdx = 1.0;
-	for (double T = 1.0e1; T <= 1e10; T *= 1.5) {
-		const auto kr = rossalind_mean_opacity(s, T);
-		const auto kp = energy_mean_opacity(s, T);
-		const auto ke = energy_mean_opacity(s, T);
-		const auto kf = flux_mean_opacity(s, T, T, dTdx);
-		const auto R = dTdx * dB_dT(T) / kr / Bp(T);
-		const auto lambda = (2.0 + R) / (6.0 + 2.0 * R + R * R);
-		printf("%e %e %e %e %e %e\n", T, kr, kf, kp, ke, lambda);
-	}
-}
-
-//void chemistry_test() {
+	constexpr int N = 3;
+	std::array<std::array<double, N>, N> A = { { { 0, 2, -1 }, { 3, 0, 4 }, { 1, 1, 0 } } };
+	matrix_inverse<N>(A);
 //	std::array<double, NS> U;
 //	const auto dt = 1.0;
 //	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "time", "T", "A", "AH", "AHe", "N", "Ne", "H", "H+", "H-", "H2",
@@ -995,4 +671,4 @@ void chemistry_test() {
 //				(double) U[nH2P], (double) U[nHE], (double) U[nHEP], (double) U[nHEPP]);
 //		U = U0;
 //	}
-//}
+}
