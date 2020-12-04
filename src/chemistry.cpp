@@ -18,7 +18,9 @@
 #define nHE  5
 #define nHEP  6
 #define nHEPP 7
-#define NS  8
+#define nTGAS 8
+#define nTRAD 9
+#define NS  10
 
 const double arad = 7.5646e-15;
 const auto tiny = 1.0e+3 * std::numeric_limits<double>::min();
@@ -32,27 +34,11 @@ std::array<std::array<double, N>, N> matrix_inverse(std::array<std::array<double
 			Ainv[n][m] = n == m ? 1.0 : 0.0;
 		}
 	}
-
-	const auto print = [](std::array<std::array<double, N>, N> A, std::array<std::array<double, N>, N> Ainv) {
-		printf("\n");
-		for (int n = 0; n < N; n++) {
-			for (int m = 0; m < N; m++) {
-				printf("%10.2e ", A[n][m]);
-			}
-			printf(" | ");
-			for (int m = 0; m < N; m++) {
-				printf("%10.2e ", Ainv[n][m]);
-			}
-			printf("\n");
-		}
-	};
-	print(A, Ainv);
 	for (int q = 0; q < N; q++) {
 		for (int n = q; n < N; n++) {
 			if (A[n][q] != 0.0) {
 				std::swap(A[n], A[q]);
 				std::swap(Ainv[n], Ainv[q]);
-				print(A, Ainv);
 				break;
 			}
 		}
@@ -91,7 +77,6 @@ std::array<std::array<double, N>, N> matrix_inverse(std::array<std::array<double
 			A[n][q] = 0.0;
 		}
 	}
-	print(A, Ainv);
 	return Ainv;
 }
 
@@ -330,8 +315,8 @@ double radiation_heating_rate(const std::function<double(double)> &sigma, double
 		J += c0 * (bnu * dnu + blambda * dlambda);
 		dJdT += c0 * (Dbnu * dnu + Dblambda * dlambda);
 	}
-	J *= 4.0 * M_PI;
-	dJdT *= 4.0 * M_PI;
+	J *= 4.0 * M_PI / clight;
+	dJdT *= 4.0 * M_PI / clight;
 
 }
 
@@ -499,7 +484,7 @@ double ion_energy(species s) {
 	return s.H * Hion + s.Hn * Hnion + s.He * Heion + s.Hep * Hepion + s.H2 * H2ion;
 }
 
-void cooling_rate2(double &C13, double &dC13dT, double &dC13dH, double &dC13dH2, double H, double H2, double T) {
+void cooling_rate2(double &C14, double &dC14dT, double &dC14dH, double &dC14dH2, double H, double H2, double T) {
 	const auto xx = std::log10(T / 1e4);
 	const auto dxx_dT = 1 / (T * std::log(10));
 	double vibha = 1.1e-18 * std::exp(-6744 / T);
@@ -544,8 +529,8 @@ void cooling_rate2(double &C13, double &dC13dT, double &dC13dH, double &dC13dH2,
 	const auto drotla_dH2 = rotla0 * 0.77 * std::pow(H2, 0.77 - 1.0);
 	const auto drotla_dH = rotla0 * 1.2 * 0.77 * std::pow(H, 0.77 - 1.0);
 
-	C13 = H2 * ((vibla * vibha) / (vibha + vibla) + (rotla * rotha) / (rotha + rotla));
-	dC13dT = (H2
+	C14 = H2 * ((vibla * vibha) / (vibha + vibla) + (rotla * rotha) / (rotha + rotla));
+	dC14dT = (H2
 			* (rotha * (-(rotla * drotha_dT) + rotha * drotla_dT)
 					+ ((rotha + rotla)
 							* (rotha * (std::pow(vibla, 2) * dvibha_dT + std::pow(vibha, 2) * dvibla_dT)
@@ -553,8 +538,8 @@ void cooling_rate2(double &C13, double &dC13dT, double &dC13dH, double &dC13dH2,
 											* (2 * vibha * vibla * drotha_dT + std::pow(vibla, 2) * (drotha_dT + dvibha_dT)
 													+ std::pow(vibha, 2) * (drotha_dT + dvibla_dT)))) / std::pow(vibha + vibla, 2)))
 			/ std::pow(rotha + rotla, 2);
-	dC13dH = H2 * ((std::pow(rotha, 2) * drotla_dH) / std::pow(rotha + rotla, 2) + (std::pow(vibha, 2) * dvibla_dH) / std::pow(vibha + vibla, 2));
-	dC13dH2 = C13 + H2 * ((std::pow(rotha, 2) * drotla_dH2) / std::pow(rotha + rotla, 2) + (std::pow(vibha, 2) * dvibla_dH2) / std::pow(vibha + vibla, 2));
+	dC14dH = H2 * ((std::pow(rotha, 2) * drotla_dH) / std::pow(rotha + rotla, 2) + (std::pow(vibha, 2) * dvibla_dH) / std::pow(vibha + vibla, 2));
+	dC14dH2 = C14 + H2 * ((std::pow(rotha, 2) * drotla_dH2) / std::pow(rotha + rotla, 2) + (std::pow(vibha, 2) * dvibla_dH2) / std::pow(vibha + vibla, 2));
 }
 
 void cooling_rate1(double &C1, double &C2, double &C3, double &C4, double &C5, double &C6, double &C7, double &C8, double &C9, double &C10, double &C11,
@@ -634,6 +619,229 @@ void cooling_rate1(double &C1, double &C2, double &C3, double &C4, double &C5, d
 	const auto z = 0.0;
 	C13 = 5.64e-36 * std::pow(1 + z, 4) * (T - 2.73 * (1 + z));
 	dC13dT = 5.64e-36 * std::pow(1 + z, 4);
+
+}
+
+void compute_next_state(species s0, species s, double Tgas0, double Trad0, double Tgas, double Trad, double dt) {
+	double K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19, dK1dT, dK2dT, dK3dT, dK4dT, dK5dT, dK6dT, dK7dT, dK8dT, dK9dT,
+			dK10dT, dK11dT, dK12dT, dK13dT, dK14dT, dK15dT, dK16dT, dK17dT, dK18dT, dK19dT;
+	double J20, J21, J22, J23, J24, J25, J26, J27, J28, dJ20dT, dJ21dT, dJ22dT, dJ23dT, dJ24dT, dJ25dT, dJ26dT, dJ27dT, dJ28dT;
+	double C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, dC1dT, dC2dT, dC3dT, dC4dT, dC5dT, dC6dT, dC7dT, dC8dT, dC9dT, dC10dT, dC11dT, dC12dT,
+			dC13dT;
+	double C14, dC14dT, dC14dH, dC14dH2;
+	double S20, S21, S22, dS20, dS20dT, dS21dT, dS22dT;
+	chemical_rates(K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19, dK1dT, dK2dT, dK3dT, dK4dT, dK5dT, dK6dT, dK7dT, dK8dT,
+			dK9dT, dK10dT, dK11dT, dK12dT, dK13dT, dK14dT, dK15dT, dK16dT, dK17dT, dK18dT, dK19dT, Tgas);
+	radiation_rates(J20, J21, J22, J23, J24, J25, J26, J27, J28, dJ20dT, dJ21dT, dJ22dT, dJ23dT, dJ24dT, dJ25dT, dJ26dT, dJ27dT, dJ28dT, Trad);
+	cooling_rate1(C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, dC1dT, dC2dT, dC3dT, dC4dT, dC5dT, dC6dT, dC7dT, dC8dT, dC9dT, dC10dT, dC11dT, dC12dT,
+			dC13dT, Tgas);
+	cooling_rate2(C14, dC14dT, dC14dH, dC14dH2, s.H, s.H2, Tgas);
+	heating_rates(S20, S21, S22, dS20dT, dS21dT, dS22dT, Trad);
+
+#define NF 10
+#define List(a0,a1,a2,a3,a4,a5,a6,a7,a8,a9) {a0,a1,a2,a3,a4,a5,a6,a7,a8,a9}
+
+#define DDT(a) d##a##dT
+	const auto a = arad;
+	const auto H0 = s0.H;
+	const auto Hp0 = s0.Hp;
+	const auto Hn0 = s0.Hn;
+	const auto H20 = s0.H2;
+	const auto H2p0 = s0.H2p;
+	const auto He0 = s0.He;
+	const auto Hep0 = s0.Hep;
+	const auto Hepp0 = s0.Hepp;
+	auto &H = s.H;
+	auto &Hp = s.Hp;
+	auto &Hn = s.Hn;
+	auto &H2 = s.H2;
+	auto &H2p = s.H2p;
+	auto &He = s.He;
+	auto &Hep = s.Hep;
+	auto &Hepp = s.Hepp;
+	double err;
+	const auto erad0 = a * std::pow(Trad0, 4);
+	const auto egas0 = kb * ((3.0 / 2.0) * (H + 2 * Hp + He + 2 * Hep + 3 * Hepp) + (5.0 / 2.0) * (H2 + H2p)) * Tgas;
+	do {
+		const std::array<std::array<double, NF>, NF> A =
+				{
+						{
+						List(
+								1
+								+ dt
+								* ((H2p + Hep + 2 * Hepp - Hn + Hp) * K1 + H2p * K10 - 2 * H2 * K13 - Hn * K15
+										+ (H2p + Hep + 2 * Hepp - Hn + Hp) * K7 + Hn * K8 + Hp * K9 + J20),
+								dt
+								* (-(H2 * (K11 + 2 * K12)) - 2 * H2p * K18 - (H2p + Hep + 2 * (Hepp + Hp)) * K2 + Hn * (-K14 - 2 * K16 + K2)
+										+ H * (K1 + K7 + K9)),
+								-(dt
+										* (-2 * H2 * K12 + Hep * K14 + 2 * Hepp * K14 - 2 * Hn * K14 + Hp * K14 + 2 * Hp * K16
+												+ H2p * (K14 - 2 * K18 + K19) - Hp * K2 + H * (K1 + K15 + K7 - K8) + J23)),
+								dt * (-(Hp * K11) - 2 * (H2p + Hep + 2 * Hepp - Hn + Hp) * K12 - 2 * H * K13 - 2 * J27 - 2 * J28),
+								dt
+								* (-2 * H2 * K12 - 2 * (2 * H2p + Hep + 2 * Hepp + Hp) * K18 - Hn * (K14 - 2 * K18 + K19) - Hp * K2
+										+ H * (K1 + K10 + K7) - J25), 0,
+								dt * (-2 * H2 * K12 - Hn * K14 - 2 * H2p * K18 - Hp * K2 + H * (K1 + K7)),
+								-2 * dt * (2 * H2 * K12 + Hn * K14 + 2 * H2p * K18 + Hp * K2 - H * (K1 + K7)), 0,
+								dt*(H*DDT(J20) - Hn*DDT(J23) - H2p*DDT(J25) - 2*H2*(DDT(J27) + DDT(J28)))),
+						List(dt * (-((H2p + Hep + 2 * Hepp - Hn + Hp) * K1) - H2p * K10 + Hp * K9 - J20),
+								1 + dt * (H2 * K11 + Hn * (K16 + K17 - K2) + (H2p + Hep + 2 * (Hepp + Hp)) * K2 + H * (-K1 + K9)),
+								dt * (H * K1 + Hp * (K16 + K17 - K2)), dt * Hp * K11, -(dt * (H * (K1 + K10) - Hp * K2 + J25 + 2 * J26)), 0,
+								dt * (-(H * K1) + Hp * K2), dt * (-2 * H * K1 + 2 * Hp * K2), 0, -(dt*(H*DDT(J20) + H2p*(DDT(J25) + 2*DDT(J26))))),
+						List(dt * (-((H2p + Hep + 2 * Hepp + Hp) * K7) + Hn * (K15 + K7 + K8)), dt * (Hn * (K14 + K16 + K17) - H * K7),
+								1
+								+ dt
+								* (Hep * K14 + 2 * Hepp * K14 - 2 * Hn * K14 + Hp * K14 + Hp * K16 + Hp * K17 + H2p * (K14 + K19)
+										+ H * (K15 + K7 + K8) + J23), 0, dt * (Hn * (K14 + K19) - H * K7), 0, dt * (Hn * K14 - H * K7),
+								2 * dt * (Hn * K14 - H * K7), 0, dt*Hn*DDT(J23)),
+						List(-(dt * (H2p * K10 - H2 * K13 + Hn * K8)), dt * H2 * (K11 + K12), -(dt * (H2 * K12 + H2p * K19 + H * K8)),
+								1 + dt * (Hp * K11 + (H2p + Hep + 2 * Hepp - Hn + Hp) * K12 + H * K13 + J24 + J27 + J28),
+								-(dt * (H * K10 - H2 * K12 + Hn * K19)), 0, dt * H2 * K12, 2 * dt * H2 * K12, 0,
+								dt*H2*(DDT(J24) + DDT(J27) + DDT(J28))),
+						List(dt*(H2p*K10 - Hp*K9),-(dt*(H2*K11 + Hn*K17 - H2p*K18 + H*K9)),-(dt*(Hp*K17 + H2p*(K18 - K19))),-(dt*(Hp*K11 + J24)),
+								1 + dt*(H*K10 + (2*H2p + Hep + 2*Hepp - Hn + Hp)*K18 + Hn*K19 + J25 + J26),0,dt*H2p*K18,2*dt*H2p*K18,0,
+								dt*(-(H2*DDT(J24)) + H2p*(DDT(J25) + DDT(J26)))),
+						List(0, dt * (He * K3 - Hep * K4), dt * (-(He * K3) + Hep * K4), 0, dt * (He * K3 - Hep * K4),
+								1 + dt * (H2p + Hep + 2 * Hepp - Hn + Hp) * K3 + dt * J21, dt * (He * K3 - (H2p + 2 * Hep + 2 * Hepp - Hn + Hp) * K4),
+								2 * dt * (He * K3 - Hep * K4), 0, dt*He*DDT(J21)),
+						List(0, dt * (-(He * K3) + Hep * (K4 + K5) - Hepp * K6), dt * (He * K3 - Hep * (K4 + K5) + Hepp * K6), 0,
+								dt * (-(He * K3) + Hep * (K4 + K5) - Hepp * K6), dt * (-((H2p + Hep + 2 * Hepp - Hn + Hp) * K3) - J21),
+								1 + dt * (-(He * K3) + (H2p + 2 * Hep + 2 * Hepp - Hn + Hp) * (K4 + K5) - Hepp * K6 + J22),
+								dt * (-2 * He * K3 + 2 * Hep * (K4 + K5) - (H2p + Hep + 4 * Hepp - Hn + Hp) * K6), 0,
+								dt*(-(He*DDT(J21)) + Hep*DDT(J22))),
+						List(0, dt * (-(Hep * K5) + Hepp * K6), dt * (Hep * K5 - Hepp * K6), 0, dt * (-(Hep * K5) + Hepp * K6), 0,
+								-(dt * ((H2p + 2 * Hep + 2 * Hepp - Hn + Hp) * K5 - Hepp * K6 + J22)),
+								1 - 2 * dt * Hep * K5 + dt * (H2p + Hep + 4 * Hepp - Hn + Hp) * K6, 0, -(dt*Hep*DDT(J22))),
+										List(-(dt * ((H2p + Hep + 2 * Hepp - Hn + Hp) * (C1 + C4) - S20 + dC14dH)),
+												-(dt
+														* (H * C1 + Hep * C10 + Hepp * C11 + (Hep + Hepp + Hp) * C12 + (H2p + Hep + 2 * Hepp - Hn + Hp) * C12
+																+ C13 + 2 * He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C2 + Hep * C3 + H * C4 + He * C5 + Hep * C6
+																+ 2 * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C7 + Hp * C8
+																+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C8 + Hep * C9)),
+												dt
+														* (H * C1 + Hep * C10 + Hepp * C11 + (Hep + Hepp + Hp) * C12 + C13
+																+ 2 * He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C2 + Hep * C3 + H * C4 + He * C5 + Hep * C6
+																+ 2 * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C7 + Hp * C8 + Hep * C9), -(dt * dC14dH2),
+												-(dt
+														* (H * C1 + Hep * C10 + Hepp * C11 + (Hep + Hepp + Hp) * C12 + C13
+																+ 2 * He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C2 + Hep * C3 + H * C4 + He * C5 + Hep * C6
+																+ 2 * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C7 + Hp * C8 + Hep * C9)),
+												dt * (-((H2p + Hep + 2 * Hepp - Hn + Hp) * ((H2p + Hep + 2 * Hepp - Hn + Hp) * C2 + C5)) + S20),
+												-(dt
+														* (H * C1 + Hep * C10 + (H2p + Hep + 2 * Hepp - Hn + Hp) * C10 + Hepp * C11 + (Hep + Hepp + Hp) * C12
+																+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C12 + C13 + 2 * He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C2
+																+ Hep * C3 + (H2p + Hep + 2 * Hepp - Hn + Hp) * C3 + H * C4 + He * C5 + Hep * C6
+																+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C6 + 2 * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C7
+																+ std::pow(H2p + Hep + 2 * Hepp - Hn + Hp, 2) * C7 + Hp * C8 + Hep * C9
+																+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C9 - S20)),
+												-(dt
+														* (2 * H * C1 + 2 * Hep * C10 + 2 * Hepp * C11 + (H2p + Hep + 2 * Hepp - Hn + Hp) * C11
+																+ 2 * (Hep + Hepp + Hp) * C12 + (H2p + Hep + 2 * Hepp - Hn + Hp) * C12 + 2 * C13
+																+ 4 * He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C2 + 2 * Hep * C3 + 2 * H * C4 + 2 * He * C5
+																+ 2 * Hep * C6 + 4 * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C7 + 2 * Hp * C8 + 2 * Hep * C9)),
+												-(dt*((H2p + Hep + 2*Hepp - Hn + Hp)*(Hep*DDT(C10) + Hepp*DDT(C11) + Hepp*DDT(C12) + Hp*DDT(C12) + DDT(C13) + H2p*He*DDT(C2) + 2*He*Hepp*DDT(C2) - He*Hn*DDT(C2) + He*Hp*DDT(C2) + H*(DDT(C1) + DDT(C4)) + He*DDT(C5) + 2*Hep*Hepp*DDT(C7) - Hep*Hn*DDT(C7) + Hep*Hp*DDT(C7) + Hep*(DDT(C12) + He*DDT(C2) + DDT(C3) + DDT(C6) + (H2p + Hep)*DDT(C7)) + Hp*DDT(C8) + Hep*DDT(C9)) + dC14dT)),
+												4*a*std::pow(Trad,3) + dt*(H + He + Hep)*DDT(S20)),
+										List((3 * kb * Tgas) / 2. + dt * ((H2p + Hep + 2 * Hepp - Hn + Hp) * (C1 + C4) - S20 + dC14dH),
+												3 * kb * Tgas
+														+ dt
+																* (H * C1 + Hep * C10 + Hepp * C11 + (Hep + Hepp + Hp) * C12
+																		+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C12 + C13
+																		+ 2 * He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C2 + Hep * C3 + H * C4 + He * C5
+																		+ Hep * C6 + 2 * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C7 + Hp * C8
+																		+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C8 + Hep * C9),
+												dt
+														* (-(H * C1) - Hep * C10 - Hepp * C11 - (Hep + Hepp + Hp) * C12 - C13
+																- 2 * He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C2 - Hep * C3 - H * C4 - He * C5 - Hep * C6
+																- 2 * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C7 - Hp * C8 - Hep * C9),
+												(5 * Tgas) / 2. + dt * dC14dH2,
+												((5 + 3 * kb) * Tgas) / 2.
+														+ dt
+																* (H * C1 + Hep * C10 + Hepp * C11 + (Hep + Hepp + Hp) * C12 + C13
+																		+ 2 * He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C2 + Hep * C3 + H * C4 + He * C5
+																		+ Hep * C6 + 2 * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C7 + Hp * C8 + Hep * C9),
+												(3 * kb * Tgas) / 2. + dt * (H2p + Hep + 2 * Hepp - Hn + Hp) * ((H2p + Hep + 2 * Hepp - Hn + Hp) * C2 + C5)
+														- dt * S20,
+												3 * kb * Tgas
+														+ dt
+																* (H * C1 + Hep * C10 + (H2p + Hep + 2 * Hepp - Hn + Hp) * C10 + Hepp * C11
+																		+ (Hep + Hepp + Hp) * C12 + (H2p + Hep + 2 * Hepp - Hn + Hp) * C12 + C13
+																		+ 2 * He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C2 + Hep * C3
+																		+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C3 + H * C4 + He * C5 + Hep * C6
+																		+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C6
+																		+ 2 * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C7
+																		+ std::pow(H2p + Hep + 2 * Hepp - Hn + Hp, 2) * C7 + Hp * C8 + Hep * C9
+																		+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C9 - S20),
+												(9 * kb * Tgas) / 2.
+														+ dt
+																* (2 * H * C1 + 2 * Hep * C10 + 2 * Hepp * C11 + (H2p + Hep + 2 * Hepp - Hn + Hp) * C11
+																		+ 2 * (Hep + Hepp + Hp) * C12 + (H2p + Hep + 2 * Hepp - Hn + Hp) * C12 + 2 * C13
+																		+ 4 * He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C2 + 2 * Hep * C3 + 2 * H * C4
+																		+ 2 * He * C5 + 2 * Hep * C6 + 4 * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C7
+																		+ 2 * Hp * C8 + 2 * Hep * C9),
+												(5*(H2 + H2p))/2. + (3*(H + H2p + He + 2*Hep + 3*Hepp + 2*Hp)*kb)/2. + dt*((H2p + Hep + 2*Hepp - Hn + Hp)*(Hep*DDT(C10) + Hepp*DDT(C11) + Hepp*DDT(C12) + Hp*DDT(C12) + DDT(C13) + H2p*He*DDT(C2) + 2*He*Hepp*DDT(C2) - He*Hn*DDT(C2) + He*Hp*DDT(C2) + H*(DDT(C1) + DDT(C4)) + He*DDT(C5) + 2*Hep*Hepp*DDT(C7) - Hep*Hn*DDT(C7) + Hep*Hp*DDT(C7) + Hep*(DDT(C12) + He*DDT(C2) + DDT(C3) + DDT(C6) + (H2p + Hep)*DDT(C7)) + Hp*DDT(C8) + Hep*DDT(C9)) + dC14dT),
+												-(dt*(H + He + Hep)*DDT(S20))) } };
+
+		const std::array<double, NF> f { H - H0
+				+ dt
+						* (H * (H2p + Hep + 2 * Hepp - Hn + Hp) * K1 + H * H2p * K10 - H2 * Hp * K11 - 2 * H2 * (H2p + Hep + 2 * Hepp - Hn + Hp) * K12
+								- 2 * H * H2 * K13 - Hn * (H2p + Hep + 2 * Hepp - Hn + Hp) * K14 - H * Hn * K15 - 2 * Hn * Hp * K16
+								- 2 * H2p * (H2p + Hep + 2 * Hepp - Hn + Hp) * K18 - H2p * Hn * K19 - Hp * (H2p + Hep + 2 * Hepp - Hn + Hp) * K2
+								+ H * (H2p + Hep + 2 * Hepp - Hn + Hp) * K7 + H * Hn * K8 + H * Hp * K9 + H * J20 - Hn * J23 - H2p * J25 - 2 * H2 * J27
+								- 2 * H2 * J28), Hp - Hp0
+				+ dt
+						* (Hp * (H2 * K11 + Hn * (K16 + K17 - K2) + (H2p + Hep + 2 * Hepp + Hp) * K2)
+								- H * ((Hep + 2 * Hepp - Hn + Hp) * K1 + H2p * (K1 + K10) - Hp * K9) - H * J20 - H2p * (J25 + 2 * J26)), Hn - Hn0
+				- dt * std::pow(Hn, 2) * K14 - dt * H * (H2p + Hep + 2 * Hepp + Hp) * K7
+				+ dt * Hn * (Hep * K14 + 2 * Hepp * K14 + Hp * K14 + Hp * K16 + Hp * K17 + H2p * (K14 + K19) + H * (K15 + K7 + K8)) + dt * Hn * J23, H2 - H20
+				+ dt * H2 * ((H2p + Hep + 2 * Hepp - Hn) * K12 + Hp * (K11 + K12) + H * K13) - dt * (H * H2p * K10 + H2p * Hn * K19 + H * Hn * K8)
+				+ dt * H2 * (J24 + J27 + J28), H2p - H2p0
+				+ dt
+						* (-(Hp * (H2 * K11 + Hn * K17)) + H2p * (H * K10 + (H2p + Hep + 2 * Hepp - Hn + Hp) * K18 + Hn * K19) - H * Hp * K9 - H2 * J24
+								+ H2p * (J25 + J26)), He - He0 + dt * (H2p + Hep + 2 * Hepp - Hn + Hp) * (He * K3 - Hep * K4) + dt * He * J21, Hep - Hep0
+				+ dt * ((H2p + Hep + 2 * Hepp - Hn + Hp) * (-(He * K3) + Hep * (K4 + K5) - Hepp * K6) - He * J21 + Hep * J22), Hepp - Hepp0
+				- dt * (H2p + Hep + 2 * Hepp - Hn + Hp) * (Hep * K5 - Hepp * K6) - dt * Hep * J22, -egas0
+				+ ((5 * (H2 + H2p) + 3 * (H + H2p + He + 2 * Hep + 3 * Hepp + 2 * Hp) * kb) * Tgas) / 2.
+				+ dt
+						* (H * (H2p + Hep + 2 * Hepp - Hn + Hp) * C1 + Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C10
+								+ Hepp * (H2p + Hep + 2 * Hepp - Hn + Hp) * C11 + (Hep + Hepp + Hp) * (H2p + Hep + 2 * Hepp - Hn + Hp) * C12
+								+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C13 + C14 + He * std::pow(H2p + Hep + 2 * Hepp - Hn + Hp, 2) * C2
+								+ Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C3 + H * (H2p + Hep + 2 * Hepp - Hn + Hp) * C4
+								+ He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C5 + Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C6
+								+ Hep * std::pow(H2p + Hep + 2 * Hepp - Hn + Hp, 2) * C7 + Hp * (H2p + Hep + 2 * Hepp - Hn + Hp) * C8
+								+ Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C9 - (H + He + Hep) * S20), -erad0 + a * std::pow(Trad, 4)
+				- dt
+						* (H * (H2p + Hep + 2 * Hepp - Hn + Hp) * C1 + Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C10
+								+ Hepp * (H2p + Hep + 2 * Hepp - Hn + Hp) * C11 + (Hep + Hepp + Hp) * (H2p + Hep + 2 * Hepp - Hn + Hp) * C12
+								+ (H2p + Hep + 2 * Hepp - Hn + Hp) * C13 + C14 + He * std::pow(H2p + Hep + 2 * Hepp - Hn + Hp, 2) * C2
+								+ Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C3 + H * (H2p + Hep + 2 * Hepp - Hn + Hp) * C4
+								+ He * (H2p + Hep + 2 * Hepp - Hn + Hp) * C5 + Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C6
+								+ Hep * std::pow(H2p + Hep + 2 * Hepp - Hn + Hp, 2) * C7 + Hp * (H2p + Hep + 2 * Hepp - Hn + Hp) * C8
+								+ Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * C9 - (H + He + Hep) * S20) };
+
+		const auto Ainv = matrix_inverse<NF>(A);
+		for (int n = 0; n < NF; n++) {
+			s.H -= Ainv[0][n] * f[n];
+			s.Hp -= Ainv[1][n] * f[n];
+			s.Hn -= Ainv[2][n] * f[n];
+			s.H2 -= Ainv[3][n] * f[n];
+			s.H2p -= Ainv[4][n] * f[n];
+			s.He -= Ainv[5][n] * f[n];
+			s.Hep -= Ainv[6][n] * f[n];
+			s.Hepp -= Ainv[7][n] * f[n];
+			Tgas -= Ainv[8][n] * f[n];
+			Trad -= Ainv[9][n] * f[n];
+		}
+		const auto norm1 = (s.H + s.Hp + s.Hn + s.H2 + s.H2p + s.He + s.Hep + s.Hepp) / 8.0;
+		const auto norm2 = (Trad + Tgas) * 0.5;
+		double err;
+		for (int i = 0; i < 8; i++) {
+			err += f[i] * f[i] / norm1 / norm1;
+		}
+		for (int i = 8; i < 10; i++) {
+			err += f[i] * f[i] / norm2 / norm2;
+		}
+		err = std::sqrt(err);
+	} while (err > 1.0e-3);
 
 }
 
