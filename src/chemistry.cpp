@@ -20,11 +20,13 @@
 #define nHEPP 7
 #define NS  8
 
+const auto tiny = 1.0e+3 * std::numeric_limits<double>::min();
+const auto dhuge = std::numeric_limits<double>::max() / 1.0e+3;
+
 void rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k6, double &k7, double &k8, double &k9, double &k10, double &k11, double &k12,
 		double &k13, double &k14, double &k15, double &k16, double &k17, double &k18, double &k19, double T, bool caseb) {
 	const auto tev = T / KperEv;
 	const auto logtev = std::log(T);
-	const auto tiny = std::numeric_limits<double>::min();
 	if (tev > 0.8) {
 		k1 = exp(
 				-32.71396786375 + 13.53655609057 * logtev - 5.739328757388 * std::pow(logtev, 2) + 1.563154982022 * std::pow(logtev, 3)
@@ -151,11 +153,11 @@ const double kb = 1.3807e-16;
 const double ergtoev = 6.242e+11;
 const double evtoerg = 1.0 / ergtoev;
 
-const double Bp(double T) {
+double Bp(double T) {
 	return (2 * std::pow(kb * M_PI * T, 4) / (15 * clight * clight * hplanck * hplanck * hplanck));
 }
 
-const double Bp_nu(double nu, double T) {
+double Bp_nu(double nu, double T) {
 	const auto c0 = 2.0 * hplanck * std::pow(nu, 3) / (clight * clight);
 	const auto x = hplanck * nu / (kb * T);
 	double c1;
@@ -168,6 +170,14 @@ const double Bp_nu(double nu, double T) {
 		c1 = std::exp(x) - 1.0;
 		return c0 / c1;
 	}
+}
+
+double dB_dT(double T) {
+	return 4.0 * Bp(T) / T;
+}
+
+double dBp_nu_dT(double nu, double T) {
+	return hplanck * hplanck * nu * nu * nu * nu / (clight * clight * kb * T * T * (std::cosh((hplanck * nu) / (kb * T)) - 1.0));
 }
 
 double grey_cross_section(const std::function<double(double, double)> &sigma, double T) {
@@ -251,6 +261,10 @@ double sigma22(double nu) {
 	return sigma20_22(nu, 2.0);
 }
 
+double sigma_20_21_22(double nu, double H, double He, double Hep) {
+	return sigma20(nu) * H + sigma21(nu) * He + sigma22(nu) * Hep;
+}
+
 double sigma23(double nu) {
 	const auto nuth = 0.755 / hplanck * evtoerg;
 	if (nu > nuth) {
@@ -294,7 +308,7 @@ double sigma28(double nu) {
 	if (hnu > 14.675 && hnu < 16.820) {
 		sigmaL0 = 1e-18 * std::pow(10, 15.1289 - 1.05139 * hnu);
 	} else if (hnu >= 16.820 && hnu < 17.6) {
-		sigmaL0 = 1e-18 * std::pow(10, -31.41 + 1.8042e-2 * std::pow(hnu, 3)) - 4.339e-5 * std::pow(hnu, 5);
+		sigmaL0 = 1e-18 * std::pow(10, -31.41 + 1.8042e-2 * std::pow(hnu, 3) - 4.339e-5 * std::pow(hnu, 5));
 	} else {
 		sigmaL0 = 0.0;
 	}
@@ -318,6 +332,23 @@ double sigma28(double nu) {
 	return 0.25 * (sigmaL0 + sigmaW0) + 0.75 * (sigmaL1 + sigmaW1);
 }
 
+double sigma_compton(double nu) {
+	const auto me = 9.10938e-28;
+	const auto mr = 2.81794e-13;
+	const auto x = hplanck * nu / (clight * clight * me);
+	double sigma;
+	if (x < 0.001) {
+		sigma = (8.0 * M_PI / 3.0) * (1.0 - 7.0 / 5.0 * x + 163.0 / 35.0 * x * x);
+	} else {
+		const auto c0 = std::atan(2.0 * std::sqrt(x));
+		const auto c1 = std::log(1.0 + 4.0 * x);
+		const auto c2 = M_PI * std::pow(1 - x, 2) * c0 * std::pow(x, -1.5);
+		const auto c3 = M_PI * (4.0 * (1.0 + x * x + x * x * x) - (2 + x * x) * c1) / (2.0 * x);
+		sigma = c2 + c3;
+	}
+	return mr * mr * sigma;
+}
+
 void radiation_rates(double &i20, double &i21, double &i22, double &i23, double &i24, double &i25, double &i26, double &i27, double &i28, double T) {
 	i20 = sigma_to_rate(sigma20, T);
 	i21 = sigma_to_rate(sigma21, T);
@@ -328,11 +359,6 @@ void radiation_rates(double &i20, double &i21, double &i22, double &i23, double 
 	i26 = sigma_to_rate(sigma26, T);
 	i27 = 1.1e8 * Bp_nu(12.27 * evtoerg / hplanck, T);
 	i28 = sigma_to_rate(sigma26, T);
-}
-
-void chemistry_test() {
-	for (double T = 1.0e3; T <= 1e10; T *= 1.5) {
-	}
 }
 
 double compute_next_ne(std::array<double, NS> U0, std::array<double, NS> &U, double ne, double T, double Trad, double dt) {
@@ -734,6 +760,208 @@ species compute_next_species(const species s0, double energy, double Trad, doubl
 	s.Hep = U[nHEP];
 	s.Hepp = U[nHEPP];
 	return s;
+}
+
+double cooling_rate(species s, double T) {
+	const auto ne = s.Hp - s.Hn + s.Hep + 2.0 * s.Hepp + s.H2p;
+	const auto T3 = T / 1e3;
+	const auto T5 = T / 1e5;
+	const auto T6 = T / 1e6;
+	const auto tmp = (1.0 + std::sqrt(T5));
+	const auto tev = T / KperEv;
+	const auto logtev = std::log(T);
+	const auto tiny = std::numeric_limits<double>::min();
+	const auto k1 = exp(
+			-32.71396786375 + 13.53655609057 * logtev - 5.739328757388 * std::pow(logtev, 2) + 1.563154982022 * std::pow(logtev, 3)
+					- 0.2877056004391 * std::pow(logtev, 4) + 0.03482559773736999 * std::pow(logtev, 5) - 0.00263197617559 * std::pow(logtev, 6)
+					+ 0.0001119543953861 * std::pow(logtev, 7) - 2.039149852002e-6 * std::pow(logtev, 8));
+
+	const auto k3 = exp(
+			-44.09864886561001 + 23.91596563469 * logtev - 10.75323019821 * std::pow(logtev, 2) + 3.058038757198 * std::pow(logtev, 3)
+					- 0.5685118909884001 * std::pow(logtev, 4) + 0.06795391233790001 * std::pow(logtev, 5) - 0.005009056101857001 * std::pow(logtev, 6)
+					+ 0.0002067236157507 * std::pow(logtev, 7) - 3.649161410833d - 6 * std::pow(logtev, 8));
+
+	const auto k5 = exp(
+			-68.71040990212001 + 43.93347632635 * logtev - 18.48066993568 * std::pow(logtev, 2) + 4.701626486759002 * std::pow(logtev, 3)
+					- 0.7692466334492 * std::pow(logtev, 4) + 0.08113042097303 * std::pow(logtev, 5) - 0.005324020628287001 * std::pow(logtev, 6)
+					+ 0.0001975705312221 * std::pow(logtev, 7) - 3.165581065665e-6 * std::pow(logtev, 8));
+	const auto c0 = 7.50e-19 * tmp * std::exp(-118348 / T) * s.H * ne;
+	const auto c1 = 9.10e-27 * tmp * std::pow(T, -.1687) * std::exp(-13179 / T) * ne * ne * s.He;
+	const auto c2 = 5.54e-17 * tmp * std::pow(T, -.397) * std::exp(-473638 / T) * ne * s.Hep;
+	const auto c3 = 2.18e-11 * k1 * ne * s.H;
+	const auto c4 = 3.94e-11 * k3 * ne * s.He;
+	const auto c5 = 8.72e-11 * k5 * ne * s.Hep;
+	const auto c6 = 5.01e-27 * tmp * std::pow(T, -.1687) * std::exp(-55338 / T) * ne * ne * s.Hep;
+	const auto c7 = 8.70e-27 * std::sqrt(T) * std::pow(T3, -0.2) / (1.0 + std::pow(T6, 0.7)) * ne * s.Hp;
+	const auto c8 = 1.55e-26 * std::pow(T, 0.3647) * ne * s.Hep;
+	const auto c9 = 1.24e-13 * std::pow(T, -1.5) * (1 + 0.3 * std::exp(-94000 / T)) * std::exp(-470000 / T) * ne * s.Hep;
+	const auto c10 = 3.48e-26 * std::sqrt(T) * std::pow(T3, -0.2) / (1.0 + std::pow(T6, 0.7)) * ne * s.Hepp;
+	const auto c11 = 1.43e-27 * std::sqrt(T) * (1.1 + 0.34 * std::exp(-std::pow(5.50 - std::log10(T), 2) / 3.0)) * ne * (s.Hp + s.Hep + s.Hepp);
+	const auto z = 0.0;
+	const auto c12 = 5.64e-36 * std::pow(1 + z, 4) * (T - 2.73 * (1 + z)) * ne;
+	const auto xx = std::log10(T / 1e4);
+	double vibha = 1.1e-18 * std::exp(-std::min(std::log(dhuge), 6744 / T));
+	double dum;
+	dum = 8.152e-13 * (4.2 / (kb * (T + 1190.)) + 1. / (kb * T));
+	double h2k01 = 1.45e-12 * std::sqrt(T) * std::exp(-std::min(log(dhuge), dum));
+	if (T > 1635.) {
+		dum = 1.0e-12 * std::sqrt(T) * std::exp(-1000. / T);
+	} else {
+		dum = 1.4e-13 * std::exp((T / 125.) - std::pow(T / 577., 2));
+	}
+	double hyd01 = dum * exp(-std::min(std::log(dhuge), 8.152e-13 / (kb * T)));
+	double vibla = hyd01 * s.H + h2k01 * s.H2;
+	double rotla, rotha;
+	if (T > 1087) {
+		rotha = 3.9e-19 * std::exp(-6118 / T);
+	} else {
+		rotha = std::pow(10.0, (-19.24 + 0.474 * xx - 1.247 * xx * xx));
+	}
+	if (T > 4031) {
+		rotla = 1.38e-22 * exp(-9243 / T);
+	} else {
+		rotla = std::pow(10, (-22.9 - 0.553 * xx - 1.148 * xx * xx));
+	}
+	rotla *= (std::pow(s.H2, 0.77) + 1.2 * std::pow(s.H, 0.77));
+	const auto c13 = s.H2 * ((vibla * vibha) / (vibha + vibla) + (rotla * rotha) / (rotha + rotla));
+	const auto c14 = sigma_to_rate([s](double nu) {
+		return (nu, s.H, s.He, s.Hep);
+	}, T);
+	return c0 + c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 + c10 + c11 + c12 + c13 + c14;
+}
+
+double energy_mean_opacity(species s, double T) {
+	const int N = 129;
+	double numax = kb * T / hplanck;
+	const double dnu = numax / (N - 1);
+	const double lambdamax = clight * hplanck / (kb * T);
+	const double dlambda = lambdamax / (N - 1);
+	double sum = 0.0;
+	for (int i = 1; i < N; i++) {
+		const auto nu = i * dnu;
+		const auto lambda = i * dlambda;
+		const auto sigma_nu = s.H * sigma20(nu) + s.He * sigma21(nu) + s.Hep * sigma22(nu) + s.Hn * sigma23(nu) + s.H2 * sigma24(nu) + s.H2p * sigma25(nu)
+				+ s.H2p * sigma26(nu) + s.H2 * sigma28(nu);
+		const auto nu2 = clight / lambda;
+		const auto sigma_lambda = s.H * sigma20(nu2) + s.He * sigma21(nu2) + s.Hep * sigma22(nu2) + s.Hn * sigma23(nu2) + s.H2 * sigma24(nu2)
+				+ s.H2p * sigma25(nu2) + s.H2p * sigma26(nu2) + s.H2 * sigma28(nu2);
+		const auto bnu = Bp_nu(nu, T) * sigma_nu;
+		const auto blambda = Bp_nu(nu2, T) * clight / (lambda * lambda) * sigma_lambda;
+		double c0;
+		if (i == N - 1) {
+			c0 = 1.0 / 3.0;
+		} else if (i % 2 == 1) {
+			c0 = 4.0 / 3.0;
+		} else {
+			c0 = 2.0 / 3.0;
+		}
+		sum += c0 * (bnu * dnu + blambda * dlambda);
+	}
+	return sum / Bp(T);
+
+}
+
+double rossalind_mean_opacity(species s, double T) {
+	const int N = 129;
+	double numax = kb * T / hplanck;
+	const double dnu = numax / (N - 1);
+	const double lambdamax = clight * hplanck / (kb * T);
+	const double dlambda = lambdamax / (N - 1);
+	double sum = 0.0;
+	auto ne = s.Hp - s.Hn + s.Hep + 2.0 * s.Hepp + s.H2p;
+	for (int i = 1; i < N; i++) {
+		const auto nu = i * dnu;
+		const auto lambda = i * dlambda;
+		const auto sigma_nu = s.H * sigma20(nu) + s.He * sigma21(nu) + s.Hep * sigma22(nu) + s.Hn * sigma23(nu) + s.H2 * sigma24(nu) + s.H2p * sigma25(nu)
+				+ s.H2p * sigma26(nu) + s.H2 * sigma28(nu) + ne * sigma_compton(nu);
+		const auto nu2 = clight / lambda;
+		const auto sigma_lambda = s.H * sigma20(nu2) + s.He * sigma21(nu2) + s.Hep * sigma22(nu2) + s.Hn * sigma23(nu2) + s.H2 * sigma24(nu2)
+				+ s.H2p * sigma25(nu2) + s.H2p * sigma26(nu2) + s.H2 * sigma28(nu2) + ne * sigma_compton(nu2);
+		const auto bnu = dBp_nu_dT(nu, T) / sigma_nu;
+		const auto blambda = dBp_nu_dT(nu2, T) * clight / (lambda * lambda) / sigma_lambda;
+		double c0;
+		if (i == N - 1) {
+			c0 = 1.0 / 3.0;
+		} else if (i % 2 == 1) {
+			c0 = 4.0 / 3.0;
+		} else {
+			c0 = 2.0 / 3.0;
+		}
+		sum += c0 * (bnu * dnu + blambda * dlambda);
+	}
+	return dB_dT(T) / sum;
+
+}
+
+double flux_mean_opacity(species s, double Tg, double Tr, double dTgdx) {
+	const int N = 129;
+	const double arad = 7.5646e-15;
+	const auto Tmean = std::sqrt(Tg * Tr);
+	double numax = kb * Tmean / hplanck;
+	const double dnu = numax / (N - 1);
+	const double lambdamax = clight * hplanck / (kb * Tmean);
+	const double dlambda = lambdamax / (N - 1);
+	double sum1 = 0.0;
+	double sum2 = 0.0;
+	auto ne = s.Hp - s.Hn + s.Hep + 2.0 * s.Hepp + s.H2p;
+	for (int i = 1; i < N; i++) {
+		const auto lambda = i * dlambda;
+		const auto nu1 = i * dnu;
+		const auto nu2 = clight / lambda;
+		const auto dBp_nu_dT1 = dBp_nu_dT(nu1, Tg);
+		const auto dBp_nu_dT2 = dBp_nu_dT(nu2, Tg);
+		auto sigma1 = s.H * sigma20(nu1) + s.He * sigma21(nu1) + s.Hep * sigma22(nu1) + s.Hn * sigma23(nu1) + s.H2 * sigma24(nu1) + s.H2p * sigma25(nu1)
+				+ s.H2p * sigma26(nu1) + s.H2 * sigma28(nu1) + ne * sigma_compton(nu1);
+		auto sigma2 = s.H * sigma20(nu2) + s.He * sigma21(nu2) + s.Hep * sigma22(nu2) + s.Hn * sigma23(nu2) + s.H2 * sigma24(nu2) + s.H2p * sigma25(nu2)
+				+ s.H2p * sigma26(nu2) + s.H2 * sigma28(nu2) + ne * sigma_compton(nu2);
+		const auto den1 = sigma1 * Bp_nu(nu1, Tr);
+		const auto den2 = sigma2 * Bp_nu(nu2, Tr);
+		const auto num1 = dBp_nu_dT1 * dTgdx;
+		const auto num2 = dBp_nu_dT2 * dTgdx;
+		const auto Rnu1 = std::min(num1 / den1, 1e+10);
+		const auto Rnu2 = std::min(num2 / den2, 1e+10);
+		const auto lnu1 = (2.0 + Rnu1) / (6.0 + 2.0 * Rnu1 + Rnu1 * Rnu1);
+		const auto lnu2 = (2.0 + Rnu2) / (6.0 + 2.0 * Rnu2 + Rnu2 * Rnu2);
+		const auto b1num = lnu1 * dBp_nu_dT1 * dnu;
+		const auto b2num = lnu2 * dBp_nu_dT2 * clight / (lambda * lambda) * dlambda;
+		const auto b1den = lnu1 * dBp_nu_dT1 / sigma1 * dnu;
+		const auto b2den = lnu2 * dBp_nu_dT2 * clight / (lambda * lambda) / sigma2 * dlambda;
+		double c0;
+		if (i == N - 1) {
+			c0 = 1.0 / 3.0;
+		} else if (i % 2 == 1) {
+			c0 = 4.0 / 3.0;
+		} else {
+			c0 = 2.0 / 3.0;
+		}
+		sum1 += c0 * (b1num + b2num);
+		sum2 += c0 * (b1den + b2den);
+	}
+	return sum1 / sum2;
+
+}
+
+void chemistry_test() {
+	species s;
+	const auto n = 1.0e+10;
+	s.H = 1e-10 * n;
+	s.Hp = 1e-10 * n;
+	s.Hn = 1e-10 * n;
+	s.H2 = 0.92 * n;
+	s.H2p = 1e-10 * n;
+	s.He = 0.08 * n;
+	s.Hep = 1e-10 * n;
+	s.Hepp = 1e-10 * n;
+	const auto dTdx = 1.0;
+	for (double T = 1.0e1; T <= 1e10; T *= 1.5) {
+		const auto kr = rossalind_mean_opacity(s, T);
+		const auto kp = energy_mean_opacity(s, T);
+		const auto ke = energy_mean_opacity(s, T);
+		const auto kf = flux_mean_opacity(s, T, T, dTdx);
+		const auto R = dTdx * dB_dT(T) / kr / Bp(T);
+		const auto lambda = (2.0 + R) / (6.0 + 2.0 * R + R * R);
+		printf("%e %e %e %e %e %e\n", T, kr, kf, kp, ke, lambda);
+	}
 }
 
 //void chemistry_test() {
