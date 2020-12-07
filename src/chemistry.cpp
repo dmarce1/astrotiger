@@ -451,22 +451,59 @@ double sigma28(double nu) {
 	return 0.25 * (sigmaL0 + sigmaW0) + 0.75 * (sigmaL1 + sigmaW1);
 }
 
-void radiation_rates(double &I20, double &I21, double &I22, double &I23, double &I24, double &I25, double &I26, double &I27, double &I28, double T) {
-	sigma_to_rate(sigma20, I20, T);
-	sigma_to_rate(sigma21, I21, T);
-	sigma_to_rate(sigma22, I22, T);
-	sigma_to_rate(sigma23, I23, T);
-	sigma_to_rate(sigma24, I24, T);
-	sigma_to_rate(sigma25, I25, T);
-	sigma_to_rate(sigma26, I26, T);
-	I27 = 1.1e8 * Bp_nu(12.27 * evtoerg / hplanck, T);
-	sigma_to_rate(sigma28, I28, T);
-}
-
 void heating_rates(double &J20, double &J21, double &J22, double T) {
 	radiation_heating_rate(sigma20, J20, 13.6 * evtoerg, T);
 	radiation_heating_rate(sigma21, J21, 13.6 * 4.0 * evtoerg, T);
 	radiation_heating_rate(sigma22, J22, 24.6 * evtoerg, T);
+}
+
+double power_law_spectrum(double nu) {
+	const double hnu = hplanck * nu;
+//	return 1e-21 * (12.86 / hnu) * std::exp(-1e22 * (sigma20(nu) + 0.08 * sigma21(nu)));
+	return 3.9e-40 * std::pow(hnu / 13.6, -1.5);
+}
+
+void sigma_to_rate(const std::function<double(double)> &spec, const std::function<double(double)> &sigma, double &I) {
+	const double numin = std::pow(10, 3);
+	const double numax = std::pow(10, 20);
+	I = 0.0;
+	const int N = 1024;
+	const double ymin = std::log(numin);
+	const double ymax = std::log(numax);
+	const auto dy = (ymax - ymin) / (N - 1);
+	for (int i = 1; i <= N; i++) {
+		double y = i * dy;
+		double nu = std::exp(y);
+		double c0;
+		if (i == N) {
+			c0 = 1.0 / 3.0;
+		} else if (i % 2 == 1) {
+			c0 = 4.0 / 3.0;
+		} else {
+			c0 = 2.0 / 3.0;
+		}
+		I += 4.0 * M_PI * c0 * spec(nu) * sigma(nu) / hplanck * dy;
+	}
+}
+
+double homo_rate(double z, double alpha, double beta, double gamma, double z0, double z1) {
+	auto c0 = beta * std::pow(z - z0, 2) / (1.0 + gamma * std::pow(z + z1, 2));
+	c0 = std::min(c0, 100.0);
+	c0 = std::max(c0, -100.0);
+	return std::pow(1 + z, alpha) * std::exp(c0);
+}
+
+
+void radiation_rates(double &I20, double &I21, double &I22, double &I23, double &I24, double &I25, double &I26, double &I27, double &I28, double z) {
+	I20 = 1.04e-12 * homo_rate(z, 0.231, -0.6818, 0.1646, 1.855, 0.3097);
+	I21 = 1.84e-14 * homo_rate(z, -1.038, -1.1640, 0.1940, 1.973, -0.6561);
+	I22 = 5.79e-13 * homo_rate(z, 0.278, -0.8260, 0.1730, 1.973, 0.2880);
+	sigma_to_rate(power_law_spectrum, sigma23, I23);
+	sigma_to_rate(power_law_spectrum, sigma24, I24);
+	sigma_to_rate(power_law_spectrum, sigma25, I25);
+	sigma_to_rate(power_law_spectrum, sigma26, I26);
+	sigma_to_rate(power_law_spectrum, sigma28, I28);
+	I27 = 1.1e8 * power_law_spectrum(12.27 * evtoerg / hplanck);
 }
 
 double ion_energy(species s) {
@@ -545,6 +582,8 @@ void cooling_rate2(double &C14, double &dC14dT, double &dC14dH, double &dC14dH2,
 	dC14dH = H2 * ((std::pow(rotha, 2) * drotla_dH) / std::pow(rotha + rotla, 2) + (std::pow(vibha, 2) * dvibla_dH) / std::pow(vibha + vibla, 2));
 	dC14dH2 = C14 + H2 * ((std::pow(rotha, 2) * drotla_dH2) / std::pow(rotha + rotla, 2) + (std::pow(vibha, 2) * dvibla_dH2) / std::pow(vibha + vibla, 2));
 }
+
+
 
 void cooling_rate1(double &C1, double &C2, double &C3, double &C4, double &C5, double &C6, double &C7, double &C8, double &C9, double &C10, double &C11,
 		double &C12, double &C13, double &dC1dT, double &dC2dT, double &dC3dT, double &dC4dT, double &dC5dT, double &dC6dT, double &dC7dT, double &dC8dT,
@@ -625,7 +664,7 @@ void cooling_rate1(double &C1, double &C2, double &C3, double &C4, double &C5, d
 
 }
 
-void compute_next_state(const species s0, species &s, double T0, double &T, double Trad, double z, double dt) {
+void compute_next_state(const species s0, species &s, double T0, double &T,  double z, double dt) {
 	double K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19, dK1dT, dK2dT, dK3dT, dK4dT, dK5dT, dK6dT, dK7dT, dK8dT, dK9dT,
 			dK10dT, dK11dT, dK12dT, dK13dT, dK14dT, dK15dT, dK16dT, dK17dT, dK18dT, dK19dT;
 	double J20, J21, J22, J23, J24, J25, J26, J27, J28;
@@ -676,54 +715,15 @@ void compute_next_state(const species s0, species &s, double T0, double &T, doub
 //		printf( "Start\n");
 		chemical_rates(K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19, dK1dT, dK2dT, dK3dT, dK4dT, dK5dT, dK6dT, dK7dT,
 				dK8dT, dK9dT, dK10dT, dK11dT, dK12dT, dK13dT, dK14dT, dK15dT, dK16dT, dK17dT, dK18dT, dK19dT, T);
-		radiation_rates(J20, J21, J22, J23, J24, J25, J26, J27, J28, Trad);
+		radiation_rates(J20, J21, J22, J23, J24, J25, J26, J27, J28,0.0);
 //		cooling_rate1(C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, dC1dT, dC2dT, dC3dT, dC4dT, dC5dT, dC6dT, dC7dT, dC8dT, dC9dT, dC10dT, dC11dT,
 //				dC12dT, dC13dT, T, z);
 //		cooling_rate2(C14, dC14dT, dC14dH, dC14dH2, s.H, s.H2, T);
+		C1 = C2 = C3 = C4 = C5 = C6 = C7 = C8 = C9 = C10 = C11 = C12 = C13 = 0.0;
+		dC1dT = dC2dT = dC3dT = dC4dT = dC5dT = dC6dT = dC7dT = dC8dT = dC9dT = dC10dT = dC11dT = dC12dT = dC13dT = 0.0;
+		C14 = dC14dT = dC14dH = dC14dH2 = 0.0;
+		S20 = S21 = S22 = 0.0;
 //		heating_rates(S20, S21, S22, Trad);
-		J20 = 0;
-		J21 = 0;
-		J22 = 0;
-		J23 = 0;
-		J24 = 0;
-		J25 = 0;
-		J26 = 0;
-		J27 = 0;
-		J28 = 0;
-		C1 = 0;
-		C2 = 0;
-		C3 = 0;
-		C4 = 0;
-		C5 = 0;
-		C6 = 0;
-		C7 = 0;
-		C8 = 0;
-		C9 = 0;
-		C10 = 0;
-		C11 = 0;
-		C12 = 0;
-		C13 = 0;
-		dC1dT = 0;
-		dC2dT = 0;
-		dC3dT = 0;
-		dC4dT = 0;
-		dC5dT = 0;
-		dC6dT = 0;
-		dC7dT = 0;
-		dC8dT = 0;
-		dC9dT = 0;
-		dC10dT = 0;
-		dC11dT = 0;
-		dC12dT = 0;
-		dC13dT = 0;
-		C14 = 0;
-		dC14dT = 0;
-		dC14dH = 0;
-		dC14dH2 = 0;
-		S20 = 0;
-		S21 = 0;
-		S22 = 0;
-//		printf("%e %e\n", K1, K2);
 		const std::array<std::array<real, NF>, NF> A =
 				{
 						{
@@ -888,7 +888,7 @@ void compute_next_state(const species s0, species &s, double T0, double &T, doub
 		s.Hepp = U[nHEPP];
 		T = U[nT];
 
-//		printf("%e %e %e %e %e %e %e %e %e\n", T, s.H, s.Hp, s.Hn, s.H2, s.H2p, s.He, s.Hep, s.Hepp);
+	//	printf("%e %e %e %e %e %e %e %e %e %e\n", err, T, s.H, s.Hp, s.Hn, s.H2, s.H2p, s.He, s.Hep, s.Hepp);
 		const auto norm1 = (s.H + s.Hp + s.Hn + s.H2 + s.H2p + s.He + s.Hep + s.Hepp) / 8.0;
 		const auto norm2 = (T);
 		err = 0.0;
@@ -903,6 +903,111 @@ void compute_next_state(const species s0, species &s, double T0, double &T, doub
 
 }
 
+double species_T(species s0, double egas0) {
+	return egas0 / ( (1.5 * s0.H + 3 * s0.Hp + 2.5 * s0.H2 + 5 * s0.H2p + 1.5 * s0.He + 3 * s0.Hep + 4.5 * s0.Hepp) * kb);
+}
+double species_energy(species s0, double T) {
+	return ( (1.5 * s0.H + 3 * s0.Hp + 2.5 * s0.H2 + 5 * s0.H2p + 1.5 * s0.He + 3 * s0.Hep + 4.5 * s0.Hepp) * kb) * T;
+}
+
+void next_state(std::array<double, NS> U0, std::array<double, NS> &U, double egas0, double z0, double dt) {
+	species s0;
+	for (int i = 0; i < NS; i++) {
+		U0[i] = std::max(U0[i], 1e-100);
+	}
+	s0.H = (U0[nH]);
+	s0.Hp = (U0[nHP]);
+	s0.Hn = (U0[nHN]);
+	s0.H2 = (U0[nH2]);
+	s0.H2p = (U0[nH2P]);
+	s0.He = (U0[nHE]);
+	s0.Hep = (U0[nHEP]);
+	s0.Hepp = (U0[nHEPP]);
+	species s;
+	double T;
+	double T0 =species_T(s0,egas0);
+	compute_next_state(s0, s, T0, T, z0, dt);
+	U[nH] = (s.H);
+	U[nHP] = (s.Hp);
+	U[nHN] = (s.Hn);
+	U[nH2] = (s.H2);
+	U[nH2P] = (s.H2p);
+	U[nHE] = (s.He);
+	U[nHEP] = (s.Hep);
+	U[nHEPP] = (s.Hepp);
+
+}
+
+double chemistry_update(const species sn, species &snp1, double e, double scale0, double scale1, double dt) {
+	std::array<double, NS> Un;
+	Un[nH] = sn.H;
+	Un[nHP] = sn.Hp;
+	Un[nHN] = sn.Hn;
+	Un[nH2] = sn.H2;
+	Un[nH2P] = sn.H2p;
+	Un[nHE] = sn.He;
+	Un[nHEP] = sn.Hep;
+	Un[nHEPP] = sn.Hepp;
+	//
+//#define M 3
+//	std::array<double, M> C = { .4358665215, .7179332608, 1.0 };
+//	std::array<double, M> W = { 1.208496649, -0.644363171, .4358665215 };
+//	std::array<std::array<double, M>, M> A = { { { .4358665215, 0, 0 }, { 0.2820667392, .4358665215, 0.0}, { 1.208496649, -0.644363171, .4358665215 } } };
+////	//
+//#define M 2
+//	const auto gamma = (0.4);
+//	std::array<double, M> C = { gamma, 1.0 };
+//	std::array<double, M> W = { 1.0 - gamma, gamma };
+//	std::array<std::array<double, M>, M> A = { { { gamma, 0.0 }, { 1 - gamma, gamma } } };
+
+#define M 1
+	std::array<double, M> C = { 1 };
+	std::array<double, M> W = { 1 };
+	std::array<std::array<double, M>, M> A = { { { 1 } } };
+
+	std::array<double, NS> dU;
+	std::array<double, NS> thisU;
+	std::array<double, NS> Unp1;
+	std::array<std::array<double, NS>, M> U;
+	std::array<std::array<double, NS>, M> S;
+
+	for (int i = 0; i < M; i++) {
+		for (int l = 0; l < NS; l++) {
+			thisU[l] = Un[l];
+		}
+		for (int j = 0; j < i; j++) {
+			for (int l = 0; l < NS; l++) {
+				thisU[l] += dt * A[i][j] * S[j][l];
+			}
+		}
+		const auto scale = scale0 * (1 - C[i]) + scale1 * C[i];
+		const auto z = 1.0 / scale - 1.0;
+		next_state(thisU, U[i], e, z, A[i][i] * dt);
+		for (int l = 0; l < NS; l++) {
+			S[i][l] = (U[i][l] - thisU[l]) / (dt * A[i][i]);
+		}
+	}
+	for (int l = 0; l < NS; l++) {
+		Unp1[l] = Un[l];
+	}
+	for (int i = 0; i < M; i++) {
+		for (int l = 0; l < NS; l++) {
+			Unp1[l] += W[i] * dt * S[i][l];
+		}
+	}
+	double T;
+	snp1.H = Unp1[nH];
+	snp1.Hp = Unp1[nHP];
+	snp1.Hn = Unp1[nHN];
+	snp1.H2 = Unp1[nH2];
+	snp1.H2p = Unp1[nH2P];
+	snp1.He = Unp1[nHE];
+	snp1.Hep = Unp1[nHEP];
+	snp1.Hepp = Unp1[nHEPP];
+	T = species_T(snp1, e);
+	return T;
+}
+
 void chemistry_test() {
 	species s0;
 	const auto n = 1.0;
@@ -914,13 +1019,11 @@ void chemistry_test() {
 	s0.He = 0.08 * n;
 	s0.Hep = 0.00 * n;
 	s0.Hepp = 0.00 * n;
-	double T0 = 1;
-	double Trad = 100.0;
-	double T;
+	double T0 = 1e+7;
 	auto s = s0;
 	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "t", "T", "na", "ne", "H", "Hp", "Hn", "H2", "H2p", "He", "Hep", "Hepp");
 	for (double dt = 1e1; dt < 1e18; dt *= 10.0) {
-		compute_next_state(s0, s, T0, T, T0, 1.0, dt);
+		auto T = chemistry_update(s0, s, species_energy(s0, T0), 1.0, 1.0, dt);
 		const auto ne = s.Hp - s.Hn + s.Hep + 2 * s.Hepp + s.H2p;
 		const auto na = s.Hp + s.Hn + s.H + 2 * s.H2 + 2 * s.H2p + 4 * s.He + 4 * s.Hep + 4 * s.Hepp;
 		printf("%14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e\n", dt / (3600 * 24 * 365), T, na, ne, s.H, s.Hp, s.Hn,
