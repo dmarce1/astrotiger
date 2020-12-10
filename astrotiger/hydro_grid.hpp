@@ -27,12 +27,9 @@ class energy_statistics;
 #define spc_i (sx_i+NDIM)
 #define h_i (spc_i+0)
 #define hp_i (spc_i+1)
-#define hn_i (spc_i+2)
-#define h2_i (spc_i+3)
-#define h2p_i (spc_i+4)
-#define he_i (spc_i+5)
-#define hep_i (spc_i+6)
-#define hepp_i (spc_i+7)
+#define he_i (spc_i+2)
+#define hep_i (spc_i+3)
+#define hepp_i (spc_i+4)
 
 struct statistics;
 

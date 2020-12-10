@@ -13,9 +13,6 @@
 struct species {
 	double H;
 	double Hp;
-	double Hn;
-	double H2;
-	double H2p;
 	double He;
 	double Hep;
 	double Hepp;

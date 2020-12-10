@@ -111,7 +111,7 @@ bool options::process_options(int argc, char *argv[]) {
 		gravity = self_gravity = true;
 	} else if (problem == "cosmos") {
 		hydro = gravity = self_gravity = particles = true;
-		nspecies = 8;
+		nspecies = 5;
 		species = true;
 		opts = *this;
 		fileio_init_read();

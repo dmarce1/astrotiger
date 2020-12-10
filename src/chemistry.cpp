@@ -10,15 +10,14 @@
 
 #define KperEv (11604.525)
 
-#define nHP  0
-#define nHN  1
-#define nH2  2
-#define nH2P  3
-#define nHEP  4
-#define nHEPP 5
-#define nH   6
-#define nHE  7
-#define NS  8
+#define nH  0
+#define nHP  1
+#define nHE 2
+#define nHEP   3
+#define nHEPP  4
+#define nE  5
+#define NS  6
+#define NF NS
 
 const double arad = 7.5646e-15;
 const auto tiny = 1.0e+3 * std::numeric_limits<double>::min();
@@ -429,11 +428,9 @@ void radiation_rates(double &I20, double &I21, double &I22, double &I23, double 
 double ion_energy(species s) {
 	const auto evtoerg = 1.60218e-12;
 	const auto Hion = -13.6 * evtoerg;
-	const auto Hnion = -0.755 * evtoerg;
 	const auto Heion = -(24.6 + 13.6 * 4) * evtoerg;
 	const auto Hepion = -24.6 * evtoerg;
-	const auto H2ion = -15.42 * evtoerg;
-	return s.H * Hion + s.Hn * Hnion + s.He * Heion + s.Hep * Hepion + s.H2 * H2ion;
+	return s.H * Hion + s.He * Heion + s.Hep * Hepion;
 }
 
 void cooling_rate2(double &C14, double &dC14dT, double &dC14dH, double &dC14dH2, double H, double H2, double T) {
@@ -582,286 +579,125 @@ void cooling_rate1(double &C1, double &C2, double &C3, double &C4, double &C5, d
 
 }
 
-void compute_next_state(std::array<double, NS> U0, std::array<double, NS> &U, double T, double z, double dt) {
+bool compute_next_state(std::array<double, NS> U0, std::array<double, NS> &U, double T, double z, double dt) {
 	double K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19;
 	double J20, J21, J22, J23, J24, J25, J26, J27, J28;
 
-#define NF (NS-2)
-#define List(a0,a1,a2,a3,a4,a5) {a0,a1,a2,a3,a4,a5}
-
-#define DDT(a) d##a##dT
 	const auto H0 = U0[nH];
 	const auto Hp0 = U0[nHP];
-	const auto Hn0 = U0[nHN];
-	const auto H20 = U0[nH2];
-	const auto H2p0 = U0[nH2P];
 	const auto He0 = U0[nHE];
 	const auto Hep0 = U0[nHEP];
 	const auto Hepp0 = U0[nHEPP];
+	const auto ne0 = U0[nE];
+	auto &ne = U[nE];
 	auto &H = U[nH];
 	auto &Hp = U[nHP];
-	auto &Hn = U[nHN];
-	auto &H2 = U[nH2];
-	auto &H2p = U[nH2P];
 	auto &He = U[nHE];
 	auto &Hep = U[nHEP];
 	auto &Hepp = U[nHEPP];
 	U = U0;
 
-	const auto Htot = H0 + Hp0 + Hn0 + 2 * H20 + 2 * H2p0;
+	const auto Htot = H0 + Hp0;
 	const auto Hetot = Hep0 + He0 + Hepp0;
-	const auto fH = Htot / (4.0 * Hetot + Htot);
-	const auto N = Hetot + Htot - H20 - H2p0;
 	chemical_rates(K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19, T);
-
-#define Sqrt std::sqrt
-#define Power std::pow
-	H = K2 / (K1 + K2) * Htot;
-	Hp = K1 / (K1 + K2) * Htot;
-	He = (Hetot * K4 * K6) / (K4 * K6 + K3 * (K5 + K6));
-	Hep = (Hetot * K3 * K6) / (K4 * K6 + K3 * (K5 + K6));
-	Hepp = (Hetot * K3 * K5) / (K4 * K6 + K3 * (K5 + K6));
-	Hn = N * K7 * K2 / K14 / K1 * fH;
-	H2p = N * 2.0 * K9 * K2 / K18 / K1 * (fH * fH) / (1.0 + fH);
-	H2 = N * 2.0 * K8 * K7 / K12 / K14 * std::pow(K2 / K1, 2 * (fH * fH) / (1.0 + fH));
-
-	double this_htot = H + Hp + Hn + 2 * H2p + 2 * H2;
-	double this_hetot = He + Hep + Hepp;
-	H *= Htot / this_htot;
-	Hp *= Htot / this_htot;
-	Hn *= Htot / this_htot;
-	H2 *= Htot / this_htot;
-	H2p *= Htot / this_htot;
-	He *= Hetot / this_hetot;
-	Hep *= Hetot / this_hetot;
-	Hepp *= Hetot / this_hetot;
-
-//	printf("T = %e H = %e %e %e %e %e %e %e %e\n", T, H, Hp, Hn, H2, H2p, He, Hep, Hepp);
-
-//	radiation_rates(J20, J21, J22, J23, J24, J25, J26, J27, J28, 0.0);
+	radiation_rates(J20, J21, J22, J23, J24, J25, J26, J27, J28, z);
+//	J20 = J21 = J22 = 0.0;
+//	K3 = K4 = K5 = K6 = 0.0;
 	double err;
+#define List(a0,a1,a2,a3,a4,a5) {a0,a1,a2,a3,a4,a5}
+#define Power std::pow
 	do {
-		const std::array<std::array<real, NF>, NF> A = { {
-		List(
-				1 + dt * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K1 + dt * H2p * K10 + dt * H2 * K11 + dt * Hn * (K16 + K17) + dt * Hp * K2
-				+ dt * (H2p + Hep + 2 * Hepp - Hn + Hp) * (K1 + K2) - dt * Hp * K9 - dt * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K9,
-				dt * ((-2 * H2 - H2p + Hep + 2 * Hepp - 2 * Hn + Htot) * K1 + H2p * K10 + Hp * (K16 + K17 - K2 - K9)),
-				dt * (2 * (H2p + Hep + 2 * Hepp - Hn + Hp) * K1 + 2 * H2p * K10 + Hp * K11 - 2 * Hp * K9),
-				dt
-				* (2 * Hep * K1 + 4 * Hepp * K1 - Hn * K1 + 3 * Hp * K1 - Htot * K1 + Hn * K10 + Hp * K10 - Htot * K10 + 2 * H2 * (K1 + K10)
-						+ 4 * H2p * (K1 + K10) + Hp * K2 - 2 * Hp * K9), dt * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K1 + dt * Hp * K2,
-				2 * dt * ((2 * H2 + 2 * H2p + Hn + Hp - Htot) * K1 + Hp * K2)),
-		List(dt * ((2 * H2 + 3 * H2p + Hep + 2 * (Hepp + Hp) - Htot) * K7 + Hn * (K14 - K15 + K16 + K17 - K8)),
-				1
-				- dt
-				* (Hn * K14 - Hp * (K16 + K17) - H2p * K19 + (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K7
-						- (H2p + Hep + 2 * Hepp - Hn + Hp) * (K14 + K7) + Hn * (K15 + K8)
-						+ (2 * H2 + 2 * H2p + Hn + Hp - Htot) * (K15 + K8)),
-				2 * dt * (H2p + Hep + 2 * Hepp - Hn + Hp) * K7 - 2 * dt * Hn * (K15 + K8),
-				dt * ((2 * H2 + 4 * H2p + 2 * Hep + 4 * Hepp + 3 * Hp - Htot) * K7 + Hn * (K14 - 2 * K15 + K19 - K7 - 2 * K8)),
-				dt * Hn * K14 + dt * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K7, 2 * dt * (Hn * K14 + (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K7)),
-		List(dt * (H2p * K10 + H2 * (K11 + K12 - K13) + Hn * K8),
-				dt * (-(H2 * (K12 + K13)) + (2 * H2 + 2 * Hn + Hp - Htot) * K8 + H2p * (K10 - K19 + 2 * K8)),
-				1 + 2 * dt * H2p * K10 + dt * Hp * K11 + dt * (H2p + Hep + 2 * Hepp - Hn + Hp) * K12 - 2 * dt * H2 * K13
-				- dt * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K13 + 2 * dt * Hn * K8,
-				dt * (4 * H2p * K10 + Hn * K10 + Hp * K10 - Htot * K10 + H2 * (2 * K10 + K12 - 2 * K13) - Hn * K19 + 2 * Hn * K8), dt * H2 * K12,
-				2 * dt * H2 * K12),
-		List(-(dt * (H2 * K11 + Hn * K17 + H2p * (K10 - K18))) + dt * (2 * H2 + 2 * H2p + Hn + 2 * Hp - Htot) * K9,
-				-(dt * (H2p * (K10 + K18 - K19) + Hp * (K17 - K9))), -(dt * (2 * H2p * K10 + Hp * (K11 - 2 * K9))),
-				1 - 2 * dt * H2p * K10 - dt * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K10 + dt * H2p * K18 + dt * (H2p + Hep + 2 * Hepp - Hn + Hp) * K18
-				+ dt * Hn * K19 + 2 * dt * Hp * K9, dt * H2p * K18, 2 * dt * H2p * K18),
-		List(dt * (-(Hetot * K3) + Hep * (K3 + K4 + K5) + Hepp * (K3 - K6)), -(dt * (-(Hetot * K3) + Hep * (K3 + K4 + K5) + Hepp * (K3 - K6))),
-				0, dt * (-(Hetot * K3) + Hep * (K3 + K4 + K5) + Hepp * (K3 - K6)),
-				1
-				+ dt
-				* (3 * Hepp * K3 - Hetot * K3 - Hn * K3 + Hp * K3 + 2 * Hepp * K4 - Hn * K4 + Hp * K4 + 2 * Hepp * K5 - Hn * K5
-						+ Hp * K5 + H2p * (K3 + K4 + K5) + 2 * Hep * (K3 + K4 + K5) - Hepp * K6),
-				dt
-				* (H2p * K3 + 3 * Hep * K3 + 4 * Hepp * K3 - 2 * Hetot * K3 - Hn * K3 + Hp * K3 + 2 * Hep * K4 + 2 * Hep * K5
-						- (H2p + Hep + 4 * Hepp - Hn + Hp) * K6)),
-		List(dt * (-(Hep * K5) + Hepp * K6), dt * (Hep * K5 - Hepp * K6), 0, dt * (-(Hep * K5) + Hepp * K6),
-				-(dt * (H2p + 2 * Hep + 2 * Hepp - Hn + Hp) * K5) + dt * Hepp * K6,
-				1 - 2 * dt * Hep * K5 + dt * (H2p + Hep + 4 * Hepp - Hn + Hp) * K6) } };
+		const std::array<double, NF> f = { -H + H0 - Hp + Hp0, Hp - Hp0 + dt * Hp * K2 * ne - dt * H * (J20 + K1 * ne), -He + He0 - Hep + Hep0 - Hepp + Hepp0,
+				Hep - Hep0 + dt * Hep * (J22 + (K4 + K5) * ne) - dt * (He * J21 + He * K3 * ne + Hepp * K6 * ne), Hepp - Hepp0 + dt * Hepp * K6 * ne
+						- dt * Hep * (J22 + K5 * ne), -Hep - 2 * Hepp - Hp + ne };
+		const std::array<std::array<double, NF>, NF> A = { { List(-1,-1,0,0,0,0), List(-(dt*(J20 + K1*ne)),1 + dt*K2*ne,0,0,0,dt*(-(H*K1) + Hp*K2)),
+				List(0, 0, -1, -1, -1, 0),
+		List(0,0,-(dt*(J21 + K3*ne)),1 + dt*(J22 + (K4 + K5)*ne),-(dt*K6*ne),-(dt*(He*K3 - Hep*(K4 + K5) + Hepp*K6))),
+				List(0, 0, 0, -(dt * (J22 + K5 * ne)), 1 + dt * K6 * ne, dt * (-(Hep * K5) + Hepp * K6)), List(0,-1,0,-1,-2,1) } };
 		const auto Ainv = matrix_inverse<NF>(A);
-		const std::array<double, NF> f = { Hp - Hp0 + dt * H2p * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K10 + dt * H2 * Hp * K11 + dt * Hn * Hp * (K16 + K17)
-				+ dt * (H2p + Hep + 2 * Hepp - Hn + Hp) * ((2 * H2 + 2 * H2p + Hn + Hp - Htot) * K1 + Hp * K2)
-				- dt * Hp * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K9, Hn - Hn0 + dt * Hn * Hp * (K16 + K17) + dt * H2p * Hn * K19
-				+ dt * (H2p + Hep + 2 * Hepp - Hn + Hp) * (Hn * K14 + (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K7)
-				- dt * Hn * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * (K15 + K8), H2 - H20
-				+ dt
-						* (H2p * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K10 + H2 * Hp * K11 + H2 * (H2p + Hep + 2 * Hepp - Hn + Hp) * K12
-								- H2 * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K13 - H2p * Hn * K19 + Hn * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K8), H2p - H2p0
-				- dt
-						* (H2p * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K10 + H2 * Hp * K11 + Hn * Hp * K17 - H2p * (H2p + Hep + 2 * Hepp - Hn + Hp) * K18
-								- H2p * Hn * K19 - Hp * (2 * H2 + 2 * H2p + Hn + Hp - Htot) * K9), Hep - Hep0
-				+ dt * (Hep + Hepp - Hetot) * (H2p + Hep + 2 * Hepp - Hn + Hp) * K3 + dt * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * K4
-				+ dt * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * K5 - dt * Hepp * (H2p + Hep + 2 * Hepp - Hn + Hp) * K6, Hepp - Hepp0
-				- dt * Hep * (H2p + Hep + 2 * Hepp - Hn + Hp) * K5 + dt * Hepp * (H2p + Hep + 2 * Hepp - Hn + Hp) * K6 };
-		//		for (int n = 0; n < NF; n++) {
-//			printf( "{");
-//			for (int m = 0; m < NF; m++) {
-//				printf("%14.6E,", Ainv[n][m]);
-//			}
-//			printf("},\n");
-//		}
-//		printf("\n");
-//		for (int n = 0; n < NF; n++) {
-//			printf("%e\n", f[n]);
-//		}
-//		exit(1);
-		std::array<double, NF> dU = { 0 };
 		for (int n = 0; n < NF; n++) {
+			auto dU = 0.0;
 			for (int m = 0; m < NF; m++) {
-				dU[n] -= Ainv[n][m] * f[m];
+				dU += Ainv[n][m] * f[m];
 			}
-			U[n] = U[n] + dU[n];
+			U[n] = U[n] - dU;
+			if( U[n] < 0.0 ) {
+				return false;
+			}
 		}
-		U[nH] = Htot - U[nHP] - U[nHN] - 2 * U[nH2] - 2 * U[nH2P];
-		U[nHE] = Hetot - U[nHEP] - U[nHEPP];
-//		for (int i = 0; i < NS; i++) {
-//			printf("%e ", U[i]);
-//		}
-//		printf("\n");
 		err = 0.0;
 		for (int i = 0; i < NF; i++) {
 			err += f[i] * f[i];
 		}
-		err = std::sqrt(err) / (Hetot + Htot);
+		err = std::sqrt(err);
+		err /= (H + Hp + He + Hep + Hepp + ne);
 	} while (err > 1.0e-7);
-
+	return true;
 }
 
 double species_T(species s0, double egas0) {
-	return egas0 / ((1.5 * s0.H + 3 * s0.Hp + 2.5 * s0.H2 + 5 * s0.H2p + 1.5 * s0.He + 3 * s0.Hep + 4.5 * s0.Hepp) * kb);
+	return egas0 / ((1.5 * s0.H + 3 * s0.Hp + 1.5 * s0.He + 3 * s0.Hep + 4.5 * s0.Hepp) * kb);
 }
 
 double species_T(std::array<double, NS> U, double egas0) {
-	return egas0 / ((1.5 * U[nH] + 3 * U[nHP] + 2.5 * U[nH2] + 5 * U[nH2P] + 1.5 * U[nHE] + 3 * U[nHEP] + 4.5 * U[nHEPP]) * kb);
+	return egas0 / ((1.5 * U[nH] + 3 * U[nHP] + 1.5 * U[nHE] + 3 * U[nHEP] + 4.5 * U[nHEPP]) * kb);
 }
 double species_energy(species s0, double T) {
-	return ((1.5 * s0.H + 3 * s0.Hp + 2.5 * s0.H2 + 5 * s0.H2p + 1.5 * s0.He + 3 * s0.Hep + 4.5 * s0.Hepp) * kb) * T;
+	return ((1.5 * s0.H + 3 * s0.Hp + 1.5 * s0.He + 3 * s0.Hep + 4.5 * s0.Hepp) * kb) * T;
 }
 
 double chemistry_update(const species sn, species &snp1, double e, double scale0, double scale1, double dt) {
 	std::array<double, NS> Un;
 	Un[nH] = sn.H;
 	Un[nHP] = sn.Hp;
-	Un[nHN] = sn.Hn;
-	Un[nH2] = sn.H2;
-	Un[nH2P] = sn.H2p;
 	Un[nHE] = sn.He;
 	Un[nHEP] = sn.Hep;
 	Un[nHEPP] = sn.Hepp;
-	//
-//#define M 3
-//	std::array<double, M> C = { .4358665215, .7179332608, 1.0 };
-//	std::array<double, M> W = { 1.208496649, -0.644363171, .4358665215 };
-//	std::array<std::array<double, M>, M> A = { { { .4358665215, 0, 0 }, { 0.2820667392, .4358665215, 0.0}, { 1.208496649, -0.644363171, .4358665215 } } };
-////	//
-//#define M 2
-//	const auto gamma = (0.4);
-//	std::array<double, M> C = { gamma, 1.0 };
-//	std::array<double, M> W = { 1.0 - gamma, gamma };
-//	std::array<std::array<double, M>, M> A = { { { gamma, 0.0 }, { 1 - gamma, gamma } } };
+	Un[nE] = sn.Hp + sn.Hep + 2 * sn.Hepp;
 
-#define M 1
-	std::array<double, M> C = { 1 };
-	std::array<double, M> W = { 1 };
-	std::array<std::array<double, M>, M> A = { { { 1 } } };
-
-	std::array<double, NS> dU;
-	std::array<double, NS> thisU;
-	std::array<double, NS> Unp1;
-	std::array<std::array<double, NS>, M> U;
-	std::array<std::array<double, NS>, M> S;
-
-	for (int i = 0; i < M; i++) {
-		for (int l = 0; l < NS; l++) {
-			thisU[l] = Un[l];
-		}
-		for (int j = 0; j < i; j++) {
-			for (int l = 0; l < NS; l++) {
-				thisU[l] += dt * A[i][j] * S[j][l];
-			}
-		}
-		const auto scale = scale0 * (1 - C[i]) + scale1 * C[i];
-		const auto z = 1.0 / scale - 1.0;
-		compute_next_state(thisU, U[i], species_T(Un, e), z, A[i][i] * dt);
-		for (int l = 0; l < NS; l++) {
-			S[i][l] = (U[i][l] - thisU[l]) / (dt * A[i][i]);
+	std::array<double, NS> Unp1 = Un;
+//	compute_next_state(Un, Unp1, species_T(Un, e), scale1, dt);
+	double this_dt = dt;
+	double tmax = dt;
+	double t = 0.0;
+	while (t < tmax) {
+//		printf("stepping %e %e\n", t / tmax, this_dt / tmax);
+		const auto w = (t + this_dt) / tmax;
+		const auto scale = scale0 * (1.0 - w) + scale1 * w;
+		if (compute_next_state(Un, Unp1, species_T(Un, e), scale, this_dt)) {
+			t += this_dt;
+			this_dt = std::min(tmax - t, this_dt * 2.0);
+			Un = Unp1;
+		} else {
+			this_dt /= 2.0;
+			Unp1 = Un;
 		}
 	}
-	for (int l = 0; l < NS; l++) {
-		Unp1[l] = Un[l];
-	}
-	for (int i = 0; i < M; i++) {
-		for (int l = 0; l < NS; l++) {
-			Unp1[l] += W[i] * dt * S[i][l];
-		}
-	}
-	double T;
 	snp1.H = Unp1[nH];
 	snp1.Hp = Unp1[nHP];
-	snp1.Hn = Unp1[nHN];
-	snp1.H2 = Unp1[nH2];
-	snp1.H2p = Unp1[nH2P];
 	snp1.He = Unp1[nHE];
 	snp1.Hep = Unp1[nHEP];
 	snp1.Hepp = Unp1[nHEPP];
-	T = species_T(snp1, e);
-	return T;
+	return species_T(snp1, e);
 }
 
 void chemistry_test() {
 	species s0;
 	const auto n = 1.0;
-	s0.H = 0.9199 * n;
-	s0.Hp = 0.0001 * n;
-	s0.Hn = 0.01 * n;
-	s0.H2 = 0.01 * n;
-	s0.H2p = 0.01 * n;
-	s0.He = 0.08 * n;
-	s0.Hep = 0.001 * n;
-	s0.Hepp = 0.001 * n;
-	double T0 = 1e+7;
+	s0.H = 0.0 * n;
+	s0.Hp = 0.92 * n;
+	s0.He = 0.00 * n;
+	s0.Hep = 0.00 * n;
+	s0.Hepp = 0.08 * n;
+	double T0 = 1e+3;
 	auto s = s0;
-	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "t", "T", "na", "ne", "H", "Hp", "Hn", "H2", "H2p", "He", "Hep", "Hepp");
+	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "t", "T0", "T", "na", "ne", "H", "Hp", "He", "Hep", "Hepp");
 	for (double dt = 1e1; dt < 1e18; dt *= 10.0) {
 		auto T = chemistry_update(s0, s, species_energy(s0, T0), 1.0, 1.0, dt);
-		const auto ne = s.Hp - s.Hn + s.Hep + 2 * s.Hepp + s.H2p;
-		const auto na = s.Hp + s.Hn + s.H + 2 * s.H2 + 2 * s.H2p + 4 * s.He + 4 * s.Hep + 4 * s.Hepp;
-		printf("%14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e\n", dt / (3600 * 24 * 365), T, na, ne, s.H, s.Hp, s.Hn,
-				s.H2, s.H2p, s.He, s.Hep, s.Hepp);
+		const auto ne = s.Hp + s.Hep + 2 * s.Hepp;
+		const auto na = s.Hp + s.H + 4 * s.He + 4 * s.Hep + 4 * s.Hepp;
+		printf("%14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e\n", dt / (3600 * 24 * 365), T0, T, na, ne, s.H, s.Hp, s.He, s.Hep,
+				s.Hepp);
 	}
 
-//	std::array<double, NS> U;
-//	const auto dt = 1.0;
-//	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "time", "T", "A", "AH", "AHe", "N", "Ne", "H", "H+", "H-", "H2",
-//			"H2p", "He", "He+", "He++");
-//	double T = 1.0e4;
-//	for (double dt = 1.0e+3; dt <= 1e+17; dt *= 10) {
-//		for (int i = 0; i < NS; i++) {
-//			U[i] = 0.0;
-//		}
-//		double ne = 1e-1;
-//		U[nH] = 0.01 * ne;
-//		U[nHP] = 0.91 * ne;
-//		U[nH2P] = 0.00 * ne;
-//		U[nHE] = 0.00 * ne;
-//		U[nHEP] = 0.08 * ne;
-//		U[nHEPP] = 0.0 * ne;
-//		auto U0 = U;
-//		const auto eint = 1.0e-10 * ne;
-//		T = compute_thermo_properties(U0, U, eint, dt);
-//		ne = U[nHP] + U[nHEP] + 2.0 * U[nHEPP] + U[nH2P] - U[nHN];
-//		const auto nnuc = U[nH] + U[nHP] + U[nHN] + 2.0 * U[nH2] + 2.0 * U[nH2P] + 4.0 * U[nHE] + 4.0 * U[nHEP] + 4.0 * U[nHEPP];
-//		const auto nnucleus = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP];
-//		const auto n = U[nH] + U[nHP] + U[nHN] + U[nH2] + U[nH2P] + U[nHE] + U[nHEP] + U[nHEPP] + ne;
-//		const auto nHnuc = U[nH] + U[nHP] + U[nHN] + 2.0 * U[nH2] + 2.0 * U[nH2P];
-//		const auto nHenuc = 4.0 * U[nHE] + 4.0 * U[nHEP] + 4.0 * U[nHEPP];
-//		printf("%14.5e %14.5e %14.5e %14.5e %14.5e  %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e %14.5e\n", (double) dt, (double) T,
-//				(double) nnuc, (double) nHnuc, (double) nHenuc, (double) n, (double) ne, (double) U[nH], (double) U[nHP], (double) U[nHN], (double) U[nH2],
-//				(double) U[nH2P], (double) U[nHE], (double) U[nHEP], (double) U[nHEPP]);
-//		U = U0;
-//	}
 }

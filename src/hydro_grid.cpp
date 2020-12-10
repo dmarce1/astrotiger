@@ -488,13 +488,10 @@ void hydro_grid::initialize() {
 				const auto nHe = 0.08 * A;
 				U[h_i][i] = 0.0 * nH;
 				U[hp_i][i] = 1.0 * nH;
-				U[hn_i][i] = 0.0 * nH;
-				U[h2_i][i] = 0.0 * nH;
-				U[h2p_i][i] = 0.0 * nH;
 				U[he_i][i] = 0.0 * nHe;
 				U[hep_i][i] = 0.0 * nHe;
 				U[hepp_i][i] = 1.0 * nHe;
-				species s = { U[h_i][i], U[hp_i][i], U[hn_i][i], U[h2_i][i], U[h2p_i][i], U[he_i][i], U[hep_i][i], U[hepp_i][i] };
+				species s = { U[h_i][i], U[hp_i][i], U[he_i][i], U[hep_i][i], U[hepp_i][i] };
 				U[egas_i][i] += ion_energy(s);
 			}
 		}
