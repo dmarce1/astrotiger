@@ -82,99 +82,42 @@ std::array<std::array<real, N>, N> matrix_inverse(std::array<std::array<real, N>
 	return Ainv;
 }
 
-void chemical_rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k6, double &k7, double &k8, double &k9, double &k10, double &k11,
-		double &k12, double &k13, double &k14, double &k15, double &k16, double &k17, double &k18, double &k19, double T) {
+void chemical_rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k6, double T) {
 
 	const auto tev = T / KperEv;
 	const auto logtev = std::log(tev);
+	const auto logtev2 = logtev * logtev;
+	const auto logtev3 = logtev2 * logtev;
+	const auto logtev4 = logtev2 * logtev2;
+	const auto logtev5 = logtev2 * logtev3;
+	const auto logtev6 = logtev3 * logtev3;
+	const auto logtev7 = logtev3 * logtev4;
+	const auto logtev8 = logtev4 * logtev4;
+	const auto logtev9 = logtev4 * logtev5;
 	k1 = exp(
-			-32.71396786375 + 13.53655609057 * logtev - 5.739328757388 * std::pow(logtev, 2) + 1.563154982022 * std::pow(logtev, 3)
-					- 0.2877056004391 * std::pow(logtev, 4) + 0.03482559773736999 * std::pow(logtev, 5) - 0.00263197617559 * std::pow(logtev, 6)
-					+ 0.0001119543953861 * std::pow(logtev, 7) - 2.039149852002e-6 * std::pow(logtev, 8));
+			-32.71396786375 + 13.53655609057 * logtev - 5.739328757388 * logtev2 + 1.563154982022 * logtev3 - 0.2877056004391 * logtev4
+					+ 0.03482559773736999 * logtev5 - 0.00263197617559 * logtev6 + 0.0001119543953861 * logtev7 - 2.039149852002e-6 * logtev8);
+
+	k2 = exp(
+			-28.61303380689232 - 0.7241125657826851 * logtev - 0.02026044731984691 * logtev2 - 0.002380861877349834 * logtev3 - 0.0003212605213188796 * logtev4
+					- 0.00001421502914054107 * logtev5 + 4.989108920299513e-6 * logtev6 + 5.755614137575758e-7 * logtev7 - 1.856767039775261e-8 * logtev8
+					- 3.071135243196595e-9 * logtev9);
 
 	k3 = exp(
-			-44.09864886561001 + 23.91596563469 * logtev - 10.75323019821 * std::pow(logtev, 2) + 3.058038757198 * std::pow(logtev, 3)
-					- 0.5685118909884001 * std::pow(logtev, 4) + 0.06795391233790001 * std::pow(logtev, 5) - 0.005009056101857001 * std::pow(logtev, 6)
-					+ 0.0002067236157507 * std::pow(logtev, 7) - 3.649161410833e-6 * std::pow(logtev, 8));
+			-44.09864886561001 + 23.91596563469 * logtev - 10.75323019821 * logtev2 + 3.058038757198 * logtev3 - 0.5685118909884001 * logtev4
+					+ 0.06795391233790001 * logtev5 - 0.005009056101857001 * logtev6 + 0.0002067236157507 * logtev7 - 3.649161410833e-6 * logtev8);
 
-	k4 = 3.92e-13 / std::pow(tev, 0.6353);
+	k4 = 3.92e-13 * std::pow(tev, -0.6353);
 
 	if (tev > 0.1) {
-		k4 += 1.54e-9 * (1. + 0.3 / std::exp(8.099328789667 / tev)) / (exp(40.49664394833662 / tev) * std::pow(tev, 1.5));
+		k4 += 1.54e-9 * (1. + 0.3 * std::exp(-8.099328789667 / tev)) / (exp(40.49664394833662 / tev) * std::pow(tev, 1.5));
 	}
 
 	k5 = exp(
-			-68.71040990212001 + 43.93347632635 * logtev - 18.48066993568 * std::pow(logtev, 2) + 4.701626486759002 * std::pow(logtev, 3)
-					- 0.7692466334492 * std::pow(logtev, 4) + 0.08113042097303 * std::pow(logtev, 5) - 0.005324020628287001 * std::pow(logtev, 6)
-					+ 0.0001975705312221 * std::pow(logtev, 7) - 3.165581065665e-6 * std::pow(logtev, 8));
-
-	k2 = exp(
-			-28.61303380689232 - 0.7241125657826851 * logtev - 0.02026044731984691 * std::pow(logtev, 2) - 0.002380861877349834 * std::pow(logtev, 3)
-					- 0.0003212605213188796 * std::pow(logtev, 4) - 0.00001421502914054107 * std::pow(logtev, 5) + 4.989108920299513e-6 * std::pow(logtev, 6)
-					+ 5.755614137575758e-7 * std::pow(logtev, 7) - 1.856767039775261e-8 * std::pow(logtev, 8) - 3.071135243196595e-9 * std::pow(logtev, 9));
-
-	k6 = 3.36e-10 / sqrt(T) / std::pow((T / 1.e3), 0.2) / (1. + std::pow((T / 1.e6), 0.7));
-
-	if (T < 3275.2) {
-		k7 = 1.429e-18 * std::pow(T, 0.7620) * std::pow(T, 0.1523 * std::log10(T)) * std::pow(T, -3.274e-2 * std::pow(std::log10(T), 2));
-	} else {
-		k7 = 3.802e-17 * std::pow(T, 0.1998 * std::log10(T)) * std::pow(10.0, 4.0415e-5 * std::pow(std::log10(T), 6) - 5.447e-3 * std::pow(std::log10(T), 4));
-	}
-
-	auto this_tev = std::max(0.1, tev);
-	auto this_logtev = std::log(this_tev);
-	k8 = exp(
-			-20.06913897587003 + 0.2289800603272916 * this_logtev + 0.03599837721023835 * std::pow(this_logtev, 2)
-					- 0.004555120027032095 * std::pow(this_logtev, 3) - 0.0003105115447124016 * std::pow(this_logtev, 4)
-					+ 0.0001073294010367247 * std::pow(this_logtev, 5) - 8.36671960467864e-6 * std::pow(this_logtev, 6)
-					+ 2.238306228891639e-7 * std::pow(this_logtev, 7));
-
-	if (T > 7843.1) {
-		k9 = 5.81e-16 * std::pow(T / 56200., (-0.6657 * std::log10(T / 56200.)));
-	} else {
-		k9 = 1.85e-23 * std::pow(T, 1.8);
-	}
-
-	k10 = 6.0e-10;
-
-	this_tev = std::max(0.3, tev);
-	this_logtev = std::log(this_tev);
-	k13 = 1.0670825e-10 * std::pow(this_tev, 2.012) / (exp(4.463 / this_tev) * std::pow((1. + 0.2472 * this_tev), 3.512));
-	k11 = exp(
-			-24.24914687731536 + 3.400824447095291 * this_logtev - 3.898003964650152 * std::pow(this_logtev, 2) + 2.045587822403071 * std::pow(this_logtev, 3)
-					- 0.5416182856220388 * std::pow(this_logtev, 4) + 0.0841077503763412 * std::pow(this_logtev, 5)
-					- 0.007879026154483455 * std::pow(this_logtev, 6) + 0.0004138398421504563 * std::pow(this_logtev, 7)
-					- 9.36345888928611e-6 * std::pow(this_logtev, 8));
-	k12 = 5.6e-11 * exp(-102124. / T) * std::pow(T, 0.5);
-
-	this_tev = std::max(0.04, tev);
-	this_logtev = std::log(this_tev);
-	k14 = exp(
-			-18.01849334273 + 2.360852208681 * this_logtev - 0.2827443061704 * std::pow(this_logtev, 2) + 0.01623316639567 * std::pow(this_logtev, 3)
-					- 0.03365012031362999 * std::pow(this_logtev, 4) + 0.01178329782711 * std::pow(this_logtev, 5)
-					- 0.001656194699504 * std::pow(this_logtev, 6) + 0.0001068275202678 * std::pow(this_logtev, 7)
-					- 2.631285809207e-6 * std::pow(this_logtev, 8));
-	if (tev > 0.0979824) {
-		k15 = exp(
-				-20.37260896533324 + 1.139449335841631 * logtev - 0.1421013521554148 * std::pow(logtev, 2) + 0.00846445538663 * std::pow(logtev, 3)
-						- 0.0014327641212992 * std::pow(logtev, 4) + 0.0002012250284791 * std::pow(logtev, 5) + 0.0000866396324309 * std::pow(logtev, 6)
-						- 0.00002585009680264 * std::pow(logtev, 7) + 2.4555011970392e-6 * std::pow(logtev, 8) - 8.06838246118e-8 * std::pow(logtev, 9));
-	} else {
-		k15 = 2.56e-9 * std::pow(tev, 1.78186);
-	}
-
-	k16 = 6.5e-9 / sqrt(tev);
-
-	if (tev < 1.74498) {
-		k17 = 2.291e-10 * std::pow(tev, -0.4);
-	} else {
-		k17 = 8.4258e-10 * std::pow(tev, -1.4) * std::exp(-1.301 / tev);
-	}
-
-	const auto this_T = std::max(616.92, T);
-	k18 = 1.32e-6 * std::pow(this_T, -0.76);
-
-	k19 = 4.64e-8 / sqrt(tev);
+			-68.71040990212001 + 43.93347632635 * logtev - 18.48066993568 * logtev2 + 4.701626486759002 * logtev3 - 0.7692466334492 * logtev4
+					+ 0.08113042097303 * logtev5 - 0.005324020628287001 * logtev6 + 0.0001975705312221 * logtev7 - 3.165581065665e-6 * logtev8);
+	const auto Tp7 = std::pow(T, 0.7);
+	k6 = 1.33764e-9 / (Tp7 * (1.0 + 6.309573e-5 * Tp7));
 
 }
 
@@ -184,228 +127,6 @@ const double kb = 1.3807e-16;
 const double ergtoev = 6.242e+11;
 const double evtoerg = 1.0 / ergtoev;
 
-double Bp(double T) {
-	return (2 * std::pow(kb * M_PI * T, 4) / (15 * clight * clight * hplanck * hplanck * hplanck));
-}
-
-double Bp_nu(double nu, double T) {
-	const auto c0 = 2.0 * hplanck * std::pow(nu, 3) / (clight * clight);
-	const auto x = hplanck * nu / (kb * T);
-	double c1;
-	if (x < 1.0e-3) {
-		c1 = x;
-		return c0 / c1;
-	} else if (x > 100.0) {
-		return 0.0;
-	} else {
-		c1 = std::exp(x) - 1.0;
-		return c0 / c1;
-	}
-}
-
-double dB_dT(double T) {
-	return 4.0 * Bp(T) / T;
-}
-
-double dBp_nu_dT(double nu, double T) {
-	return hplanck * hplanck * nu * nu * nu * nu / (clight * clight * kb * T * T * (std::cosh((hplanck * nu) / (kb * T)) - 1.0));
-}
-
-double radiation_heating_rate(const std::function<double(double)> &sigma, double &J, double hnuth, double T) {
-	const int N = 129;
-	double numax = kb * T / hplanck;
-	const double dnu = numax / (N - 1);
-	const double lambdamax = clight * hplanck / (kb * T);
-	const double dlambda = lambdamax / (N - 1);
-	for (int i = 1; i < N; i++) {
-		const auto nu = i * dnu;
-		const auto lambda = i * dlambda;
-		const auto sigma_nu = sigma(nu);
-		const auto sigma_lambda = sigma(clight / lambda);
-		const auto c0_nu = 1.0 / (hplanck * nu) * std::max(1.0 - hplanck * nu / hnuth, 0.0);
-		const auto c0_lambda = 1.0 / (hplanck * lambda) * std::max(1.0 - hplanck * clight / hnuth / lambda, 0.0);
-		const auto bnu = Bp_nu(nu, T) * sigma_nu * c0_nu;
-		const auto blambda = Bp_nu(clight / lambda, T) * c0_lambda * sigma_lambda;
-		double c0;
-		if (i == N - 1) {
-			c0 = 1.0 / 3.0;
-		} else if (i % 2 == 1) {
-			c0 = 4.0 / 3.0;
-		} else {
-			c0 = 2.0 / 3.0;
-		}
-		J += c0 * (bnu * dnu + blambda * dlambda);
-	}
-	J *= 4.0 * M_PI / clight;
-
-}
-
-void sigma_to_rate(const std::function<double(double)> &sigma, double &I, double T) {
-	const int N = 129;
-	double numax = kb * T / hplanck;
-	const double dnu = numax / (N - 1);
-	const double lambdamax = clight * hplanck / (kb * T);
-	const double dlambda = lambdamax / (N - 1);
-	I = 0.0;
-	for (int i = 1; i < N; i++) {
-		const auto nu = i * dnu;
-		const auto lambda = i * dlambda;
-		const auto sigma_nu = sigma(nu);
-		const auto sigma_lambda = sigma(clight / lambda);
-		const auto c0_nu = 1.0 / (hplanck * nu);
-		const auto c0_lambda = 1.0 / (hplanck * lambda);
-		const auto bnu = Bp_nu(nu, T) * sigma_nu * c0_nu;
-		const auto blambda = Bp_nu(clight / lambda, T) * c0_lambda * sigma_lambda;
-		double c0;
-		if (i == N - 1) {
-			c0 = 1.0 / 3.0;
-		} else if (i % 2 == 1) {
-			c0 = 4.0 / 3.0;
-		} else {
-			c0 = 2.0 / 3.0;
-		}
-		I += c0 * (bnu * dnu + blambda * dlambda);
-	}
-	I *= 4.0 * M_PI;
-}
-
-double sigma20_22(double nu, double Z) {
-	const double A0 = 6.30e-15 / (Z * Z);
-	const double nuth = 13.6 * evtoerg * Z * Z / hplanck;
-	if (nu > nuth) {
-		const auto c0 = std::pow(nu / nuth, 4);
-		const auto c1 = std::sqrt(nu / nuth - 1.0);
-		const auto c2 = std::exp(4.0 - 4.0 * std::atan(c1) / c1);
-		const auto c3 = 1.0 - std::exp(-2.0 * M_PI * c1);
-		return A0 * c0 * c2 / c3;
-	} else {
-		return 0.0;
-	}
-}
-
-double sigma20(double nu) {
-	return sigma20_22(nu, 1.0);
-}
-
-double sigma21(double nu) {
-	const double nuth = 24.6 * evtoerg / hplanck;
-	if (nu > nuth) {
-		return 7.42e-18 * (1.66 * std::pow(nu / nuth, -2.05) - 0.66 * std::pow(nu / nuth, -3.05));
-	} else {
-		return 0.0;
-	}
-}
-
-double sigma22(double nu) {
-	return sigma20_22(nu, 2.0);
-}
-
-double sigma_20_21_22(double nu, double H, double He, double Hep) {
-	return sigma20(nu) * H + sigma21(nu) * He + sigma22(nu) * Hep;
-}
-
-double sigma23(double nu) {
-	const auto nuth = 0.755 / hplanck * evtoerg;
-	if (nu > nuth) {
-		return 7.928e5 * std::pow(nu - nuth, 1.5) / (nu * nu * nu);
-	} else {
-		return 0.0;
-	}
-}
-
-double sigma24(double nu) {
-	const auto hnu = hplanck * nu * ergtoev;
-	if (hnu < 15.42) {
-		return 0.0;
-	} else if (hnu < 16.50) {
-		return 6.2e-18 * hnu - 9.4e-17;
-	} else if (hnu < 17.7) {
-		return 1.4e-18 * hnu - 1.48e-17;
-	} else {
-		return 2.5e-14 * std::pow(hnu, -2.71);
-	}
-}
-
-double sigma25(double nu) {
-	return std::pow(10,
-			-1.6547717e6 + 1.8660333e5 * std::log(nu) - 7.8986431e3 * std::pow(std::log(nu), 2) + 148.73693 * std::pow(std::log(nu), 3)
-					- 1.0513032 * std::pow(std::log(nu), 4));
-}
-
-double sigma26(double nu) {
-	const auto hnu = hplanck * nu * ergtoev;
-	if (hnu > 30.0 && hnu < 90.0) {
-		return std::pow(10, -16.926 - 4.528e-2 * hnu + 2.238e-4 * hnu * hnu + 4.245e-7 * hnu * hnu * hnu);
-	} else {
-		return 0.0;
-	}
-}
-
-double sigma28(double nu) {
-	const auto hnu = nu * hplanck * ergtoev;
-	double sigmaL0, sigmaW0, sigmaL1, sigmaW1;
-	if (hnu > 14.675 && hnu < 16.820) {
-		sigmaL0 = 1e-18 * std::pow(10, 15.1289 - 1.05139 * hnu);
-	} else if (hnu >= 16.820 && hnu < 17.6) {
-		sigmaL0 = 1e-18 * std::pow(10, -31.41 + 1.8042e-2 * std::pow(hnu, 3) - 4.339e-5 * std::pow(hnu, 5));
-	} else {
-		sigmaL0 = 0.0;
-	}
-	if (hnu > 14.675 && hnu < 17.7) {
-		sigmaW0 = 1e-18 * std::pow(10, 13.5331 - 0.9182618 * hnu);
-	} else {
-		sigmaW0 = 0.0;
-	}
-	if (hnu > 14.159 && hnu < 15.302) {
-		sigmaL1 = 1e-18 * std::pow(10, 12.0218406 - 0.819429 * hnu);
-	} else if (hnu > 15.302 && hnu < 17.2) {
-		sigmaL1 = 1e-18 * std::pow(10, 16.04644 - 1.082438 * hnu);
-	} else {
-		sigmaL1 = 0.0;
-	}
-	if (hnu > 14.159 && hnu < 17.2) {
-		sigmaW1 = 1e-18 * std::pow(10, 12.87367 - 0.85088597 * hnu);
-	} else {
-		sigmaW1 = 0.0;
-	}
-	return 0.25 * (sigmaL0 + sigmaW0) + 0.75 * (sigmaL1 + sigmaW1);
-}
-
-void heating_rates(double &J20, double &J21, double &J22, double T) {
-	radiation_heating_rate(sigma20, J20, 13.6 * evtoerg, T);
-	radiation_heating_rate(sigma21, J21, 13.6 * 4.0 * evtoerg, T);
-	radiation_heating_rate(sigma22, J22, 24.6 * evtoerg, T);
-}
-
-double power_law_spectrum(double nu) {
-	const double hnu = hplanck * nu;
-//	return 1e-21 * (12.86 / hnu) * std::exp(-1e22 * (sigma20(nu) + 0.08 * sigma21(nu)));
-	return 3.9e-40 * std::pow(hnu / 13.6, -1.5);
-}
-
-void sigma_to_rate(const std::function<double(double)> &spec, const std::function<double(double)> &sigma, double &I) {
-	const double numin = std::pow(10, 3);
-	const double numax = std::pow(10, 20);
-	I = 0.0;
-	const int N = 1024;
-	const double ymin = std::log(numin);
-	const double ymax = std::log(numax);
-	const auto dy = (ymax - ymin) / (N - 1);
-	for (int i = 1; i <= N; i++) {
-		double y = i * dy;
-		double nu = std::exp(y);
-		double c0;
-		if (i == N) {
-			c0 = 1.0 / 3.0;
-		} else if (i % 2 == 1) {
-			c0 = 4.0 / 3.0;
-		} else {
-			c0 = 2.0 / 3.0;
-		}
-		I += 4.0 * M_PI * c0 * spec(nu) * sigma(nu) / hplanck * dy;
-	}
-}
-
 double homo_rate(double z, double alpha, double beta, double gamma, double z0, double z1) {
 	auto c0 = beta * std::pow(z - z0, 2) / (1.0 + gamma * std::pow(z + z1, 2));
 	c0 = std::min(c0, 100.0);
@@ -413,16 +134,10 @@ double homo_rate(double z, double alpha, double beta, double gamma, double z0, d
 	return std::pow(1 + z, alpha) * std::exp(c0);
 }
 
-void radiation_rates(double &I20, double &I21, double &I22, double &I23, double &I24, double &I25, double &I26, double &I27, double &I28, double z) {
+void radiation_rates(double &I20, double &I21, double &I22, double z) {
 	I20 = 1.04e-12 * homo_rate(z, 0.231, -0.6818, 0.1646, 1.855, 0.3097);
 	I21 = 1.84e-14 * homo_rate(z, -1.038, -1.1640, 0.1940, 1.973, -0.6561);
 	I22 = 5.79e-13 * homo_rate(z, 0.278, -0.8260, 0.1730, 1.973, 0.2880);
-	sigma_to_rate(power_law_spectrum, sigma23, I23);
-	sigma_to_rate(power_law_spectrum, sigma24, I24);
-	sigma_to_rate(power_law_spectrum, sigma25, I25);
-	sigma_to_rate(power_law_spectrum, sigma26, I26);
-	sigma_to_rate(power_law_spectrum, sigma28, I28);
-	I27 = 1.1e8 * power_law_spectrum(12.27 * evtoerg / hplanck);
 }
 
 double ion_energy(species s) {
@@ -433,74 +148,7 @@ double ion_energy(species s) {
 	return s.H * Hion + s.He * Heion + s.Hep * Hepion;
 }
 
-void cooling_rate2(double &C14, double &dC14dT, double &dC14dH, double &dC14dH2, double H, double H2, double T) {
-
-	/*********************************/
-	C14 = 0.0;
-	dC14dT = 0.0;
-	dC14dH = 0.0;
-	dC14dH2 = 0.0;
-	return;
-	/*********************************/
-
-	const auto xx = std::log10(T / 1e4);
-	const auto dxx_dT = 1 / (T * std::log(10));
-	double vibha = 1.1e-18 * std::exp(-6744 / T);
-	double dvibha_dT = 1.1e-18 * 6744 / (std::exp(6744 / T) * std::pow(T, 2));
-	double dum1, dum2, ddum2_dT;
-	dum1 = 8.152e-13 * (4.2 / (kb * (T + 1190.)) + 1. / (kb * T));
-	double ddum1_dT = 8.152e-13 * (-1. / std::pow(T, 2) - 4.2 / std::pow(1190. + T, 2)) / kb;
-	double h2k01 = 1.45e-12 * std::sqrt(T) * std::exp(dum1);
-	double dh2k01_dT = 1.45e-12 * (std::exp(dum1) * (1 + 2 * T * ddum1_dT)) / (2. * std::sqrt(T));
-	if (T > 1635.) {
-		dum2 = 1.0e-12 * std::sqrt(T) * std::exp(-1000. / T);
-		ddum2_dT = 1.0e-12 * (0.5 * (2000. + T)) / (std::exp(1000. / T) * std::pow(T, 1.5));
-	} else {
-		dum2 = 1.4e-13 * std::exp((T / 125.) - std::pow(T / 577., 2));
-		ddum2_dT = 1.4e-13 * std::exp((0.008 - 3.003643419467814e-6 * T) * T) * (0.008 - 6.007286838935628e-6 * T);
-	}
-	double hyd01 = dum2 * std::exp(8.152e-13 / (kb * T));
-	double dhyd01_dT = ddum2_dT * hyd01 + dum2 * (-8.152e-13 * std::exp(8.152e-13 / (kb * T))) / (kb * std::pow(T, 2));
-	double vibla = hyd01 * H + h2k01 * H2;
-	double dvibla_dT = dhyd01_dT * H + dh2k01_dT * H2;
-	double dvibla_dH = hyd01;
-	double dvibla_dH2 = h2k01;
-	double rotla0, rotha, drotla0_dT, drotha_dT;
-	if (T > 1087) {
-		rotha = 3.9e-19 * std::exp(-6118 / T);
-		drotha_dT = 3.9e-19 * 6118 / (std::exp(6118 / T) * std::pow(T, 2));
-	} else {
-		rotha = std::pow(10.0, (-19.24 + 0.474 * xx - 1.247 * xx * xx));
-		drotha_dT = (std::pow(T, 9.45) * (8.533285780697259e-41 - 8.844652214438655e-42 * std::log(T)))
-				/ std::exp(0.541565218933355 * std::pow(std::log(T), 2));
-	}
-	if (T > 4031) {
-		rotla0 = 1.38e-22 * exp(-9243 / T);
-		drotla0_dT = 9243 * rotla0 / (T * T);
-	} else {
-		rotla0 = std::pow(10, (-22.9 - 0.553 * xx - 1.148 * xx * xx));
-		drotla0_dT = (-6.961857527221768e-24 - 1.2553250493430911e-23 * std::log(T))
-				/ (std::exp(0.49857006522493297 * std::pow(std::log(T), 2)) * std::pow(T, 1.553));
-	}
-	const auto rotla = rotla0 * (std::pow(H2, 0.77) + 1.2 * std::pow(H, 0.77));
-	const auto drotla_dT = drotla0_dT * (std::pow(H2, 0.77) + 1.2 * std::pow(H, 0.77));
-	const auto drotla_dH2 = rotla0 * 0.77 * std::pow(H2, 0.77 - 1.0);
-	const auto drotla_dH = rotla0 * 1.2 * 0.77 * std::pow(H, 0.77 - 1.0);
-
-	C14 = H2 * ((vibla * vibha) / (vibha + vibla) + (rotla * rotha) / (rotha + rotla));
-	dC14dT = (H2
-			* (rotha * (-(rotla * drotha_dT) + rotha * drotla_dT)
-					+ ((rotha + rotla)
-							* (rotha * (std::pow(vibla, 2) * dvibha_dT + std::pow(vibha, 2) * dvibla_dT)
-									+ rotla
-											* (2 * vibha * vibla * drotha_dT + std::pow(vibla, 2) * (drotha_dT + dvibha_dT)
-													+ std::pow(vibha, 2) * (drotha_dT + dvibla_dT)))) / std::pow(vibha + vibla, 2)))
-			/ std::pow(rotha + rotla, 2);
-	dC14dH = H2 * ((std::pow(rotha, 2) * drotla_dH) / std::pow(rotha + rotla, 2) + (std::pow(vibha, 2) * dvibla_dH) / std::pow(vibha + vibla, 2));
-	dC14dH2 = C14 + H2 * ((std::pow(rotha, 2) * drotla_dH2) / std::pow(rotha + rotla, 2) + (std::pow(vibha, 2) * dvibla_dH2) / std::pow(vibha + vibla, 2));
-}
-
-void cooling_rate1(double &C1, double &C2, double &C3, double &C4, double &C5, double &C6, double &C7, double &C8, double &C9, double &C10, double &C11,
+void cooling_rate(double &C1, double &C2, double &C3, double &C4, double &C5, double &C6, double &C7, double &C8, double &C9, double &C10, double &C11,
 		double &C12, double &C13, double &dC1dT, double &dC2dT, double &dC3dT, double &dC4dT, double &dC5dT, double &dC6dT, double &dC7dT, double &dC8dT,
 		double &dC9dT, double &dC10dT, double &dC11dT, double &dC12dT, double &dC13dT, double T, double z) {
 	const auto T3 = T / 1e3;
@@ -509,74 +157,74 @@ void cooling_rate1(double &C1, double &C2, double &C3, double &C4, double &C5, d
 	const auto tev = T / KperEv;
 	const auto logtev = std::log(T);
 	const auto tiny = std::numeric_limits<double>::min();
-
-	const auto k1 = exp(
-			-32.71396786375 + 13.53655609057 * logtev - 5.739328757388 * std::pow(logtev, 2) + 1.563154982022 * std::pow(logtev, 3)
-					- 0.2877056004391 * std::pow(logtev, 4) + 0.03482559773736999 * std::pow(logtev, 5) - 0.00263197617559 * std::pow(logtev, 6)
-					+ 0.0001119543953861 * std::pow(logtev, 7) - 2.039149852002e-6 * std::pow(logtev, 8));
-
-	const auto dk1dT = (1 * 13.53655609057 - 2 * 5.739328757388 * logtev + 3 * 1.563154982022 * std::pow(logtev, 2) - 4 * 0.2877056004391 * std::pow(logtev, 3)
-			+ 5 * 0.03482559773736999 * std::pow(logtev, 4) - 6 * 0.00263197617559 * std::pow(logtev, 5) + 7 * 0.0001119543953861 * std::pow(logtev, 6)
-			- 8 * 2.039149852002e-6 * std::pow(logtev, 7)) * k1 / tev / KperEv;
-
-	const auto k3 = exp(
-			-44.09864886561001 + 23.91596563469 * logtev - 10.75323019821 * std::pow(logtev, 2) + 3.058038757198 * std::pow(logtev, 3)
-					- 0.5685118909884001 * std::pow(logtev, 4) + 0.06795391233790001 * std::pow(logtev, 5) - 0.005009056101857001 * std::pow(logtev, 6)
-					+ 0.0002067236157507 * std::pow(logtev, 7) - 3.649161410833e-6 * std::pow(logtev, 8));
-
-	const auto dk3dT = (1 * 23.91596563469 - 2 * 10.75323019821 * logtev + 3 * 3.058038757198 * std::pow(logtev, 2)
-			- 4 * 0.5685118909884001 * std::pow(logtev, 3) + 5 * 0.06795391233790001 * std::pow(logtev, 4) - 6 * 0.005009056101857001 * std::pow(logtev, 5)
-			+ 7 * 0.0002067236157507 * std::pow(logtev, 6) - 8 * 3.649161410833e-6 * std::pow(logtev, 7)) * k3 / tev / KperEv;
-
-	const auto k5 = exp(
-			-68.71040990212001 + 43.93347632635 * logtev - 18.48066993568 * std::pow(logtev, 2) + 4.701626486759002 * std::pow(logtev, 3)
-					- 0.7692466334492 * std::pow(logtev, 4) + 0.08113042097303 * std::pow(logtev, 5) - 0.005324020628287001 * std::pow(logtev, 6)
-					+ 0.0001975705312221 * std::pow(logtev, 7) - 3.165581065665e-6 * std::pow(logtev, 8));
-
-	const auto dk5dT = (1 * 43.93347632635 - 2 * 18.48066993568 * logtev + 3 * 4.701626486759002 * std::pow(logtev, 2)
-			- 4 * 0.7692466334492 * std::pow(logtev, 3) + 5 * 0.08113042097303 * std::pow(logtev, 4) - 6 * 0.005324020628287001 * std::pow(logtev, 5)
-			+ 7 * 0.0001975705312221 * std::pow(logtev, 6) - 8 * 3.165581065665e-6 * std::pow(logtev, 7)) * k5 / tev / KperEv;
-
-	C1 = 7.50e-19 * (1.0 + std::sqrt(T / 100000)) * std::exp(-118348 / T);
-	dC1dT = 7.50e-19 * ((118348. + (374.2492365256074 + 0.0015811388300841897 * T) * std::sqrt(T)) / (std::exp(118348 / T) * T * T));
-	C2 = 9.10e-27 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.1687) * std::exp(-13179 / T);
-	dC2dT = 9.10e-27
-			* ((13179 * std::pow(T, 1.8374) + 41.67565728335908 * std::pow(T, 2.3374) - 0.1687 * std::pow(T, 2.8374)
-					+ 0.0010476625888137844 * std::pow(T, 3.3374)) / (std::exp(13179 / T) * std::pow(T, 4.0061)));
-	C3 = 5.54e-17 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.397) * std::exp(-473638 / T);
-	dC3dT =
-			5.54e-17
-					* ((473638. * std::pow(T, 2.294) + 1497.774866406831 * std::pow(T, 2.794) - 0.397 * std::pow(T, 3.294)
-							+ 0.00032571459899734327 * std::pow(T, 3.794)) / (std::exp(473638 / T) * std::pow(T, 4.691)));
-	C4 = 2.18e-11 * k1;
-	dC4dT = 2.18e-11 * dk1dT;
-	C5 = 3.94e-11 * k3;
-	dC5dT = 3.94e-11 * dk3dT;
-	C6 = 8.72e-11 * k5;
-	dC6dT = 8.72e-11 * dk5dT;
-	C7 = 5.01e-27 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.1687) * std::exp(-55338 / T);
-	dC7dT = 5.01e-27
-			* ((55338 * std::pow(T, 1.8374) + 174.9941211583978 * std::pow(T, 2.3374) - 0.1687 * std::pow(T, 2.8374)
-					+ 0.0010476625888137844 * std::pow(T, 3.3374)) / (std::exp(55338 / T) * std::pow(T, 4.0061)));
-	C8 = 8.70e-27 * std::sqrt(T) * std::pow(T3, -0.2) / (1.0 + std::pow(T6, 0.7));
-	dC8dT = 8.70e-27 * (-((25238.293779207717 - 3e8 / std::pow(T, 0.7)) / (2.5118864315095773e8 + 31697.863849222253 * std::pow(T, 0.7) + std::pow(T, 1.4))));
-	C9 = 1.55e-26 * std::pow(T, 0.3647);
-	dC9dT = 0.3647 * C9 / T;
-	C10 = 1.24e-13 * std::pow(T, -1.5) * (1 + 0.3 * std::exp(-94000 / T)) * std::exp(-470000 / T);
-	dC10dT = 1.24e-13
-			* (((169200 + 470000 * std::exp(94000 / T)) * std::pow(T, 2.5) + (-0.45 - 1.5 * std::exp(94000 / T)) * std::pow(T, 3.5))
-					/ (std::exp(564000 / T) * std::pow(T, 6.)));
-	C11 = 3.48e-26 * std::sqrt(T) * std::pow(T / 1000, -0.2) / (1.0 + std::pow(T / 1000000, 0.7));
-	dC11dT = 3.48e-26
-			* (-((25238.293779207717 - 3e8 / std::pow(T, 0.7)) / (2.5118864315095773e8 + 31697.863849222253 * std::pow(T, 0.7) + 1. * std::pow(T, 1.4))));
-	C12 = 1.43e-27 * std::sqrt(T) * (1.1 + 0.34 * std::exp(-std::pow(5.50 - std::log10(T), 2) / 3.0));
-	dC12dT = 1.43e-27
-			* (0.55 / std::pow(T, 0.5)
-					+ (std::pow(T, 1.0924131003119228) * (0.00002971599807934954 - 1.7857483385425343e-6 * std::log(T)))
-							/ std::exp(0.06287056567053795 * std::pow(std::log(T), 2)));
-	C13 = 5.64e-36 * std::pow(1 + z, 4) * (T - 2.73 * (1 + z));
-	dC13dT = 5.64e-36 * std::pow(1 + z, 4);
-
+//
+//	const auto k1 = exp(
+//			-32.71396786375 + 13.53655609057 * logtev - 5.739328757388 * std::pow(logtev, 2) + 1.563154982022 * std::pow(logtev, 3)
+//					- 0.2877056004391 * std::pow(logtev, 4) + 0.03482559773736999 * std::pow(logtev, 5) - 0.00263197617559 * std::pow(logtev, 6)
+//					+ 0.0001119543953861 * std::pow(logtev, 7) - 2.039149852002e-6 * std::pow(logtev, 8));
+//
+//	const auto dk1dT = (1 * 13.53655609057 - 2 * 5.739328757388 * logtev + 3 * 1.563154982022 * std::pow(logtev, 2) - 4 * 0.2877056004391 * std::pow(logtev, 3)
+//			+ 5 * 0.03482559773736999 * std::pow(logtev, 4) - 6 * 0.00263197617559 * std::pow(logtev, 5) + 7 * 0.0001119543953861 * std::pow(logtev, 6)
+//			- 8 * 2.039149852002e-6 * std::pow(logtev, 7)) * k1 / tev / KperEv;
+//
+//	const auto k3 = exp(
+//			-44.09864886561001 + 23.91596563469 * logtev - 10.75323019821 * std::pow(logtev, 2) + 3.058038757198 * std::pow(logtev, 3)
+//					- 0.5685118909884001 * std::pow(logtev, 4) + 0.06795391233790001 * std::pow(logtev, 5) - 0.005009056101857001 * std::pow(logtev, 6)
+//					+ 0.0002067236157507 * std::pow(logtev, 7) - 3.649161410833e-6 * std::pow(logtev, 8));
+//
+//	const auto dk3dT = (1 * 23.91596563469 - 2 * 10.75323019821 * logtev + 3 * 3.058038757198 * std::pow(logtev, 2)
+//			- 4 * 0.5685118909884001 * std::pow(logtev, 3) + 5 * 0.06795391233790001 * std::pow(logtev, 4) - 6 * 0.005009056101857001 * std::pow(logtev, 5)
+//			+ 7 * 0.0002067236157507 * std::pow(logtev, 6) - 8 * 3.649161410833e-6 * std::pow(logtev, 7)) * k3 / tev / KperEv;
+//
+//	const auto k5 = exp(
+//			-68.71040990212001 + 43.93347632635 * logtev - 18.48066993568 * std::pow(logtev, 2) + 4.701626486759002 * std::pow(logtev, 3)
+//					- 0.7692466334492 * std::pow(logtev, 4) + 0.08113042097303 * std::pow(logtev, 5) - 0.005324020628287001 * std::pow(logtev, 6)
+//					+ 0.0001975705312221 * std::pow(logtev, 7) - 3.165581065665e-6 * std::pow(logtev, 8));
+//
+//	const auto dk5dT = (1 * 43.93347632635 - 2 * 18.48066993568 * logtev + 3 * 4.701626486759002 * std::pow(logtev, 2)
+//			- 4 * 0.7692466334492 * std::pow(logtev, 3) + 5 * 0.08113042097303 * std::pow(logtev, 4) - 6 * 0.005324020628287001 * std::pow(logtev, 5)
+//			+ 7 * 0.0001975705312221 * std::pow(logtev, 6) - 8 * 3.165581065665e-6 * std::pow(logtev, 7)) * k5 / tev / KperEv;
+//
+//	C1 = 7.50e-19 * (1.0 + std::sqrt(T / 100000)) * std::exp(-118348 / T);
+//	dC1dT = 7.50e-19 * ((118348. + (374.2492365256074 + 0.0015811388300841897 * T) * std::sqrt(T)) / (std::exp(118348 / T) * T * T));
+//	C2 = 9.10e-27 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.1687) * std::exp(-13179 / T);
+//	dC2dT = 9.10e-27
+//			* ((13179 * std::pow(T, 1.8374) + 41.67565728335908 * std::pow(T, 2.3374) - 0.1687 * std::pow(T, 2.8374)
+//					+ 0.0010476625888137844 * std::pow(T, 3.3374)) / (std::exp(13179 / T) * std::pow(T, 4.0061)));
+//	C3 = 5.54e-17 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.397) * std::exp(-473638 / T);
+//	dC3dT =
+//			5.54e-17
+//					* ((473638. * std::pow(T, 2.294) + 1497.774866406831 * std::pow(T, 2.794) - 0.397 * std::pow(T, 3.294)
+//							+ 0.00032571459899734327 * std::pow(T, 3.794)) / (std::exp(473638 / T) * std::pow(T, 4.691)));
+//	C4 = 2.18e-11 * k1;
+//	dC4dT = 2.18e-11 * dk1dT;
+//	C5 = 3.94e-11 * k3;
+//	dC5dT = 3.94e-11 * dk3dT;
+//	C6 = 8.72e-11 * k5;
+//	dC6dT = 8.72e-11 * dk5dT;
+//	C7 = 5.01e-27 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.1687) * std::exp(-55338 / T);
+//	dC7dT = 5.01e-27
+//			* ((55338 * std::pow(T, 1.8374) + 174.9941211583978 * std::pow(T, 2.3374) - 0.1687 * std::pow(T, 2.8374)
+//					+ 0.0010476625888137844 * std::pow(T, 3.3374)) / (std::exp(55338 / T) * std::pow(T, 4.0061)));
+//	C8 = 8.70e-27 * std::sqrt(T) * std::pow(T3, -0.2) / (1.0 + std::pow(T6, 0.7));
+//	dC8dT = 8.70e-27 * (-((25238.293779207717 - 3e8 / std::pow(T, 0.7)) / (2.5118864315095773e8 + 31697.863849222253 * std::pow(T, 0.7) + std::pow(T, 1.4))));
+//	C9 = 1.55e-26 * std::pow(T, 0.3647);
+//	dC9dT = 0.3647 * C9 / T;
+//	C10 = 1.24e-13 * std::pow(T, -1.5) * (1 + 0.3 * std::exp(-94000 / T)) * std::exp(-470000 / T);
+//	dC10dT = 1.24e-13
+//			* (((169200 + 470000 * std::exp(94000 / T)) * std::pow(T, 2.5) + (-0.45 - 1.5 * std::exp(94000 / T)) * std::pow(T, 3.5))
+//					/ (std::exp(564000 / T) * std::pow(T, 6.)));
+//	C11 = 3.48e-26 * std::sqrt(T) * std::pow(T / 1000, -0.2) / (1.0 + std::pow(T / 1000000, 0.7));
+//	dC11dT = 3.48e-26
+//			* (-((25238.293779207717 - 3e8 / std::pow(T, 0.7)) / (2.5118864315095773e8 + 31697.863849222253 * std::pow(T, 0.7) + 1. * std::pow(T, 1.4))));
+//	C12 = 1.43e-27 * std::sqrt(T) * (1.1 + 0.34 * std::exp(-std::pow(5.50 - std::log10(T), 2) / 3.0));
+//	dC12dT = 1.43e-27
+//			* (0.55 / std::pow(T, 0.5)
+//					+ (std::pow(T, 1.0924131003119228) * (0.00002971599807934954 - 1.7857483385425343e-6 * std::log(T)))
+//							/ std::exp(0.06287056567053795 * std::pow(std::log(T), 2)));
+//	C13 = 5.64e-36 * std::pow(1 + z, 4) * (T - 2.73 * (1 + z));
+//	dC13dT = 5.64e-36 * std::pow(1 + z, 4);
+//
 }
 
 bool compute_next_state(std::array<double, NS> U0, std::array<double, NS> &U, double T, double z, double dt) {
@@ -599,39 +247,72 @@ bool compute_next_state(std::array<double, NS> U0, std::array<double, NS> &U, do
 
 	const auto Htot = H0 + Hp0;
 	const auto Hetot = Hep0 + He0 + Hepp0;
-	chemical_rates(K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19, T);
-	radiation_rates(J20, J21, J22, J23, J24, J25, J26, J27, J28, z);
-//	J20 = J21 = J22 = 0.0;
-//	K3 = K4 = K5 = K6 = 0.0;
+	chemical_rates(K1, K2, K3, K4, K5, K6, T);
+	radiation_rates(J20, J21, J22, z);
+//	K1 = K2 = K3 = K4 = K5 = K6 = 0.0;
 	double err;
 #define List(a0,a1,a2,a3,a4,a5) {a0,a1,a2,a3,a4,a5}
 #define Power std::pow
+	std::array<double, NF> f = { -H + H0 - Hp + Hp0, Hp - Hp0 + dt * Hp * K2 * ne - dt * H * (J20 + K1 * ne), -He + He0 - Hep + Hep0 - Hepp + Hepp0, Hep - Hep0
+			+ dt * Hep * (J22 + (K4 + K5) * ne) - dt * (He * J21 + He * K3 * ne + Hepp * K6 * ne), Hepp - Hepp0 + dt * Hepp * K6 * ne
+			- dt * Hep * (J22 + K5 * ne), -Hep - 2 * Hepp - Hp + ne };
 	do {
-		const std::array<double, NF> f = { -H + H0 - Hp + Hp0, Hp - Hp0 + dt * Hp * K2 * ne - dt * H * (J20 + K1 * ne), -He + He0 - Hep + Hep0 - Hepp + Hepp0,
-				Hep - Hep0 + dt * Hep * (J22 + (K4 + K5) * ne) - dt * (He * J21 + He * K3 * ne + Hepp * K6 * ne), Hepp - Hepp0 + dt * Hepp * K6 * ne
-						- dt * Hep * (J22 + K5 * ne), -Hep - 2 * Hepp - Hp + ne };
-		const std::array<std::array<double, NF>, NF> A = { { List(-1,-1,0,0,0,0), List(-(dt*(J20 + K1*ne)),1 + dt*K2*ne,0,0,0,dt*(-(H*K1) + Hp*K2)),
-				List(0, 0, -1, -1, -1, 0),
-		List(0,0,-(dt*(J21 + K3*ne)),1 + dt*(J22 + (K4 + K5)*ne),-(dt*K6*ne),-(dt*(He*K3 - Hep*(K4 + K5) + Hepp*K6))),
-				List(0, 0, 0, -(dt * (J22 + K5 * ne)), 1 + dt * K6 * ne, dt * (-(Hep * K5) + Hepp * K6)), List(0,-1,0,-1,-2,1) } };
-		const auto Ainv = matrix_inverse<NF>(A);
+
+		const double a10 = -(dt * (J20 + K1 * ne));
+		const double a11 = 1 + dt * K2 * ne;
+		const double a15 = -(dt * (H * K1 - Hp * K2));
+		const double a32 = -(dt * (J21 + K3 * ne));
+		const double a33 = 1 - dt * (-J22 - K4 * ne - K5 * ne);
+		const double a34 = -(dt * K6 * ne);
+		const double a35 = -(dt * (He * K3 - Hep * K4 - Hep * K5 + Hepp * K6));
+		const double a43 = -(dt * (J22 + K5 * ne));
+		const double a44 = 1 + dt * K6 * ne;
+		const double a45 = -(dt * (Hep * K5 - Hepp * K6));
+		const double detA = a15 * (-(a34 * a43) + a32 * (a43 - a44) + a33 * a44)
+				+ a11 * (-2 * a35 * a43 + a33 * a44 + a35 * a44 + a32 * (a43 - a44 - a45) + 2 * a33 * a45 - a34 * (a43 + a45))
+				+ a10 * (2 * a35 * a43 - a33 * a44 - a35 * a44 - 2 * a33 * a45 + a34 * (a43 + a45) + a32 * (-a43 + a44 + a45));
+		const std::array<std::array<double, NF>, NF> AinvdetA = { {
+		List(
+				a15 * (a34 * a43 - a33 * a44 + a32 * (-a43 + a44))
+				+ a11 * (a34 * a43 + 2 * a35 * a43 - a35 * a44 + a34 * a45 + a32 * (-a43 + a44 + a45) - a33 * (a44 + 2 * a45)),
+				2 * a35 * a43 - a33 * a44 - a35 * a44 - 2 * a33 * a45 + a34 * (a43 + a45) + a32 * (-a43 + a44 + a45), a15 * a32 * (-2 * a43 + a44),
+				a15 * (-2 * a43 + a44), -(a15 * (a32 - 2 * a33 + a34)), a15 * (-(a34 * a43) + a32 * (a43 - a44) + a33 * a44)),
+		List(a10 * (-2 * a35 * a43 + a33 * a44 + a35 * a44 + a32 * (a43 - a44 - a45) + 2 * a33 * a45 - a34 * (a43 + a45)),
+				-2 * a35 * a43 + a33 * a44 + a35 * a44 + a32 * (a43 - a44 - a45) + 2 * a33 * a45 - a34 * (a43 + a45), a15 * a32 * (2 * a43 - a44),
+				a15 * (2 * a43 - a44), a15 * (a32 - 2 * a33 + a34), a15 * (a34 * a43 - a33 * a44 + a32 * (-a43 + a44))),
+		List(a10 * (a35 * (-a43 + a44) + (a33 - a34) * a45), a35 * (-a43 + a44) + (a33 - a34) * a45,
+				a15 * (a34 * a43 - a33 * a44) + a10 * (-2 * a35 * a43 + a33 * a44 + a35 * a44 + 2 * a33 * a45 - a34 * (a43 + a45))
+				+ a11 * (a34 * a43 + 2 * a35 * a43 - a35 * a44 + a34 * a45 - a33 * (a44 + 2 * a45)),
+				(-a10 + a11 + a15) * (a43 - a44) + (a10 - a11) * a45, -((-a10 + a11 + a15) * (a33 - a34)) + (-a10 + a11) * a35,
+				(a10 - a11) * (a35 * (a43 - a44) + (-a33 + a34) * a45)),
+		List(-(a10 * (a35 * a44 + (a32 - a34) * a45)), -(a35 * a44) + (-a32 + a34) * a45,
+				a32 * ((a11 + a15) * a44 + 2 * a11 * a45 - a10 * (a44 + 2 * a45)), (a11 + a15) * a44 + 2 * a11 * a45 - a10 * (a44 + 2 * a45),
+				(-a10 + a11 + a15) * (a32 - a34) + 2 * (a10 - a11) * a35, (a10 - a11) * (a35 * a44 + (a32 - a34) * a45)),
+		List(a10 * (a35 * a43 + (a32 - a33) * a45), a35 * a43 + (a32 - a33) * a45, a32 * (-(a15 * a43) + a10 * (a43 + a45) - a11 * (a43 + a45)),
+				-(a15 * a43) + a10 * (a43 + a45) - a11 * (a43 + a45), -((-a10 + a11 + a15) * (a32 - a33)) + (-a10 + a11) * a35,
+				-((a10 - a11) * (a35 * a43 + (a32 - a33) * a45))),
+		List(a10 * (-(a34 * a43) + a32 * (a43 - a44) + a33 * a44), -(a34 * a43) + a32 * (a43 - a44) + a33 * a44, (a10 - a11) * a32 * (2 * a43 - a44),
+				(a10 - a11) * (2 * a43 - a44), (a10 - a11) * (a32 - 2 * a33 + a34), (a10 - a11) * (a34 * a43 - a33 * a44 + a32 * (-a43 + a44))) } };
 		for (int n = 0; n < NF; n++) {
 			auto dU = 0.0;
 			for (int m = 0; m < NF; m++) {
-				dU += Ainv[n][m] * f[m];
+				dU += AinvdetA[n][m] * f[m] / detA;
 			}
 			U[n] = U[n] - dU;
-			if( U[n] < 0.0 ) {
+			if (U[n] < 0.0) {
 				return false;
 			}
 		}
 		err = 0.0;
+		f = { -H + H0 - Hp + Hp0, Hp - Hp0 + dt * Hp * K2 * ne - dt * H * (J20 + K1 * ne), -He + He0 - Hep + Hep0 - Hepp + Hepp0, Hep - Hep0
+				+ dt * Hep * (J22 + (K4 + K5) * ne) - dt * (He * J21 + He * K3 * ne + Hepp * K6 * ne), Hepp - Hepp0 + dt * Hepp * K6 * ne
+				- dt * Hep * (J22 + K5 * ne), -Hep - 2 * Hepp - Hp + ne };
 		for (int i = 0; i < NF; i++) {
 			err += f[i] * f[i];
 		}
 		err = std::sqrt(err);
 		err /= (H + Hp + He + Hep + Hepp + ne);
-	} while (err > 1.0e-7);
+	} while (err > 1.0e-9);
 	return true;
 }
 
@@ -684,16 +365,16 @@ double chemistry_update(const species sn, species &snp1, double e, double scale0
 void chemistry_test() {
 	species s0;
 	const auto n = 1.0;
-	s0.H = 0.0 * n;
-	s0.Hp = 0.92 * n;
-	s0.He = 0.00 * n;
+	s0.H = 0.92 * n;
+	s0.Hp = 0.001 * n;
+	s0.He = 0.08 * n;
 	s0.Hep = 0.00 * n;
-	s0.Hepp = 0.08 * n;
-	double T0 = 1e+3;
+	s0.Hepp = 0.00 * n;
+	double T0 = 1e+7;
 	auto s = s0;
 	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "t", "T0", "T", "na", "ne", "H", "Hp", "He", "Hep", "Hepp");
 	for (double dt = 1e1; dt < 1e18; dt *= 10.0) {
-		auto T = chemistry_update(s0, s, species_energy(s0, T0), 1.0, 1.0, dt);
+		auto T = chemistry_update(s0, s, species_energy(s0, T0), 0.0, 0.0, dt);
 		const auto ne = s.Hp + s.Hep + 2 * s.Hepp;
 		const auto na = s.Hp + s.H + 4 * s.He + 4 * s.Hep + 4 * s.Hepp;
 		printf("%14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e\n", dt / (3600 * 24 * 365), T0, T, na, ne, s.H, s.Hp, s.He, s.Hep,
