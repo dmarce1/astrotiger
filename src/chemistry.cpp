@@ -140,180 +140,10 @@ void radiation_rates(double &I20, double &I21, double &I22, double z) {
 	I22 = 5.79e-13 * homo_rate(z, 0.278, -0.8260, 0.1730, 1.973, 0.2880);
 }
 
-double ion_energy(species s) {
-	const auto evtoerg = 1.60218e-12;
-	const auto Hion = -13.6 * evtoerg;
-	const auto Heion = -(24.6 + 13.6 * 4) * evtoerg;
-	const auto Hepion = -24.6 * evtoerg;
-	return s.H * Hion + s.He * Heion + s.Hep * Hepion;
-}
-
-void cooling_rate(double &C1, double &C2, double &C3, double &C4, double &C5, double &C6, double &C7, double &C8, double &C9, double &C10, double &C11,
-		double &C12, double &C13, double &dC1dT, double &dC2dT, double &dC3dT, double &dC4dT, double &dC5dT, double &dC6dT, double &dC7dT, double &dC8dT,
-		double &dC9dT, double &dC10dT, double &dC11dT, double &dC12dT, double &dC13dT, double T, double z) {
-	const auto T3 = T / 1e3;
-	const auto T5 = T / 1e5;
-	const auto T6 = T / 1e6;
-	const auto tev = T / KperEv;
-	const auto logtev = std::log(T);
-	const auto tiny = std::numeric_limits<double>::min();
-//
-//	const auto k1 = exp(
-//			-32.71396786375 + 13.53655609057 * logtev - 5.739328757388 * std::pow(logtev, 2) + 1.563154982022 * std::pow(logtev, 3)
-//					- 0.2877056004391 * std::pow(logtev, 4) + 0.03482559773736999 * std::pow(logtev, 5) - 0.00263197617559 * std::pow(logtev, 6)
-//					+ 0.0001119543953861 * std::pow(logtev, 7) - 2.039149852002e-6 * std::pow(logtev, 8));
-//
-//	const auto dk1dT = (1 * 13.53655609057 - 2 * 5.739328757388 * logtev + 3 * 1.563154982022 * std::pow(logtev, 2) - 4 * 0.2877056004391 * std::pow(logtev, 3)
-//			+ 5 * 0.03482559773736999 * std::pow(logtev, 4) - 6 * 0.00263197617559 * std::pow(logtev, 5) + 7 * 0.0001119543953861 * std::pow(logtev, 6)
-//			- 8 * 2.039149852002e-6 * std::pow(logtev, 7)) * k1 / tev / KperEv;
-//
-//	const auto k3 = exp(
-//			-44.09864886561001 + 23.91596563469 * logtev - 10.75323019821 * std::pow(logtev, 2) + 3.058038757198 * std::pow(logtev, 3)
-//					- 0.5685118909884001 * std::pow(logtev, 4) + 0.06795391233790001 * std::pow(logtev, 5) - 0.005009056101857001 * std::pow(logtev, 6)
-//					+ 0.0002067236157507 * std::pow(logtev, 7) - 3.649161410833e-6 * std::pow(logtev, 8));
-//
-//	const auto dk3dT = (1 * 23.91596563469 - 2 * 10.75323019821 * logtev + 3 * 3.058038757198 * std::pow(logtev, 2)
-//			- 4 * 0.5685118909884001 * std::pow(logtev, 3) + 5 * 0.06795391233790001 * std::pow(logtev, 4) - 6 * 0.005009056101857001 * std::pow(logtev, 5)
-//			+ 7 * 0.0002067236157507 * std::pow(logtev, 6) - 8 * 3.649161410833e-6 * std::pow(logtev, 7)) * k3 / tev / KperEv;
-//
-//	const auto k5 = exp(
-//			-68.71040990212001 + 43.93347632635 * logtev - 18.48066993568 * std::pow(logtev, 2) + 4.701626486759002 * std::pow(logtev, 3)
-//					- 0.7692466334492 * std::pow(logtev, 4) + 0.08113042097303 * std::pow(logtev, 5) - 0.005324020628287001 * std::pow(logtev, 6)
-//					+ 0.0001975705312221 * std::pow(logtev, 7) - 3.165581065665e-6 * std::pow(logtev, 8));
-//
-//	const auto dk5dT = (1 * 43.93347632635 - 2 * 18.48066993568 * logtev + 3 * 4.701626486759002 * std::pow(logtev, 2)
-//			- 4 * 0.7692466334492 * std::pow(logtev, 3) + 5 * 0.08113042097303 * std::pow(logtev, 4) - 6 * 0.005324020628287001 * std::pow(logtev, 5)
-//			+ 7 * 0.0001975705312221 * std::pow(logtev, 6) - 8 * 3.165581065665e-6 * std::pow(logtev, 7)) * k5 / tev / KperEv;
-//
-//	C1 = 7.50e-19 * (1.0 + std::sqrt(T / 100000)) * std::exp(-118348 / T);
-//	dC1dT = 7.50e-19 * ((118348. + (374.2492365256074 + 0.0015811388300841897 * T) * std::sqrt(T)) / (std::exp(118348 / T) * T * T));
-//	C2 = 9.10e-27 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.1687) * std::exp(-13179 / T);
-//	dC2dT = 9.10e-27
-//			* ((13179 * std::pow(T, 1.8374) + 41.67565728335908 * std::pow(T, 2.3374) - 0.1687 * std::pow(T, 2.8374)
-//					+ 0.0010476625888137844 * std::pow(T, 3.3374)) / (std::exp(13179 / T) * std::pow(T, 4.0061)));
-//	C3 = 5.54e-17 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.397) * std::exp(-473638 / T);
-//	dC3dT =
-//			5.54e-17
-//					* ((473638. * std::pow(T, 2.294) + 1497.774866406831 * std::pow(T, 2.794) - 0.397 * std::pow(T, 3.294)
-//							+ 0.00032571459899734327 * std::pow(T, 3.794)) / (std::exp(473638 / T) * std::pow(T, 4.691)));
-//	C4 = 2.18e-11 * k1;
-//	dC4dT = 2.18e-11 * dk1dT;
-//	C5 = 3.94e-11 * k3;
-//	dC5dT = 3.94e-11 * dk3dT;
-//	C6 = 8.72e-11 * k5;
-//	dC6dT = 8.72e-11 * dk5dT;
-//	C7 = 5.01e-27 * (1.0 + std::sqrt(T / 100000)) * std::pow(T, -.1687) * std::exp(-55338 / T);
-//	dC7dT = 5.01e-27
-//			* ((55338 * std::pow(T, 1.8374) + 174.9941211583978 * std::pow(T, 2.3374) - 0.1687 * std::pow(T, 2.8374)
-//					+ 0.0010476625888137844 * std::pow(T, 3.3374)) / (std::exp(55338 / T) * std::pow(T, 4.0061)));
-//	C8 = 8.70e-27 * std::sqrt(T) * std::pow(T3, -0.2) / (1.0 + std::pow(T6, 0.7));
-//	dC8dT = 8.70e-27 * (-((25238.293779207717 - 3e8 / std::pow(T, 0.7)) / (2.5118864315095773e8 + 31697.863849222253 * std::pow(T, 0.7) + std::pow(T, 1.4))));
-//	C9 = 1.55e-26 * std::pow(T, 0.3647);
-//	dC9dT = 0.3647 * C9 / T;
-//	C10 = 1.24e-13 * std::pow(T, -1.5) * (1 + 0.3 * std::exp(-94000 / T)) * std::exp(-470000 / T);
-//	dC10dT = 1.24e-13
-//			* (((169200 + 470000 * std::exp(94000 / T)) * std::pow(T, 2.5) + (-0.45 - 1.5 * std::exp(94000 / T)) * std::pow(T, 3.5))
-//					/ (std::exp(564000 / T) * std::pow(T, 6.)));
-//	C11 = 3.48e-26 * std::sqrt(T) * std::pow(T / 1000, -0.2) / (1.0 + std::pow(T / 1000000, 0.7));
-//	dC11dT = 3.48e-26
-//			* (-((25238.293779207717 - 3e8 / std::pow(T, 0.7)) / (2.5118864315095773e8 + 31697.863849222253 * std::pow(T, 0.7) + 1. * std::pow(T, 1.4))));
-//	C12 = 1.43e-27 * std::sqrt(T) * (1.1 + 0.34 * std::exp(-std::pow(5.50 - std::log10(T), 2) / 3.0));
-//	dC12dT = 1.43e-27
-//			* (0.55 / std::pow(T, 0.5)
-//					+ (std::pow(T, 1.0924131003119228) * (0.00002971599807934954 - 1.7857483385425343e-6 * std::log(T)))
-//							/ std::exp(0.06287056567053795 * std::pow(std::log(T), 2)));
-//	C13 = 5.64e-36 * std::pow(1 + z, 4) * (T - 2.73 * (1 + z));
-//	dC13dT = 5.64e-36 * std::pow(1 + z, 4);
-//
-}
-
-bool compute_next_state(std::array<double, NS> U0, std::array<double, NS> &U, double T, double z, double dt) {
-	double K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K11, K12, K13, K14, K15, K16, K17, K18, K19;
-	double J20, J21, J22, J23, J24, J25, J26, J27, J28;
-
-	const auto H0 = U0[nH];
-	const auto Hp0 = U0[nHP];
-	const auto He0 = U0[nHE];
-	const auto Hep0 = U0[nHEP];
-	const auto Hepp0 = U0[nHEPP];
-	const auto ne0 = U0[nE];
-	auto &ne = U[nE];
-	auto &H = U[nH];
-	auto &Hp = U[nHP];
-	auto &He = U[nHE];
-	auto &Hep = U[nHEP];
-	auto &Hepp = U[nHEPP];
-	U = U0;
-
-	const auto Htot = H0 + Hp0;
-	const auto Hetot = Hep0 + He0 + Hepp0;
-	chemical_rates(K1, K2, K3, K4, K5, K6, T);
-	radiation_rates(J20, J21, J22, z);
-//	K1 = K2 = K3 = K4 = K5 = K6 = 0.0;
-	double err;
-#define List(a0,a1,a2,a3,a4,a5) {a0,a1,a2,a3,a4,a5}
-#define Power std::pow
-	std::array<double, NF> f = { -H + H0 - Hp + Hp0, Hp - Hp0 + dt * Hp * K2 * ne - dt * H * (J20 + K1 * ne), -He + He0 - Hep + Hep0 - Hepp + Hepp0, Hep - Hep0
-			+ dt * Hep * (J22 + (K4 + K5) * ne) - dt * (He * J21 + He * K3 * ne + Hepp * K6 * ne), Hepp - Hepp0 + dt * Hepp * K6 * ne
-			- dt * Hep * (J22 + K5 * ne), -Hep - 2 * Hepp - Hp + ne };
-	do {
-
-		const double a10 = -(dt * (J20 + K1 * ne));
-		const double a11 = 1 + dt * K2 * ne;
-		const double a15 = -(dt * (H * K1 - Hp * K2));
-		const double a32 = -(dt * (J21 + K3 * ne));
-		const double a33 = 1 - dt * (-J22 - K4 * ne - K5 * ne);
-		const double a34 = -(dt * K6 * ne);
-		const double a35 = -(dt * (He * K3 - Hep * K4 - Hep * K5 + Hepp * K6));
-		const double a43 = -(dt * (J22 + K5 * ne));
-		const double a44 = 1 + dt * K6 * ne;
-		const double a45 = -(dt * (Hep * K5 - Hepp * K6));
-		const double detA = a15 * (-(a34 * a43) + a32 * (a43 - a44) + a33 * a44)
-				+ a11 * (-2 * a35 * a43 + a33 * a44 + a35 * a44 + a32 * (a43 - a44 - a45) + 2 * a33 * a45 - a34 * (a43 + a45))
-				+ a10 * (2 * a35 * a43 - a33 * a44 - a35 * a44 - 2 * a33 * a45 + a34 * (a43 + a45) + a32 * (-a43 + a44 + a45));
-		const std::array<std::array<double, NF>, NF> AinvdetA = { {
-		List(
-				a15 * (a34 * a43 - a33 * a44 + a32 * (-a43 + a44))
-				+ a11 * (a34 * a43 + 2 * a35 * a43 - a35 * a44 + a34 * a45 + a32 * (-a43 + a44 + a45) - a33 * (a44 + 2 * a45)),
-				2 * a35 * a43 - a33 * a44 - a35 * a44 - 2 * a33 * a45 + a34 * (a43 + a45) + a32 * (-a43 + a44 + a45), a15 * a32 * (-2 * a43 + a44),
-				a15 * (-2 * a43 + a44), -(a15 * (a32 - 2 * a33 + a34)), a15 * (-(a34 * a43) + a32 * (a43 - a44) + a33 * a44)),
-		List(a10 * (-2 * a35 * a43 + a33 * a44 + a35 * a44 + a32 * (a43 - a44 - a45) + 2 * a33 * a45 - a34 * (a43 + a45)),
-				-2 * a35 * a43 + a33 * a44 + a35 * a44 + a32 * (a43 - a44 - a45) + 2 * a33 * a45 - a34 * (a43 + a45), a15 * a32 * (2 * a43 - a44),
-				a15 * (2 * a43 - a44), a15 * (a32 - 2 * a33 + a34), a15 * (a34 * a43 - a33 * a44 + a32 * (-a43 + a44))),
-		List(a10 * (a35 * (-a43 + a44) + (a33 - a34) * a45), a35 * (-a43 + a44) + (a33 - a34) * a45,
-				a15 * (a34 * a43 - a33 * a44) + a10 * (-2 * a35 * a43 + a33 * a44 + a35 * a44 + 2 * a33 * a45 - a34 * (a43 + a45))
-				+ a11 * (a34 * a43 + 2 * a35 * a43 - a35 * a44 + a34 * a45 - a33 * (a44 + 2 * a45)),
-				(-a10 + a11 + a15) * (a43 - a44) + (a10 - a11) * a45, -((-a10 + a11 + a15) * (a33 - a34)) + (-a10 + a11) * a35,
-				(a10 - a11) * (a35 * (a43 - a44) + (-a33 + a34) * a45)),
-		List(-(a10 * (a35 * a44 + (a32 - a34) * a45)), -(a35 * a44) + (-a32 + a34) * a45,
-				a32 * ((a11 + a15) * a44 + 2 * a11 * a45 - a10 * (a44 + 2 * a45)), (a11 + a15) * a44 + 2 * a11 * a45 - a10 * (a44 + 2 * a45),
-				(-a10 + a11 + a15) * (a32 - a34) + 2 * (a10 - a11) * a35, (a10 - a11) * (a35 * a44 + (a32 - a34) * a45)),
-		List(a10 * (a35 * a43 + (a32 - a33) * a45), a35 * a43 + (a32 - a33) * a45, a32 * (-(a15 * a43) + a10 * (a43 + a45) - a11 * (a43 + a45)),
-				-(a15 * a43) + a10 * (a43 + a45) - a11 * (a43 + a45), -((-a10 + a11 + a15) * (a32 - a33)) + (-a10 + a11) * a35,
-				-((a10 - a11) * (a35 * a43 + (a32 - a33) * a45))),
-		List(a10 * (-(a34 * a43) + a32 * (a43 - a44) + a33 * a44), -(a34 * a43) + a32 * (a43 - a44) + a33 * a44, (a10 - a11) * a32 * (2 * a43 - a44),
-				(a10 - a11) * (2 * a43 - a44), (a10 - a11) * (a32 - 2 * a33 + a34), (a10 - a11) * (a34 * a43 - a33 * a44 + a32 * (-a43 + a44))) } };
-		for (int n = 0; n < NF; n++) {
-			auto dU = 0.0;
-			for (int m = 0; m < NF; m++) {
-				dU += AinvdetA[n][m] * f[m] / detA;
-			}
-			U[n] = U[n] - dU;
-			if (U[n] < 0.0) {
-				return false;
-			}
-		}
-		err = 0.0;
-		f = { -H + H0 - Hp + Hp0, Hp - Hp0 + dt * Hp * K2 * ne - dt * H * (J20 + K1 * ne), -He + He0 - Hep + Hep0 - Hepp + Hepp0, Hep - Hep0
-				+ dt * Hep * (J22 + (K4 + K5) * ne) - dt * (He * J21 + He * K3 * ne + Hepp * K6 * ne), Hepp - Hepp0 + dt * Hepp * K6 * ne
-				- dt * Hep * (J22 + K5 * ne), -Hep - 2 * Hepp - Hp + ne };
-		for (int i = 0; i < NF; i++) {
-			err += f[i] * f[i];
-		}
-		err = std::sqrt(err);
-		err /= (H + Hp + He + Hep + Hepp + ne);
-	} while (err > 1.0e-9);
-	return true;
+void heating_rates(double &I20, double &I21, double &I22, double z) {
+	I20 = 8.86e-25 * homo_rate(z, 0.231, -0.6818, 0.1646, 1.855, 0.3097);
+	I21 = 5.86e-24 * homo_rate(z, -1.038, -1.1640, 0.1940, 1.973, -0.6561);
+	I22 = 2.17e-25 * homo_rate(z, 0.278, -0.8260, 0.1730, 1.973, 0.2880);
 }
 
 double species_T(species s0, double egas0) {
@@ -327,54 +157,260 @@ double species_energy(species s0, double T) {
 	return ((1.5 * s0.H + 3 * s0.Hp + 1.5 * s0.He + 3 * s0.Hep + 4.5 * s0.Hepp) * kb) * T;
 }
 
-double chemistry_update(const species sn, species &snp1, double e, double scale0, double scale1, double dt) {
-	std::array<double, NS> Un;
-	Un[nH] = sn.H;
-	Un[nHP] = sn.Hp;
-	Un[nHE] = sn.He;
-	Un[nHEP] = sn.Hep;
-	Un[nHEPP] = sn.Hepp;
-	Un[nE] = sn.Hp + sn.Hep + 2 * sn.Hepp;
+double ion_energy(species s) {
+	const auto evtoerg = 1.60218e-12;
+	const auto Hion = -13.6 * evtoerg;
+	const auto Heion = -(24.6 + 13.6 * 4) * evtoerg;
+	const auto Hepion = -24.6 * evtoerg;
+	return s.H * Hion + s.He * Heion + s.Hep * Hepion;
+}
 
-	std::array<double, NS> Unp1 = Un;
-//	compute_next_state(Un, Unp1, species_T(Un, e), scale1, dt);
-	double this_dt = dt;
-	double tmax = dt;
-	double t = 0.0;
-	while (t < tmax) {
-//		printf("stepping %e %e\n", t / tmax, this_dt / tmax);
-		const auto w = (t + this_dt) / tmax;
-		const auto scale = scale0 * (1.0 - w) + scale1 * w;
-		if (compute_next_state(Un, Unp1, species_T(Un, e), scale, this_dt)) {
-			t += this_dt;
-			this_dt = std::min(tmax - t, this_dt * 2.0);
-			Un = Unp1;
-		} else {
-			this_dt /= 2.0;
-			Unp1 = Un;
-		}
+void cooling_rate(species s, double &dEdt, double &dEdtdT, double z, double T) {
+	double C1, C2, C3, C4, C5, C6, C7, C8, C9, C10, C11, C12, C13, dC1dT, dC2dT, dC3dT, dC4dT, dC5dT, dC6dT, dC7dT, dC8dT, dC9dT, dC10dT, dC11dT, dC12dT,
+			dC13dT;
+
+	const auto ne = s.Hp + s.Hep + 2 * s.Hepp;
+	const auto T3 = T / 1e3;
+	const auto T5 = T / 1e5;
+	const auto T6 = T / 1e6;
+	const auto tev = T / KperEv;
+	const auto logtev = std::log(T);
+	const auto tiny = std::numeric_limits<double>::min();
+
+	const auto k1 = std::exp(
+			-32.71396786375 + 13.53655609057 * logtev - 5.739328757388 * std::pow(logtev, 2) + 1.563154982022 * std::pow(logtev, 3)
+					- 0.2877056004391 * std::pow(logtev, 4) + 0.03482559773736999 * std::pow(logtev, 5) - 0.00263197617559 * std::pow(logtev, 6)
+					+ 0.0001119543953861 * std::pow(logtev, 7) - 2.039149852002e-6 * std::pow(logtev, 8));
+
+	const auto dk1dT = (1 * 13.53655609057 - 2 * 5.739328757388 * logtev + 3 * 1.563154982022 * std::pow(logtev, 2) - 4 * 0.2877056004391 * std::pow(logtev, 3)
+			+ 5 * 0.03482559773736999 * std::pow(logtev, 4) - 6 * 0.00263197617559 * std::pow(logtev, 5) + 7 * 0.0001119543953861 * std::pow(logtev, 6)
+			- 8 * 2.039149852002e-6 * std::pow(logtev, 7)) * k1 / tev / KperEv;
+
+	const auto k3 = std::exp(
+			-44.09864886561001 + 23.91596563469 * logtev - 10.75323019821 * std::pow(logtev, 2) + 3.058038757198 * std::pow(logtev, 3)
+					- 0.5685118909884001 * std::pow(logtev, 4) + 0.06795391233790001 * std::pow(logtev, 5) - 0.005009056101857001 * std::pow(logtev, 6)
+					+ 0.0002067236157507 * std::pow(logtev, 7) - 3.649161410833e-6 * std::pow(logtev, 8));
+
+	const auto dk3dT = (1 * 23.91596563469 - 2 * 10.75323019821 * logtev + 3 * 3.058038757198 * std::pow(logtev, 2)
+			- 4 * 0.5685118909884001 * std::pow(logtev, 3) + 5 * 0.06795391233790001 * std::pow(logtev, 4) - 6 * 0.005009056101857001 * std::pow(logtev, 5)
+			+ 7 * 0.0002067236157507 * std::pow(logtev, 6) - 8 * 3.649161410833e-6 * std::pow(logtev, 7)) * k3 / tev / KperEv;
+
+	const auto k5 = std::exp(
+			-68.71040990212001 + 43.93347632635 * logtev - 18.48066993568 * std::pow(logtev, 2) + 4.701626486759002 * std::pow(logtev, 3)
+					- 0.7692466334492 * std::pow(logtev, 4) + 0.08113042097303 * std::pow(logtev, 5) - 0.005324020628287001 * std::pow(logtev, 6)
+					+ 0.0001975705312221 * std::pow(logtev, 7) - 3.165581065665e-6 * std::pow(logtev, 8));
+
+	const auto dk5dT = (1 * 43.93347632635 - 2 * 18.48066993568 * logtev + 3 * 4.701626486759002 * std::pow(logtev, 2)
+			- 4 * 0.7692466334492 * std::pow(logtev, 3) + 5 * 0.08113042097303 * std::pow(logtev, 4) - 6 * 0.005324020628287001 * std::pow(logtev, 5)
+			+ 7 * 0.0001975705312221 * std::pow(logtev, 6) - 8 * 3.165581065665e-6 * std::pow(logtev, 7)) * k5 / tev / KperEv;
+
+	if (T > 250) {
+		C1 = 7.50e-19 * std::exp(-118348 / T) / (1.0 + std::sqrt(T / 100000));
+		dC1dT = 7.50e-19 * (-500 * (-236696000 + std::sqrt(10) * (-236696 + T) * std::sqrt(T)))
+				/ (std::exp(118348 / T) * std::pow(1000 + std::sqrt(10) * std::sqrt(T), 2) * std::pow(T, 2));
+	} else {
+		C1 = dC1dT = 0.0;
 	}
-	snp1.H = Unp1[nH];
-	snp1.Hp = Unp1[nHP];
-	snp1.He = Unp1[nHE];
-	snp1.Hep = Unp1[nHEP];
-	snp1.Hepp = Unp1[nHEPP];
-	return species_T(snp1, e);
+	if (T > 25) {
+		C2 = 9.10e-27 * std::pow(T, -.1687) * std::exp(-13179 / T) / (1.0 + std::sqrt(T / 100000));
+		dC2dT = 9.10e-27
+				* (1.3179e10 * std::pow(T, 1.8374000000000001) + 4.167565728335908e7 * std::pow(T, 2.3373999999999997)
+						- 168700.00000000003 * std::pow(T, 2.8373999999999997) - 2114.6150713545953 * std::pow(T, 3.3373999999999997))
+				/ (std::exp(13179 / T) * std::pow(1000. + 3.1622776601683795 * std::sqrt(T), 2) * std::pow(T, 4.0061));
+	} else {
+		C2 = dC2dT = 0.0;
+	}
+	if (T > 1000) {
+		C3 = 5.54e-17 * std::pow(T, -.397) * std::exp(-473638 / T) / (1.0 + std::sqrt(T / 100000));
+		dC3dT = 5.54e-17
+				* (4.73638e11 * std::pow(T, 2.294) + 1.4977748664068308e9 * std::pow(T, 2.794) - 397000. * std::pow(T, 3.2940000000000005)
+						- 2836.5630611710367 * std::pow(T, 3.7940000000000005))
+				/ (std::exp(473638 / T) * std::pow(1000. + 3.1622776601683795 * std::sqrt(T), 2) * std::pow(T, 4.691000000000001));
+	} else {
+		C3 = dC3dT = 0.0;
+	}
+	C4 = 2.18e-11 * k1;
+	dC4dT = 2.18e-11 * dk1dT;
+	C5 = 3.94e-11 * k3;
+	dC5dT = 3.94e-11 * dk3dT;
+	C6 = 8.72e-11 * k5;
+	dC6dT = 8.72e-11 * dk5dT;
+	if (T > 100) {
+		C7 = 5.01e-27 * std::pow(T, -.1687) * std::exp(-55338 / T) / (1.0 + std::sqrt(T / 100000));
+		dC7dT = 5.01e-27
+				* (5.5338e10 * std::pow(T, 1.8374000000000001) + 1.749941211583978e8 * std::pow(T, 2.3373999999999997)
+						- 168700. * std::pow(T, 2.8373999999999997) - 2114.6150713545953 * std::pow(T, 3.3373999999999997))
+				/ (std::exp(55338 / T) * std::pow(1000. + 3.1622776601683795 * std::sqrt(T), 2) * std::pow(T, 4.0061));
+	} else {
+		C7 = dC7dT = 0.0;
+	}
+	C8 = 8.70e-27 * std::sqrt(T) * std::pow(T3, -0.2) / (1.0 + std::pow(T6, 0.7));
+	dC8dT = 8.70e-27
+			* -((25238.293779207717 - 2.9999999999999964e8 / std::pow(T, 0.7))
+					/ (2.5118864315095773e8 + 31697.863849222253 * std::pow(T, 0.7) + std::pow(T, 1.4)));
+	C9 = 1.55e-26 * std::pow(T, 0.3647);
+	dC9dT = 0.3647 * C9 / T;
+	if (T > 1000) {
+		C10 = 1.24e-13 * std::pow(T, -1.5) * (1 + 0.3 * std::exp(-94000 / T)) * std::exp(-470000 / T);
+		dC10dT = 1.24e-13
+				* (((169200 + 470000 * std::exp(94000 / T)) * std::pow(T, 2.5) + (-0.45 - 1.5 * std::exp(94000 / T)) * std::pow(T, 3.5))
+						/ (std::exp(564000 / T) * std::pow(T, 6.)));
+	} else {
+		C10 = dC10dT = 0.0;
+	}
+	C11 = 3.48e-26 * std::sqrt(T) * std::pow(T / 1000, -0.2) / (1.0 + std::pow(T / 1000000, 0.7));
+	dC11dT = 3.48e-26
+			* (-((25238.293779207717 - 3e8 / std::pow(T, 0.7)) / (2.5118864315095773e8 + 31697.863849222253 * std::pow(T, 0.7) + 1. * std::pow(T, 1.4))));
+	C12 = 1.43e-27 * std::sqrt(T) * (1.1 + 0.34 * std::exp(-std::pow(5.50 - std::log10(T), 2) / 3.0));
+	dC12dT = 1.43e-27
+			* (0.55 / std::pow(T, 0.5)
+					+ (std::pow(T, 1.0924131003119228) * (0.00002971599807934954 - 1.7857483385425343e-6 * std::log(T)))
+							/ std::exp(0.06287056567053795 * std::pow(std::log(T), 2)));
+	C13 = 5.64e-36 * std::pow(1 + z, 4) * (T - 2.73 * (1 + z));
+	dC13dT = 5.64e-36 * std::pow(1 + z, 4);
+
+	double J20, J21, J22;
+	heating_rates(J20, J21, J22, z);
+
+//	C1 = 0.0;
+//	C2 = 0.0;
+//	C3 = 0.0;
+//	C4 = 0.0;
+//	C5 = 0.0;
+//	C6 = 0.0;
+//	C7 = 0.0;
+////	C8 = 0.0;
+//	C9 = 0.0;
+//	C10 = 0.0;
+//	C11 = 0.0;
+//	C12 = 0.0;
+//	C13 = 0.0;
+//	dC1dT = 0.0;
+//	dC2dT = 0.0;
+//	dC3dT = 0.0;
+//	dC4dT = 0.0;
+//	dC5dT = 0.0;
+//	dC6dT = 0.0;
+//	dC7dT = 0.0;
+////	dC8dT = 0.0;
+//	dC9dT = 0.0;
+//	dC10dT = 0.0;
+//	dC11dT = 0.0;
+//	dC12dT = 0.0;
+//	dC13dT = 0.0;
+//	J20 = J21 = J22 = 0.0;
+
+	dEdt = -ne
+			* (C1 * s.H + C2 * ne * s.He + C3 * s.Hep + C4 * s.H + C5 * s.He + C6 * s.Hep + C7 * ne * s.Hep + C8 * s.Hp + C9 * s.Hep + C10 * s.Hep
+					+ C11 * s.Hepp + C12 * (s.Hp + s.Hep + s.Hepp) + C13);
+	dEdtdT = -ne
+			* (dC1dT * s.H + dC2dT * ne * s.He + dC3dT * s.Hep + dC4dT * s.H + dC5dT * s.He + dC6dT * s.Hep + dC7dT * ne * s.Hep + dC8dT * s.Hp + dC9dT * s.Hep
+					+ dC10dT * s.Hep + dC11dT * s.Hepp + dC12dT * (s.Hp + s.Hep + s.Hepp) + dC13dT);
+
+	dEdt += J20 * s.H + J21 * s.He + J22 * s.Hep;
+//	printf( "%e\n", dEdt);
+}
+
+double compute_next_energy(species s, double egas0, double z, double tmax) {
+//
+//	const auto T0 = species_T(s, egas0);
+//	const auto ne = s.Hp + s.Hep + 2 * s.Hepp;
+//	const auto cv = 1.5 * kb * (s.H + 2 * s.Hp + s.He + 2 * s.Hep + 3 * s.Hepp + ne);
+//	double T = T0;
+//	double egas = egas0;
+//	double err;
+//	double last_dT = 0.0;
+//	double dT = 0.0;
+//	double dEdt, dEdtdT;
+//	constexpr double toler = 1e-12;
+//	double t = 0.0;
+//	while (t < tmax) {
+//		//	printf( "!\n");
+//		cooling_rate(s, dEdt, dEdtdT, z, T);
+//		if (std::abs(dEdt) > 0.0) {
+//			const auto dt_lim = std::abs(egas0 / dEdt * 0.1);
+//			const auto dt = std::min(dt_lim, tmax - t);
+//			do {
+//				const auto f = egas - egas0 - dt * dEdt;
+//				const auto dfdT = cv - dt * dEdtdT;
+//				dT = -f / dfdT;
+//				dT = std::min(std::max(dT, -0.1 * T), 0.1 * T);
+//				T += dT;
+//				egas = cv * T;
+//				err = std::abs(dT / T);
+//				if (err > toler) {
+//					cooling_rate(s, dEdt, dEdtdT, z, T);
+//				}
+//
+////			printf("---%e %e %e %e %e %e\n", T0, T, dT, f, err);
+//			} while (err > toler);
+//	//		printf("%e %e %e %e %e %e\n", t / tmax, (t + dt) / tmax, dt / tmax, T, egas0, dEdt);
+//			t += dt;
+//			egas0 = egas;
+//		} else {
+//			t = tmax;
+//		}
+//	}
+//	return egas;
+//
+}
+
+double compute_next_ne(double ne, species s0, species &s, double e0, double &e, double z, double dt) {
+	e = e0;
+	double K1, K2, K3, K4, K5, K6;
+	double J20, J21, J22;
+	const auto hinv = 1.0 / (1 + dt * (J20 + (K1 + K2) * ne));
+	const auto hsum = (s0.H + s0.Hp);
+	const auto hesum = (s0.He + s0.Hep + s0.Hepp);
+	const auto cv = (ne + s0.H + s0.Hp + s0.He + s0.Hep + s0.Hepp) * 1.5 * kb;
+	const auto T = e0 / cv;
+	chemical_rates(K1, K2, K3, K4, K5, K6, T);
+	radiation_rates(J20, J21, J20, z);
+	s.H = (s0.H + dt * hsum * K2 * ne) * hinv;
+	s.Hp = hsum - s.H;
+	const auto heinv = 1.0
+			/ (1 + dt * (J21 + J22 + dt * J22 * K3 * ne + dt * J21 * (J22 + (K5 + K6) * ne) + ne * (K3 + K4 + K5 + K6 + dt * (K3 * K5 + (K3 + K4) * K6) * ne)));
+	s.He = (s0.He + dt * K4 * ne * (s0.Hep + dt * (s0.Hep + s0.Hepp) * K6 * ne) + dt * s0.He * (J22 + ne * (K4 + K5 + K6 + dt * K4 * K6 * ne))) * heinv;
+	s.Hep = (s0.Hep + dt * s0.He * J21 + dt * s0.Hep * J21 + dt * ((s0.He + s0.Hep) * K3 + (s0.Hep + s0.Hepp + dt * hesum * J21) * K6) * ne
+			+ dt * dt * hesum * K3 * K6 * ne * ne) * heinv;
+	s.Hepp = hesum - s.He - s.Hep;
+	return s.Hp + s.Hep + 2 * s.Hepp;
+}
+
+double chemistry_update(species s0, species &s, double egas0, double &egas, double z, double dt) {
+	double nemin = 0.0;
+	double nemax = (s0.H + s0.Hp) + 2 * (s0.He + s0.Hep + s0.Hepp);
+	egas = egas0;
+	double err;
+	do {
+		const auto nemid = 0.5 * (nemax + nemin);
+		const auto f1 = nemax - compute_next_ne(nemax, s0, s, egas0, egas, z, dt);
+		const auto f2 = nemid - compute_next_ne(nemid, s0, s, egas0, egas, z, dt);
+		if( f1 * f2 < 0.0 ) {
+			nemin = nemid;
+		} else {
+			nemax = nemid;
+		}
+		err = 1.0 - nemin / nemax;
+	} while (err > 1.0e-7);
+	return species_T(s,egas);
 }
 
 void chemistry_test() {
 	species s0;
 	const auto n = 1.0;
-	s0.H = 0.92 * n;
-	s0.Hp = 0.001 * n;
+	s0.H = 0.91 * n;
+	s0.Hp = 0.01 * n;
 	s0.He = 0.08 * n;
-	s0.Hep = 0.00 * n;
-	s0.Hepp = 0.00 * n;
+	s0.Hep = 0.005 * n;
+	s0.Hepp = 0.005 * n;
 	double T0 = 1e+7;
 	auto s = s0;
 	printf("%14s %14s %14s %14s %14s %14s %14s %14s %14s %14s\n", "t", "T0", "T", "na", "ne", "H", "Hp", "He", "Hep", "Hepp");
 	for (double dt = 1e1; dt < 1e18; dt *= 10.0) {
-		auto T = chemistry_update(s0, s, species_energy(s0, T0), 0.0, 0.0, dt);
+		const auto egas0 = species_energy(s0, T0);
+		double egas;
+		auto T = chemistry_update(s0, s, egas0, egas, 0.0, dt);
 		const auto ne = s.Hp + s.Hep + 2 * s.Hepp;
 		const auto na = s.Hp + s.H + 4 * s.He + 4 * s.Hep + 4 * s.Hepp;
 		printf("%14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e\n", dt / (3600 * 24 * 365), T0, T, na, ne, s.H, s.Hp, s.He, s.Hep,
