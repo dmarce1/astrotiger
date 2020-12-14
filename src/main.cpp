@@ -139,7 +139,7 @@ bool master(int level, int coarse_level, double tmax, bool already_refined = fal
 		}
 		amax = levels_fine_fluxes(level);
 		auto vmax = root.max_part_velocity(level).get();
-		auto cmax = 100 * opts.cfl * dx[level] * std::abs(cosmos_adot());
+		auto cmax = 10 * opts.cfl * dx[level] * std::abs(cosmos_adot());
 		//	printf("%e\n", a / std::abs(cosmos_adot()));
 		//	printf("%e\n", amax);
 		double mtot1, mtot2;
@@ -254,8 +254,8 @@ void chemistry_test();
 
 int hpx_main(int argc, char *argv[]) {
 //	srand(1000);
-	chemistry_test();
-	return hpx::finalize();
+//	chemistry_test();
+//	return hpx::finalize();
 
 	options opts;
 

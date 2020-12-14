@@ -114,9 +114,9 @@ bool options::process_options(int argc, char *argv[]) {
 		nspecies = 5;
 		species = true;
 		opts = *this;
+		printf( "Reading input file\n");
 		fileio_init_read();
 		*this = opts;
-		set(*this);
 	}
 
 	nhydro = 4 + NDIM + nspecies;
@@ -151,5 +151,6 @@ bool options::process_options(int argc, char *argv[]) {
 	hpx::wait_all(futs.begin(), futs.end());
 #define SHOW( opt ) std::cout << std::string( #opt ) << " = " << std::to_string(opt) << '\n';
 #define SHOW_STR( opt ) std::cout << std::string( #opt ) << " = " << opt << '\n';
+	printf( "Sending H0 %e\n", H0);
 	return true;
 }

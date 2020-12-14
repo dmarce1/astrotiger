@@ -116,7 +116,7 @@ double hydro_grid::compute_flux(int rk) {
 		V[rho_i][i] = U[rho_i][i];
 		if (opts.species) {
 			for (int si = 0; si < opts.nspecies; si++) {
-				V[spc_i + si][i] = U[spc_i + si][i] * amu / U[rho_i][i];
+				V[spc_i + si][i] = U[spc_i + si][i];
 			}
 		}
 		for (int dim = 0; dim < NDIM; dim++) {
@@ -153,8 +153,8 @@ double hydro_grid::compute_flux(int rk) {
 			ul[rho_i] = vl[rho_i];
 			if (opts.species) {
 				for (int si = 0; si < opts.nspecies; si++) {
-					ur[spc_i + si] = vr[spc_i + si] * vr[rho_i] / amu;
-					ul[spc_i + si] = vl[spc_i + si] * vl[rho_i] / amu;
+					ur[spc_i + si] = vr[spc_i + si];
+					ul[spc_i + si] = vl[spc_i + si];
 				}
 			}
 			ur[pot_i] = vr[rho_i] * vr[pot_i];
@@ -213,6 +213,8 @@ double hydro_grid::compute_flux(int rk) {
 			}
 //			this_s[egas_i] += std::pow(a, (NDIM + 2)) * sdotg;
 			this_s[egas_i] -= std::pow(a, (NDIM + 2) - 1) * phi[j] * drho_dt[j];
+
+
 			for (int f = 0; f < opts.nhydro; f++) {
 				S[f][j] = (1.0 - opts.beta[rk]) * S[f][j] + opts.beta[rk] * this_s[f];
 			}
@@ -483,16 +485,13 @@ void hydro_grid::initialize() {
 			}
 			U[tau_i][i] = std::pow(U[egas_i][i] - ek, 1.0 / opts.gamma);
 			if (opts.species) {
-				const auto A = U[rho_i][i] / amu;
-				const auto nH = 0.92 * A;
-				const auto nHe = 0.08 * A;
+				const auto nH = 0.75 * U[rho_i][i];
+				const auto nHe = 0.25 * U[rho_i][i];
 				U[h_i][i] = 0.0 * nH;
 				U[hp_i][i] = 1.0 * nH;
 				U[he_i][i] = 0.0 * nHe;
 				U[hep_i][i] = 0.0 * nHe;
 				U[hepp_i][i] = 1.0 * nHe;
-				species s = { U[h_i][i], U[hp_i][i], U[he_i][i], U[hep_i][i], U[hepp_i][i] };
-				U[egas_i][i] += ion_energy(s);
 			}
 		}
 	} else {
@@ -963,7 +962,7 @@ std::vector<std::vector<double>> hydro_grid::pack_output(const multi_array<std::
 	double units;
 	const auto a = cosmos_a();
 	for (int f = 0; f <= opts.nhydro + 1; f++) {
-		if (f == rho_i) {
+		if (f == rho_i || (f >= spc_i && f < spc_i + opts.nspecies)) {
 			units = opts.code_to_g / std::pow(opts.code_to_cm * a, NDIM);
 		} else if (f == tau_i) {
 			units = std::pow(opts.code_to_g / std::pow(opts.code_to_cm, NDIM - 2) / std::pow(opts.code_to_s, 2), 1.0 / opts.gamma) / std::pow(a, NDIM);
@@ -973,8 +972,6 @@ std::vector<std::vector<double>> hydro_grid::pack_output(const multi_array<std::
 			units = opts.code_to_g / std::pow(opts.code_to_cm, NDIM - 2) / std::pow(opts.code_to_s, 2) / std::pow(a, NDIM + 2);
 		} else if (f == pot_i) {
 			units = opts.code_to_g / std::pow(opts.code_to_cm, NDIM - 2) / std::pow(opts.code_to_s, 2);
-		} else if (f == spc_i && f < spc_i + opts.nspecies) {
-			units = 1.0 / std::pow(opts.code_to_cm, NDIM);
 		} else {
 			units = 1.0;
 		}
@@ -1227,12 +1224,19 @@ statistics hydro_grid::get_statistics(const std::vector<multi_range> &child_rang
 
 std::vector<std::string> hydro_grid::field_names() {
 	std::vector<std::string> names;
-	names.push_back("D");
+	names.push_back("rho");
 	names.push_back("E");
 	names.push_back("tau");
 	names.push_back("pot");
 	for (int dim = 0; dim < NDIM; dim++) {
-		names.push_back(std::string("S") + char('x' + dim));
+		names.push_back(std::string("s") + char('x' + dim));
+	}
+	if (opts.species) {
+		names.push_back(std::string("rho_H"));
+		names.push_back(std::string("rho_Hp"));
+		names.push_back(std::string("rho_He"));
+		names.push_back(std::string("rho_Hep"));
+		names.push_back(std::string("rho_Hepp"));
 	}
 	names.push_back("phi");
 	names.push_back("error");

@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 #include <astrotiger/chemistry.hpp>
+#include <astrotiger/options.hpp>
 
 #include <functional>
 #include <limits>
@@ -25,62 +26,86 @@ const auto dhuge = std::numeric_limits<double>::max() / 1.0e+3;
 
 using real = double;
 
-template<int N>
-std::array<std::array<real, N>, N> matrix_inverse(std::array<std::array<real, N>, N> A) {
-	std::array<std::array<real, N>, N> Ainv;
-	for (int n = 0; n < N; n++) {
-		for (int m = 0; m < N; m++) {
-			Ainv[n][m] = n == m ? 1.0 : 0.0;
-			if (std::abs(A[n][m]) < 1.0e-50) {
-				A[n][m] = 0.0;
-			}
-		}
-	}
-	for (int q = 0; q < N; q++) {
-		for (int n = q; n < N; n++) {
-			if (A[n][q] != 0.0) {
-				std::swap(A[n], A[q]);
-				std::swap(Ainv[n], Ainv[q]);
-				break;
-			}
-		}
-		for (int n = q; n < N; n++) {
-			if (A[n][q] != 0.0) {
-				const auto inv = 1.0 / A[n][q];
-				for (int k = 0; k < q; k++) {
-					A[n][k] *= inv;
-				}
-				A[n][q] = 1.0;
-				for (int k = q + 1; k < N; k++) {
-					A[n][k] *= inv;
-				}
-				for (int k = 0; k < N; k++) {
-					Ainv[n][k] *= inv;
-				}
-			}
-		}
-		for (int n = q + 1; n < N; n++) {
-			if (A[n][q] != 0.0) {
-				A[n][q] -= A[q][q];
-				for (int l = q + 1; l < N; l++) {
-					A[n][l] -= A[q][l];
-				}
-				for (int l = 0; l < N; l++) {
-					Ainv[n][l] -= Ainv[q][l];
-				}
-			}
-		}
-	}
-	for (int q = N - 1; q >= 0; q--) {
-		for (int n = q - 1; n >= 0; n--) {
-			for (int k = 0; k < N; k++) {
-				Ainv[n][k] -= Ainv[q][k] * A[n][q];
-			}
-			A[n][q] = 0.0;
-		}
-	}
-	return Ainv;
-}
+
+const auto avo = 6.0221409e+23;
+#define amu (1.0/avo)
+
+struct species {
+	double H;
+	double Hp;
+	double He;
+	double Hep;
+	double Hepp;
+};
+
+struct thermo_props {
+	double pressure;
+	double T;
+	double ne;
+	double sound_speed;
+	double gamma;
+	double rho;
+	double eion;
+	double cv;
+};
+//
+//
+//template<int N>
+//std::array<std::array<real, N>, N> matrix_inverse(std::array<std::array<real, N>, N> A) {
+//	std::array<std::array<real, N>, N> Ainv;
+//	for (int n = 0; n < N; n++) {
+//		for (int m = 0; m < N; m++) {
+//			Ainv[n][m] = n == m ? 1.0 : 0.0;
+//			if (std::abs(A[n][m]) < 1.0e-50) {
+//				A[n][m] = 0.0;
+//			}
+//		}
+//	}
+//	for (int q = 0; q < N; q++) {
+//		for (int n = q; n < N; n++) {
+//			if (A[n][q] != 0.0) {
+//				std::swap(A[n], A[q]);
+//				std::swap(Ainv[n], Ainv[q]);
+//				break;
+//			}
+//		}
+//		for (int n = q; n < N; n++) {
+//			if (A[n][q] != 0.0) {
+//				const auto inv = 1.0 / A[n][q];
+//				for (int k = 0; k < q; k++) {
+//					A[n][k] *= inv;
+//				}
+//				A[n][q] = 1.0;
+//				for (int k = q + 1; k < N; k++) {
+//					A[n][k] *= inv;
+//				}
+//				for (int k = 0; k < N; k++) {
+//					Ainv[n][k] *= inv;
+//				}
+//			}
+//		}
+//		for (int n = q + 1; n < N; n++) {
+//			if (A[n][q] != 0.0) {
+//				A[n][q] -= A[q][q];
+//				for (int l = q + 1; l < N; l++) {
+//					A[n][l] -= A[q][l];
+//				}
+//				for (int l = 0; l < N; l++) {
+//					Ainv[n][l] -= Ainv[q][l];
+//				}
+//			}
+//		}
+//	}
+//	for (int q = N - 1; q >= 0; q--) {
+//		for (int n = q - 1; n >= 0; n--) {
+//			for (int k = 0; k < N; k++) {
+//				Ainv[n][k] -= Ainv[q][k] * A[n][q];
+//			}
+//			A[n][q] = 0.0;
+//		}
+//	}
+//	return Ainv;
+//}
 
 void chemical_rates(double &k1, double &k2, double &k3, double &k4, double &k5, double &k6, double T) {
 
@@ -228,88 +253,13 @@ void cooling_rate(species s, double &dEdt, double z, double T) {
 
 	double J20, J21, J22;
 	heating_rates(J20, J21, J22, z);
-
-//	C1 = 0.0;
-//	C2 = 0.0;
-//	C3 = 0.0;
-//	C4 = 0.0;
-//	C5 = 0.0;
-//	C6 = 0.0;
-//	C7 = 0.0;
-////	C8 = 0.0;
-//	C9 = 0.0;
-//	C10 = 0.0;
-//	C11 = 0.0;
-//	C12 = 0.0;
-//	C13 = 0.0;
-//	dC1dT = 0.0;
-//	dC2dT = 0.0;
-//	dC3dT = 0.0;
-//	dC4dT = 0.0;
-//	dC5dT = 0.0;
-//	dC6dT = 0.0;
-//	dC7dT = 0.0;
-////	dC8dT = 0.0;
-//	dC9dT = 0.0;
-//	dC10dT = 0.0;
-//	dC11dT = 0.0;
-//	dC12dT = 0.0;
-//	dC13dT = 0.0;
-//	J20 = J21 = J22 = 0.0;
-
-	dEdt = -ne
+	const auto cooling = -ne
 			* (C1 * s.H + C2 * ne * s.He + C3 * s.Hep + C4 * s.H + C5 * s.He + C6 * s.Hep + C7 * ne * s.Hep + C8 * s.Hp + C9 * s.Hep + C10 * s.Hep
 					+ C11 * s.Hepp + C12 * (s.Hp + s.Hep + s.Hepp) + C13);
-//	dEdtdT = -ne
-//			* (dC1dT * s.H + dC2dT * ne * s.He + dC3dT * s.Hep + dC4dT * s.H + dC5dT * s.He + dC6dT * s.Hep + dC7dT * ne * s.Hep + dC8dT * s.Hp + dC9dT * s.Hep
-//					+ dC10dT * s.Hep + dC11dT * s.Hepp + dC12dT * (s.Hp + s.Hep + s.Hepp) + dC13dT);
-//
-	dEdt += J20 * s.H + J21 * s.He + J22 * s.Hep;
-//	printf( "%e\n", dEdt);
-}
-
-double compute_next_energy(species s, double egas0, double z, double tmax) {
-//
-//	const auto T0 = species_T(s, egas0);
-//	const auto ne = s.Hp + s.Hep + 2 * s.Hepp;
-//	const auto cv = 1.5 * kb * (s.H + 2 * s.Hp + s.He + 2 * s.Hep + 3 * s.Hepp + ne);
-//	double T = T0;
-//	double egas = egas0;
-//	double err;
-//	double last_dT = 0.0;
-//	double dT = 0.0;
-//	double dEdt, dEdtdT;
-//	constexpr double toler = 1e-12;
-//	double t = 0.0;
-//	while (t < tmax) {
-//		//	printf( "!\n");
-//		cooling_rate(s, dEdt, dEdtdT, z, T);
-//		if (std::abs(dEdt) > 0.0) {
-//			const auto dt_lim = std::abs(egas0 / dEdt * 0.1);
-//			const auto dt = std::min(dt_lim, tmax - t);
-//			do {
-//				const auto f = egas - egas0 - dt * dEdt;
-//				const auto dfdT = cv - dt * dEdtdT;
-//				dT = -f / dfdT;
-//				dT = std::min(std::max(dT, -0.1 * T), 0.1 * T);
-//				T += dT;
-//				egas = cv * T;
-//				err = std::abs(dT / T);
-//				if (err > toler) {
-//					cooling_rate(s, dEdt, dEdtdT, z, T);
-//				}
-//
-////			printf("---%e %e %e %e %e %e\n", T0, T, dT, f, err);
-//			} while (err > toler);
-//	//		printf("%e %e %e %e %e %e\n", t / tmax, (t + dt) / tmax, dt / tmax, T, egas0, dEdt);
-//			t += dt;
-//			egas0 = egas;
-//		} else {
-//			t = tmax;
-//		}
-//	}
-//	return egas;
-//
+	const auto heating = J20 * s.H + J21 * s.He + J22 * s.Hep;
+//	printf("%e %e\n", cooling, heating);
+	dEdt = cooling + heating;
+//	printf( "%e %e %e\n", J20, J21, J22);
 }
 
 double compute_next_ne(double ne, species s0, species &s, double &e, double z, double dt) {
@@ -334,44 +284,81 @@ double compute_next_ne(double ne, species s0, species &s, double &e, double z, d
 	return s.Hp + s.Hep + 2 * s.Hepp;
 }
 
-double chemistry_update(species s0, species &s, double egas0, double &egas, double z, double tmax) {
+void chemistry(species s0, species &s, double egas, double z, double dt) {
+	double nemin = 0.0;
+	double nemax = (s0.H + s0.Hp) + 2 * (s0.He + s0.Hep + s0.Hepp);
+	double err;
+	do {
+		const auto nemid = 0.5 * (nemax + nemin);
+		const auto f1 = nemax - compute_next_ne(nemax, s0, s, egas, z, dt);
+		const auto f2 = nemid - compute_next_ne(nemid, s0, s, egas, z, dt);
+		if (f1 * f2 < 0.0) {
+			nemin = nemid;
+		} else {
+			nemax = nemid;
+		}
+		err = 1.0 - nemin / nemax;
+	} while (err > 1.0e-8);
+}
+
+double chemistry_and_cooling(species s0, species &s, double egas0, double &egas, double z, double tmax) {
 
 	double t = 0.0;
 	double T;
 	egas = egas0;
 	while (t < tmax) {
-		double dEdt;
+		double dEdt1, dEdt2;
 		T = species_T(s, egas);
-		cooling_rate(s, dEdt, z, T);
-		auto this_dt = std::min(std::abs(egas / dEdt) * 0.1, tmax - t);
-		egas += dEdt * this_dt;
-		if (egas < species_energy(s, 2.73)) {
+		cooling_rate(s, dEdt1, z, T);
+		auto this_dt = std::min(std::abs(egas / dEdt1) * 0.1, tmax - t);
+		egas += dEdt1 * this_dt;
+		T = species_T(s, egas);
+		cooling_rate(s, dEdt2, z, T);
+		egas += 0.5 * (dEdt2 - dEdt1) * this_dt;
+		chemistry(s0, s, egas, z, this_dt);
+		s0 = s;
+		if (egas < species_energy(s, 10)) {
 			this_dt = tmax - t;
 		}
-		double nemin = 0.0;
-		double nemax = (s0.H + s0.Hp) + 2 * (s0.He + s0.Hep + s0.Hepp);
-		double err;
-		do {
-			const auto nemid = 0.5 * (nemax + nemin);
-			const auto f1 = nemax - compute_next_ne(nemax, s0, s, egas, z, this_dt);
-			const auto f2 = nemid - compute_next_ne(nemid, s0, s, egas, z, this_dt);
-			if (f1 * f2 < 0.0) {
-				nemin = nemid;
-			} else {
-				nemax = nemid;
-			}
-			err = 1.0 - nemin / nemax;
-		} while (err > 1.0e-8);
-		s0 = s;
 		t += this_dt;
-//		printf("%e %e\n", t / tmax, T);
 	}
 	return T;
 }
 
+double chemistry_and_cooling_step(std::array<double, NS>& rho_m, double egas, double z, double dt) {
+	species s, s0;
+	std::array<double, NS> N;
+	std::array<double, NS> NA = { 1, 1, 4, 4, 4 };
+	const double rho_convert = opts.code_to_g * std::pow(opts.code_to_cm, -3);
+	const double egas_convert = opts.code_to_g * std::pow(opts.code_to_cm, -1) * std::pow(opts.code_to_s,-2);
+	const auto dt_cgs = dt * opts.code_to_s;
+	for (int i = 0; i < NS; i++) {
+		const double rho_cgs = rho_m[i] * rho_convert;
+		N[i] = avo * rho_cgs / NA[i];
+	}
+	double egas0 = egas * egas_convert;
+	s0.H = N[nH];
+	s0.Hp = N[nHP];
+	s0.He = N[nHE];
+	s0.Hep = N[nHEP];
+	s0.Hepp = N[nHEPP];
+	chemistry_and_cooling(s0, s, egas0, egas, z, dt_cgs);
+	N[nH] = s.H;
+	N[nHP] = s.Hp;
+	N[nHE] = s.He;
+	N[nHEP] = s.Hep;
+	N[nHEPP] = s.Hepp;
+	for (int i = 0; i < NS; i++) {
+		const double rho_cgs = N[i]* NA[i] / avo;
+		rho_m[i] = rho_cgs / rho_convert;
+	}
+	egas /= egas_convert;
+	return egas;
+}
+
 void chemistry_test() {
 	species s0;
-	const auto n = 1.0;
+	const auto n = 1.0e-3;
 	s0.H = 0.92 * n;
 	s0.Hp = 0.01 * n;
 	s0.He = 0.08 * n;
@@ -383,7 +370,7 @@ void chemistry_test() {
 	for (double dt = 1e1; dt < 1e18; dt *= 10.0) {
 		const auto egas0 = species_energy(s0, T0);
 		double egas;
-		auto T = chemistry_update(s0, s, egas0, egas, 0.0, dt);
+		auto T = chemistry_and_cooling(s0, s, egas0, egas, 0.0, dt);
 		const auto ne = s.Hp + s.Hep + 2 * s.Hepp;
 		const auto na = s.Hp + s.H + 4 * s.He + 4 * s.Hep + 4 * s.Hepp;
 		printf("%14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e %14.4e\n", dt / (3600 * 24 * 365), T0, T, na, ne, s.H, s.Hp, s.He, s.Hep,

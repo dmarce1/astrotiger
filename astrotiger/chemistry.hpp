@@ -8,29 +8,6 @@
 #ifndef ASTROTIGER_CHEMISTRY_HPP_
 #define ASTROTIGER_CHEMISTRY_HPP_
 
-#define amu 1.6605e-24
-
-struct species {
-	double H;
-	double Hp;
-	double He;
-	double Hep;
-	double Hepp;
-};
-
-struct thermo_props {
-	double pressure;
-	double T;
-	double ne;
-	double sound_speed;
-	double gamma;
-	double rho;
-	double eion;
-	double cv;
-};
-
-double ion_energy(species s);
-thermo_props compute_thermo_properties(const species s, double energy);
-species compute_next_species(const species s0, double energy, double Trad, double dt);
+double chemistry_and_cooling_step(std::array<double, 5>& rho_m, double egas, double z, double dt);
 
 #endif /* ASTROTIGER_CHEMISTRY_HPP_ */
