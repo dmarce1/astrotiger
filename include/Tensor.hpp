@@ -2,12 +2,14 @@
 
 #include <array>
 #include <bitset>
-#include <utility>
+#include <optional>
 #include <type_traits>
+#include <utility>
 
 #include "IndexTuple.hpp"
 #include "Numbers.hpp"
 #include "Permutation.hpp"
+#include "SymmetricGroup.hpp"
 
 namespace Tensors {
 
@@ -34,13 +36,10 @@ struct IsIndex<Index<C>> {
 
 struct map_index_t;
 
-template<size_t N>
-using SymmetryPermutation = std::pair<int, Permutation<N>>;
-
-template<typename T, typename F, size_t D, size_t R, size_t N, std::array<SymmetryPermutation<R>, N> S, char ...I>
+template<typename T, typename F, size_t D, size_t R, Symmetries<R> S, char ...I>
 struct TensorExpr;
 
-template<typename T, size_t D, size_t R, std::pair<int, Permutation<R>> ...S>
+template<typename T, size_t D, size_t R, Symmetries<R> S>
 struct Tensor;
 
 struct map_index_t {
@@ -93,21 +92,110 @@ auto extractChars(Index<C>, Args ...args) {
 }
 
 template<typename T, size_t R, Permutation<R> P>
-constexpr auto permuteList(T const &list);
-
-template<size_t D, size_t R, std::pair<int, Permutation<R>> ...S>
-constexpr auto createIndexMap();
-
-template<size_t D, size_t R, size_t N, std::array<SymmetryPermutation<R>, N>>
-constexpr size_t computeUniqueIndicesSize();
-
-template<size_t D, size_t R, size_t N, std::array<SymmetryPermutation<R>, N>>
-constexpr auto computeUniqueIndices();
+constexpr auto permuteList(T const &list) {
+	auto permutedList = list;
+	for (size_t i = 0; i < list.size(); i++) {
+		for (size_t j = 0; j < R; j++) {
+			permutedList[i][j] = list[i][P[j] - 1];
+		}
+	}
+	return permutedList;
+}
 
 template<size_t N, std::array<char, N> A, std::array<char, N> B>
-constexpr Permutation<N> computePermutation();
+constexpr Permutation<N> computePermutation() {
+	Permutation<N> P;
+	for (size_t i = 0; i < N; i++) {
+		size_t j = 0;
+		while (A[i] != B[j]) {
+			j++;
+		}
+		static_assert(j != N);
+		P[i] = j + 1;
+	}
+}
 
-template<typename T, typename F, size_t D, size_t R, size_t N, std::array<SymmetryPermutation<R>, N> S, char ...I>
+template<size_t D, size_t R, Symmetries<R> S>
+constexpr auto computeUniqueIndices() {
+	using i_type = IndexTuple<D, R>;
+	static constexpr auto symmetrySpecification = genSymmetryPermutations(S);
+	static constexpr size_t Size = Math::integerPower(D, R);
+	std::array<i_type, Size> uniqeIndices;
+	std::bitset<Size> haveVisited;
+	size_t tensorIndex = 0;
+	for (i_type tensorIndices = i_type::begin(); tensorIndices != i_type::end(); tensorIndices++) {
+		if (!haveVisited[tensorIndex]) {
+			haveVisited[tensorIndex] = true;
+			uniqeIndices[tensorIndex++] = tensorIndices;
+			for (size_t n = 0; n < symmetrySpecification.size(); n++) {
+				auto const permutation = symmetrySpecification[n].second;
+				auto permutedIndices = permutation.apply(tensorIndices);
+				do {
+					haveVisited[permutedIndices.flatIndex()] = true;
+					permutedIndices = permutation.apply(permutedIndices);
+				} while (permutedIndices != tensorIndices);
+			}
+		}
+	}
+	return uniqeIndices;
+
+}
+
+template<size_t D, size_t R, size_t N, Symmetries<R> S>
+constexpr size_t computeUniqueIndicesSize() {
+	using i_type = IndexTuple<D, R>;
+	static constexpr size_t Size = Math::integerPower(D, R);
+	std::bitset<Size> haveVisited;
+	size_t count = 0;
+	for (i_type tensorIndices = i_type::begin(); tensorIndices != i_type::end(); tensorIndices++) {
+		if (!haveVisited[count]) {
+			haveVisited[count] = true;
+			for (size_t n = 0; n < N; n++) {
+				auto const permutation = S[n].second;
+				auto permutedIndices = permutation.apply(tensorIndices);
+				do {
+					haveVisited[permutedIndices.flatIndex()] = true;
+					permutedIndices = permutation.apply(permutedIndices);
+				} while (permutedIndices != tensorIndices);
+			}
+		}
+	}
+	return count;
+}
+
+template<size_t D, size_t R, Symmetries<R> S>
+constexpr auto createIndexMap() {
+	using i_type = IndexTuple<D, R>;
+	static constexpr size_t Size = Math::integerPower(D, R);
+	static constexpr auto permutations = genSymmetryPermutations<R, S>();
+	static constexpr size_t N = permutations.size();
+	std::array<map_index_t, Size> indexMap;
+	std::bitset<Size> haveVisited;
+	size_t elementCount = 0;
+	for (i_type tensorIndices = i_type::begin(); tensorIndices != i_type::end(); tensorIndices++) {
+		size_t const tensorIndex = tensorIndices.flatIndex();
+		if (!haveVisited[tensorIndex]) {
+			haveVisited[tensorIndex] = true;
+			unsigned const commonMapIndex = elementCount++;
+			indexMap[tensorIndex] = { +1, commonMapIndex };
+			for (size_t n = 0; n < N; n++) {
+				auto const &symmetrySign = permutations[n].first;
+				auto const &permutation = permutations[n].second;
+				auto permutedIndices = permutation.apply(tensorIndices);
+				do {
+					size_t const mapIndex = permutedIndices.flatIndex();
+					haveVisited[mapIndex] = true;
+					signed char const sign = ((symmetrySign < 0) && (permutation.parity() < 0)) ? ((permutedIndices == tensorIndices) ? 0 : -1) : +1;
+					indexMap[mapIndex] = { sign, commonMapIndex };
+					permutedIndices = permutation.apply(permutedIndices);
+				} while (permutedIndices != tensorIndices);
+			}
+		}
+	}
+	return indexMap;
+}
+
+template<typename T, typename F, size_t D, size_t R, Symmetries<R> S, char ...I>
 struct TensorExpr {
 	using index_type = IndexTuple<D, R>;
 	using value_type = T;
@@ -120,8 +208,8 @@ struct TensorExpr {
 	auto& operator()(auto ...is) {
 		return handle(is...);
 	}
-	template<typename F1, size_t N1, std::array<SymmetryPermutation<R>, N1> S1, char ...I1>
-	auto& operator=(TensorExpr<T, F1, D, R, N1, S1, I1...> const &other) {
+	template<typename F1, Symmetries<R> S1, char ...I1>
+	auto& operator=(TensorExpr<T, F1, D, R, S1, I1...> const &other) {
 		std::array<char, R> A = { I... };
 		std::array<char, R> B = { I1... };
 		static constexpr auto P = computePermutation<R, A, B>();
@@ -135,7 +223,7 @@ private:
 	F handle;
 };
 
-template<typename T, size_t D, size_t R, std::pair<int, Permutation<R>> ...S>
+template<typename T, size_t D, size_t R, Symmetries<R> S>
 struct Tensor {
 	using value_type = T;
 	using index_type = IndexTuple<D, R>;
@@ -176,7 +264,7 @@ struct Tensor {
 		auto const handle = [this](auto ...is) {
 			return this->operator()(is...);
 		};
-		return TensorExpr<T, decltype(handle), D, R, sizeof...(S), Symmetries, I...>(handle);
+		return TensorExpr<T, decltype(handle), D, R, S, I...>(handle);
 	}
 
 	template<typename ...Args>
@@ -195,116 +283,12 @@ struct Tensor {
 private:
 	template<typename F, char ...C>
 	auto createTensorExpression(F const &handle, std::tuple<Index<C> ...>) {
-		return TensorExpr<T, F, D, R, sizeof...(S), Symmetries, C...>(handle);
+		return TensorExpr<T, F, D, R, S, C...>(handle);
 	}
-	static constexpr std::array<SymmetryPermutation<R>, sizeof...(S)> Symmetries = { S... };
 	static constexpr size_t Size = Math::integerPower(D, R);
-	static constexpr auto IndexMap = createIndexMap<D, R, S...>();
+	static constexpr auto IndexMap = createIndexMap<D, R, S>();
 	std::array<T, Size> data;
 };
-
-template<typename T, size_t R, Permutation<R> P>
-constexpr auto permuteList(T const &list) {
-	auto permutedList = list;
-	for (size_t i = 0; i < list.size(); i++) {
-		for (size_t j = 0; j < R; j++) {
-			permutedList[i][j] = list[i][P[j] - 1];
-		}
-	}
-	return permutedList;
-}
-
-template<size_t N, std::array<char, N> A, std::array<char, N> B>
-constexpr Permutation<N> computePermutation() {
-	Permutation<N> P;
-	for (size_t i = 0; i < N; i++) {
-		size_t j = 0;
-		while (A[i] != B[j]) {
-			j++;
-		}
-		static_assert(j != N);
-		P[i] = j + 1;
-	}
-}
-
-template<size_t D, size_t R, size_t N, std::array<SymmetryPermutation<R>, N> S>
-constexpr auto computeUniqueIndices() {
-	using i_type = IndexTuple<D, R>;
-	static constexpr size_t Size = Math::integerPower(D, R);
-	std::array<i_type, Size> uniqeIndices;
-	std::bitset < Size > haveVisited;
-	size_t tensorIndex = 0;
-	for (i_type tensorIndices = i_type::begin(); tensorIndices != i_type::end(); tensorIndices++) {
-		if (!haveVisited[tensorIndex]) {
-			haveVisited[tensorIndex] = true;
-			uniqeIndices[tensorIndex++] = tensorIndices;
-			for (size_t n = 0; n < N; n++) {
-				auto const permutation = S[n].second;
-				auto permutedIndices = permutation.apply(tensorIndices);
-				do {
-					haveVisited[permutedIndices.flatIndex()] = true;
-					permutedIndices = permutation.apply(permutedIndices);
-				} while (permutedIndices != tensorIndices);
-			}
-		}
-	}
-	return uniqeIndices;
-
-}
-
-template<size_t D, size_t R, size_t N, std::array<SymmetryPermutation<R>, N> S>
-constexpr size_t computeUniqueIndicesSize() {
-	using i_type = IndexTuple<D, R>;
-	static constexpr size_t Size = Math::integerPower(D, R);
-	std::bitset < Size > haveVisited;
-	size_t count = 0;
-	for (i_type tensorIndices = i_type::begin(); tensorIndices != i_type::end(); tensorIndices++) {
-		if (!haveVisited[count]) {
-			haveVisited[count] = true;
-			for (size_t n = 0; n < N; n++) {
-				auto const permutation = S[n].second;
-				auto permutedIndices = permutation.apply(tensorIndices);
-				do {
-					haveVisited[permutedIndices.flatIndex()] = true;
-					permutedIndices = permutation.apply(permutedIndices);
-				} while (permutedIndices != tensorIndices);
-			}
-		}
-	}
-	return count;
-}
-
-template<size_t D, size_t R, std::pair<int, Permutation<R>> ...S>
-constexpr auto createIndexMap() {
-	using i_type = IndexTuple<D, R>;
-	static constexpr size_t Size = Math::integerPower(D, R);
-	static constexpr size_t N = sizeof...(S);
-	static constexpr std::array<std::pair<int, Permutation<R>>, N> permutations = { S... };
-	std::array<map_index_t, Size> indexMap;
-	std::bitset < Size > haveVisited;
-	size_t elementCount = 0;
-	for (i_type tensorIndices = i_type::begin(); tensorIndices != i_type::end(); tensorIndices++) {
-		size_t const tensorIndex = tensorIndices.flatIndex();
-		if (!haveVisited[tensorIndex]) {
-			haveVisited[tensorIndex] = true;
-			unsigned const commonMapIndex = elementCount++;
-			indexMap[tensorIndex] = { +1, commonMapIndex };
-			for (size_t n = 0; n < N; n++) {
-				auto const &symmetrySign = permutations[n].first;
-				auto const &permutation = permutations[n].second;
-				auto permutedIndices = permutation.apply(tensorIndices);
-				do {
-					size_t const mapIndex = permutedIndices.flatIndex();
-					haveVisited[mapIndex] = true;
-					signed char const sign = ((symmetrySign < 0) && (permutation.parity() < 0)) ? ((permutedIndices == tensorIndices) ? 0 : -1) : +1;
-					indexMap[mapIndex] = { sign, commonMapIndex };
-					permutedIndices = permutation.apply(permutedIndices);
-				} while (permutedIndices != tensorIndices);
-			}
-		}
-	}
-	return indexMap;
-}
 
 }
 

@@ -450,10 +450,11 @@ int hpx_main(int argc, char *argv[]) {
 	printf("Done.\n");
 	using namespace Tensors;
 	constexpr size_t D = 3;
-	constexpr size_t R = 2;
+	constexpr size_t R = 3;
 	using symmetry_type = std::pair<int, Permutation<R>>;
-	Tensor<double, D, R, symmetry_type( { 1, { 1, 2 } }), symmetry_type( { 1, { 2, 1 } })> ten;
-	auto test = ten(Index<'a'>(), 2);
+	static constexpr Symmetries S = genSymmetries<R, symmetry_type( { 1, { 1, 2, 3 } }), symmetry_type( { 1, { 2, 1, 3 } })>();
+	Tensor<double, D, R, S> ten;
+//	auto test = ten(Index<'a'>(), 2, Index<'c'>());
 	return hpx::local::finalize();
 }
 

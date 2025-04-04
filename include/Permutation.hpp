@@ -135,7 +135,7 @@ struct Permutation: public std::array<size_t, N> {
 			base_type { other.size() } {
 		reinterpret_cast<base_type&>(*this) = other;
 	}
-	Permutation& operator=(Permutation const &other) {
+	constexpr Permutation& operator=(Permutation const &other) {
 		reinterpret_cast<base_type&>(*this) = other;
 		return *this;
 	}
@@ -231,14 +231,14 @@ struct Permutation: public std::array<size_t, N> {
 		}
 		return key;
 	}
-	Permutation next() const {
+	constexpr Permutation next() const {
 		Permutation nextP = *this;
 		if (!std::next_permutation(nextP.begin(), nextP.end())) {
 			nextP = identity;
 		}
 		return nextP;
 	}
-	Permutation previous() const {
+	constexpr Permutation previous() const {
 		Permutation prevP = *this;
 		if (!std::prev_permutation(prevP.begin(), prevP.end())) {
 			prevP = reversing;
