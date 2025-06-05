@@ -80,7 +80,7 @@ int hpx_main(int argc, char *argv[]) {
 //	auto f = [](double x, double y, double z) {
 //		return x * x;
 //	};
-	B[1] = 1;
+	B[2] = 1;
 //	B = trial.analyze(A);
 	A = trial.synthesize(B);
 	std::cout << arrayToString(A) << "\n" << arrayToString(B) << "\n";
