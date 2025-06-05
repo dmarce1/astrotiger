@@ -1,5 +1,5 @@
 #include <hpx/hpx_init.hpp>
-#include "transforms.hpp"
+#include "TrialSpace.hpp"
 #include "Options.hpp"
 #include "MultiIndex.hpp"
 #include "HyperGrid.hpp"
@@ -72,29 +72,18 @@ int hpx_main(int argc, char *argv[]) {
 	processOptions(argc, argv);
 	constexpr int basisOrder = 2;
 	constexpr int dimensionCount = 3;
-
-//	NodalValues1 A;
-//	ModalCoefficients1 B;
-//	std::fill(A.begin(), A.end(), 0);
-//	std::fill(B.begin(), B.end(), 0);
+	TrialSpace<double> trial;
+	typename TrialSpace<double>::SynthesisVector A;
+	typename TrialSpace<double>::AnalysisVector B;
+	std::fill(A.begin(), A.end(), 1);
+	std::fill(B.begin(), B.end(), 0);
 //	auto f = [](double x, double y, double z) {
-//		return x * x * y * y;
+//		return x * x;
 //	};
-//	std::array<double, 4> points = { -1, -0.447214, 0.447214, 1 };
-//	std::array<double, 4> weights = { 1.0 / 6.0, 5.0 / 6.0, 5.0 / 6.0, 1.0 / 6.0 };
-//	for (int n = 0; n < A.size(); n++) {
-//		std::array<int, 3> I;
-//		int k = n;
-//		for (int d = 0; d < 3; d++) {
-//			I[2 - d] = k % 4;
-//			k /= 4;
-//		}
-//		A[n] = f(points[I[0]], points[I[1]], points[I[2]]);
-//	}
-//
-//	B = legendreAnalyze(A);
-//	//A = legendreSynthesize(B);
-//	std::cout << arrayToString(A) << "\n" << arrayToString(B) << "\n";
+	B[1] = 1;
+//	B = trial.analyze(A);
+	A = trial.synthesize(B);
+	std::cout << arrayToString(A) << "\n" << arrayToString(B) << "\n";
 //	using Indices = MultiIndex<basisOrder, dimensionCount>;
 //	constexpr int size = Indices::count();
 //	constexpr auto strides = Indices::strides();

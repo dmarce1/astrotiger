@@ -73,7 +73,7 @@ inline constexpr T factorial(int n) {
 	if (n <= 1) {
 		return one;
 	} else {
-		return T(n) * nFactorial < T > (n - 1);
+		return T(n) * factorial<T>(n - 1);
 	}
 }
 
@@ -116,5 +116,4 @@ inline constexpr std::array<int, D> unit(int d) {
 void installFpeHandler();
 
 void toFile(std::string const &content, std::filesystem::path const &filePath);
-
 

@@ -34,33 +34,29 @@ using Real = long double;
 static Indent indent { };
 
 struct Constants {
-	Constants(std::string const &name = "C") :
+	Constants(std::string const &name = "constant") :
 			name_(name) {
 		setType("double");
 	}
-	std::string operator()(Real constant, int simdWidth) {
+	std::string operator()(Real constant) {
 		auto iterator = indexes_.find(constant);
 		if (iterator == indexes_.end()) {
-			indexes_.insert(std::make_pair(constant, nextIndex_++));
+			indexes_.insert(std::make_pair(constant, nextIndex_));
 			iterator = indexes_.find(constant);
+			constants_.push_back(constant);
+			nextIndex_++;
 		}
-		return name_ + std::to_string(simdWidth) + "[" + std::to_string(iterator->second) + std::string("]");
+		return name_ + "[" + std::to_string(iterator->second) + std::string("]");
 	}
-//	std::string getHeader(std::string const &realTypename, int simdWidth) const {
-//		std::ostringstream code;
-//		code << std::string(indent) << "static const std::array<" << realTypename << ", " << std::to_string(indexes_.size()) << "> " << name_ << simdWidth
-//				<< ";\n";
-//		return code.str();
-//	}
-	std::string getCode(std::string const &realTypename, int simdWidth) const {
+	std::string getCode() const {
 		std::ostringstream code;
 		std::ostringstream line;
-		code << std::string(indent) << "const std::array<" << realTypename << ", " << std::to_string(indexes_.size()) << "> " << name_ << simdWidth << " {";
+		code << "std::array<Type, " << indexes_.size() << "> " << name_ << " {";
 		indent++;
 		bool first = true;
 		code << std::string(indent);
 		int counter = 0;
-		for (auto iterator = indexes_.begin(); iterator != indexes_.end(); iterator++) {
+		for (int i = 0; i < int(constants_.size()); i++) {
 			if (!first) {
 				line << ", ";
 			}
@@ -69,23 +65,20 @@ struct Constants {
 				line = std::ostringstream { };
 				line << "\n" << std::string(indent);
 			}
-			line << realTypename << "{" << std::setprecision(std::numeric_limits<double>::max_digits10 - 1) << std::scientific << iterator->first << "}";
+			line << indent << "Type {" << std::setprecision(std::numeric_limits<double>::max_digits10 - 1) << std::scientific << constants_[i] << "}";
 			first = false;
 		}
 		code << line.str();
 		line.clear();
 		indent--;
-		code << "\n" << std::string(indent) + "};\n";
 		return code.str();
-	}
-	void reset() {
-		*this = Constants { };
 	}
 	void setType(std::string type) {
 		type_ = type;
 	}
 private:
-	std::map<double, int, std::less<double>> indexes_;
+	std::unordered_map<double, int> indexes_;
+	std::vector<double> constants_;
 	std::string type_;
 	std::string name_ = "C";
 	int nextIndex_ = 0;
@@ -181,23 +174,6 @@ Matrix matrixInverse(Matrix const &A) {
 	return I;
 }
 
-Matrix leftInverse(Matrix const &R) {
-	// (Rt * R)^-1 * Rt   R
-	Matrix Rt = matrixTranspose(R);
-	Matrix RtR = matrixMultiply(Rt, R);
-	Matrix RtR_inv = matrixInverse(RtR);
-	return matrixMultiply(RtR_inv, Rt);
-}
-
-Matrix rightInverse(Matrix const &L) {
-	// L   Lt (L * Lt)^-1
-	Matrix Lt = matrixTranspose(L);
-	Matrix LLt = matrixMultiply(L, Lt);
-	Matrix LLt_inv = matrixInverse(LLt);
-	auto result = matrixMultiply(Lt, LLt_inv);
-	return result;
-}
-
 Matrix kroneckerProduct(Matrix const &A, Matrix const &B) {
 	int const NR = A.size();
 	int const NC = A[0].size();
@@ -223,7 +199,8 @@ std::string matrixToString(Matrix const &A) {
 	std::string str;
 	for (int n = 0; n < (int) A.size(); n++) {
 		for (int m = 0; m < (int) A[n].size(); m++) {
-			asprintf(&ptr, "%.3f ", (double) A[n][m]);
+			Real value = std::abs(A[n][m]) < tiny ? Real(0) : A[n][m];
+			asprintf(&ptr, "%4.1f ", (double) value);
 			str += ptr;
 			free(ptr);
 		}
@@ -246,16 +223,56 @@ struct QuadraturePoint {
 	Real weight;
 };
 
-Real legendreP(int n, Real x, int m = 0) {
-	if (std::abs(x) != Real(1)) {
-		return std::sqrt(Real(1) / ipow(Real(1) - x * x, m)) * std::assoc_legendre(n, m, x);
+int triangular2flat(std::vector<int> const &I) {
+	int const D = I.size();
+	int flat = 0;
+	int sum = 0;
+	for (int d1 = D - 1; d1 >= 0; d1--) {
+		sum += I[d1];
+		int num = 1;
+		int den = 1;
+		for (int d2 = 0; d2 < D - d1; d2++) {
+			num *= sum + d2;
+			den *= d2 + 1;
+		}
+		flat += num / den;
+	}
+	return flat;
+}
+
+std::vector<int> flat2triangular(int D, int flat) {
+	std::vector<int> I(D);
+	I[0] = std::floor(std::pow(factorial<int>(D) * flat, Real(1) / Real(D)));
+	for (int dim = 0; dim < D; dim++) {
+		int count = binco(I[dim] + D - dim - 1, D - dim);
+		while (count > flat) {
+			assert(I[dim]);
+			I[dim]--;
+			count = binco(I[dim] + D - dim - 1, D - dim);
+		}
+		flat -= count;
+		if (dim + 1 < D) {
+			I[dim + 1] = I[dim];
+		}
+	}
+	for (int d = 0; d < D - 1; d++) {
+		I[d] -= I[d + 1];
+	}
+	return I;
+}
+
+Real legendreP(int n, Real eta, int m = 0) {
+	Real value;
+	if (std::abs(eta) != Real(1)) {
+		value = std::sqrt(Real(1) / ipow(Real(1) - eta * eta, m)) * std::assoc_legendre(n, m, eta);
 	} else {
-		Real value = Real(1);
+		value = Real(1);
 		for (int k = 1; k < m; k++) {
 			value *= Real(n + k) / Real(2 * k * (n - k));
 		}
-		return Real((x < Real(0)) ? nonepow(n + m) : +1) * value;
+		value *= Real((eta < Real(0)) ? nonepow(n + m) : +1);
 	}
+	return value;
 }
 
 std::vector<QuadraturePoint> gaussQuadrature(int nodeCount, Quadrature quadrature) {
@@ -295,6 +312,7 @@ std::vector<QuadraturePoint> gaussQuadrature(int nodeCount, Quadrature quadratur
 				newTheta = theta + rootEquation / rootEquationDerivative;
 			} while (double(newTheta) != std::nextafter(double(theta), double(newTheta)));
 			point.weight = baseWeight / sqr(legendreP(nodeCount - 1, point.position));
+			//	printf( "----> %e\n", double(point.position));
 			results.push_back(point);
 		}
 		edgePoint.position = -edgePoint.position;
@@ -332,13 +350,10 @@ Matrix transformMatrix1D(TransformDirection transformDirection, int modeCount, i
 	return transform;
 }
 
-std::string matrixVectorProduct(std::vector<std::string> const &v, Matrix const &A, std::vector<std::string> const &x, int simdWidth) {
+std::string matrixVectorProduct(std::vector<std::string> const &v, Matrix const &A, std::vector<std::string> const &x) {
 	std::string code;
 	int const M = x.size();
 	int const N = A.size();
-	if (v.size() != N) {
-		printf("---- %i %i %i %i\n", v.size(), A.size(), A[0].size(), x.size());
-	}
 	assert((int ) v.size() == N);
 	assert((int ) A[0].size() == M);
 
@@ -355,7 +370,7 @@ std::string matrixVectorProduct(std::vector<std::string> const &v, Matrix const 
 			}
 			std::string cons;
 			if (std::abs(std::abs(C) - Real(1)) >= tiny) {
-				cons = std::to_string(std::abs(C));
+				cons = getConstant(std::abs(C));
 			}
 			if (first) {
 				if (std::abs(C - Real(+1)) < tiny) {
@@ -387,7 +402,7 @@ std::string matrixVectorProduct(std::vector<std::string> const &v, Matrix const 
 			free(ptr);
 		}
 		if (first) {
-			asprintf(&ptr, "%s  = %s(0);\n", v[n].c_str(), (std::string("Real") + std::to_string(simdWidth)).c_str());
+			asprintf(&ptr, "%s  = %s(0);\n", v[n].c_str(), (std::string("Type")).c_str());
 			code += indent + ptr;
 			free(ptr);
 		}
@@ -395,62 +410,31 @@ std::string matrixVectorProduct(std::vector<std::string> const &v, Matrix const 
 	return code;
 }
 
-Matrix permutationMatrix(int N, int modeCount, int triIndexCount) {
-	std::vector<bool> ones(N, true);
-	int M = 0;
-	for (int i = 0; i < N; i++) {
-		int deg = 0;
-		int k = i;
-		for (int j = 0; j < triIndexCount; j++) {
-			deg += k % modeCount;
-			k /= modeCount;
+Matrix permutationMatrix(int modeCount, int triIndexCount) {
+	int N = binco(modeCount + triIndexCount - 1, triIndexCount);
+	int M = ipow(modeCount, triIndexCount);
+	int L = ipow(modeCount + 1, dimensionCount - triIndexCount);
+	assert(N);
+	assert(M);
+	Matrix P = createMatrix(N, M);
+	if (triIndexCount) {
+		for (int n = 0; n < N; n++) {
+			auto const i = flat2triangular(triIndexCount, n);
+			int m = 0;
+			for (int d = 0; d < triIndexCount; d++) {
+				m = modeCount * m + i[d];
+			}
+			printf("%i %i %i %i\n", n, N, m, M);
+			P[n][m] = Real(1);
 		}
-		ones[i] = (deg < modeCount);
-		if (ones[i]) {
-			M++;
-		}
+	} else {
+		P[0][0] = 1;
 	}
-	Matrix P = createMatrix(M, N);
-	int m = 0;
-	for (int n = 0; n < N; n++) {
-		if (ones[n]) {
-			P[m++][n] = Real(1.0);
-		}
+	P = kroneckerProduct(identityMatrix(L), P);
+	if (!triIndexCount) {
+		std::cout << matrixToString(P);
 	}
 	return P;
-}
-
-std::vector<int> totalOrderPermute(int dimensionCount, int modeCount) {
-	std::function<bool(std::vector<int> const&, std::vector<int> const&)> const less = [](std::vector<int> const &a, std::vector<int> const &b) {
-		int aSum = std::accumulate(a.begin(), a.end(), 0);
-		int bSum = std::accumulate(b.begin(), b.end(), 0);
-		for (int i = 0; i < int(a.size()); i++) {
-			if (aSum < bSum) {
-				return true;
-			} else if (aSum > bSum) {
-				return false;
-			}
-			aSum = aSum - a[i];
-			bSum = bSum - b[i];
-		}
-		return false;
-	};
-	int const flatSize = std::pow(modeCount, dimensionCount);
-	std::vector<std::vector<int>> allowed;
-	std::vector<int> indices(dimensionCount, 0);
-	for (int index = 0; index < flatSize; index++) {
-		int const deg = std::accumulate(indices.begin(), indices.end(), 0);
-		if (deg < modeCount) {
-			allowed.push_back(indices);
-		}
-		if (index + 1 < flatSize) {
-			int dim = dimensionCount;
-			while (++indices[--dim] == modeCount) {
-				indices[dim] = 0;
-			}
-		}
-	}
-	return sortWithPermutation(allowed, less);
 }
 
 Matrix permutationToMatrix(std::vector<int> const &permutation) {
@@ -480,21 +464,14 @@ Matrix transformMatrix(TransformDirection transformDirection, int transformDimen
 	int const columnCount = A[0].size();
 	int const rowCount = A.size();
 	if (transformDirection == TransformDirection::forward) {
-		auto const P1 = permutationMatrix(columnCount, modeCount, dimensionCount - transformDimension - 1);
-		auto const P2 = permutationMatrix(rowCount, modeCount, dimensionCount - transformDimension);
+		auto const P1 = permutationMatrix(modeCount, dimensionCount - transformDimension - 1);
+		auto const P2 = permutationMatrix(modeCount, dimensionCount - transformDimension);
 		A = matrixMultiply(P2, matrixMultiply(A, matrixTranspose(P1)));
 	} else {
-		auto const P1 = permutationMatrix(columnCount, modeCount, dimensionCount - transformDimension);
-		auto const P2 = permutationMatrix(rowCount, modeCount, dimensionCount - transformDimension - 1);
-//		printf("%i x %i\n", P1.size(), P1[0].size());
-//		printf("%i x %i\n", A.size(), A[0].size());
-//		printf("%i x %i\n\n", P2.size(), P2[0].size());
+		auto const P1 = permutationMatrix(modeCount, dimensionCount - transformDimension);
+		auto const P2 = permutationMatrix(modeCount, dimensionCount - transformDimension - 1);
 		A = matrixMultiply(P2, matrixMultiply(A, matrixTranspose(P1)));
 	}
-//	if ((transformDimension == 0) && (dimensionCount > 1)) {
-//		auto P = permutationToMatrix(totalOrderPermute(dimensionCount, modeCount));
-//		A = matrixMultiply(P, A);
-//	}
 	return A;
 }
 
@@ -518,20 +495,7 @@ std::string generateVariableDeclaration(char name, int count, std::string type) 
 	return indent + std::string("std::array<") + type + std::string(", ") + std::to_string(count) + std::string("> ") + std::string(1, name) + ";\n";
 }
 
-Matrix swapMatrix(int swapDimension, int M) {
-	assert(swapDimension + 1 < dimensionCount);
-	int const N = ipow(M, dimensionCount);
-	auto P = createMatrix(N);
-	int const stride = ipow(M, dimensionCount - 1 - swapDimension);
-	for (int n = 0; n < N; n++) {
-		int k = n + (1 - stride) * ((n / stride) % M - n % M);
-		P[n][k] = Real(1);
-	}
-//	std::cout << matrixToString(P) << "\n";
-	return P;
-}
-
-Matrix stiffnessMatrix(int modeCount) {
+Matrix stiffnessMatrix(int modeCount, int direction) {
 	auto S = createMatrix(modeCount);
 	auto const rules = gaussQuadrature(modeCount, Quadrature::gaussLegendre);
 	for (int n = 0; n < modeCount; n++) {
@@ -544,250 +508,223 @@ Matrix stiffnessMatrix(int modeCount) {
 			}
 		}
 	}
-	auto S3d = S;
-	for (int dimension = dimensionCount - 2; dimension >= 0; dimension--) {
-		S3d = kroneckerProduct(identityMatrix(modeCount), S3d);
+	auto S3d = identityMatrix(1);
+	for (int dimension = 0; dimension < dimensionCount; dimension++) {
+		S3d = kroneckerProduct((direction == dimension) ? S : identityMatrix(modeCount), S3d);
 	}
+	std::cout << matrixToString(S3d) << "\n";
 	return S3d;
 }
 
-Matrix massMatrix(int N, bool inverse) {
-	auto M = createMatrix(N);
-	auto const rules = gaussQuadrature(N + 1, Quadrature::gaussLegendre);
-	for (int n = 0; n < N; n++) {
-		for (int m = 0; m < N; m++) {
-			M[n][m] = Real(0);
-			for (auto const &rule : rules) {
-				Real const x = rule.position;
-				Real const w = rule.weight;
-				M[n][m] += w * legendreP(n, x) * legendreP(m, x);
-			}
+Matrix inverseMassMatrix(int modeCount) {
+	auto iM = createMatrix(modeCount);
+	for (int m = 0; m < modeCount; m++) {
+		iM[m][m] = Real(2 * m + 1) / Real(2);
+	}
+	auto iM3d = identityMatrix(1);
+	for (int dimension = 0; dimension < dimensionCount; dimension++) {
+		iM3d = kroneckerProduct(iM, iM3d);
+	}
+	return iM3d;
+}
+
+static auto genArray(int count) {
+	return std::string("std::array<Type, ") + std::to_string(count) + ">";
+}
+;
+
+std::string generateStiffnessMatrix() {
+	std::string code;
+	std::vector<std::string> inputs, outputs;
+	std::array<Matrix, dimensionCount> S;
+	for (int d = 0; d < dimensionCount; d++) {
+		S[d] = stiffnessMatrix(modeCount, d);
+		auto const permute = permutationMatrix(modeCount, dimensionCount);
+		S[d] = matrixMultiply(S[d], matrixTranspose(permute));
+		S[d] = matrixMultiply(permute, S[d]);
+	}
+	code += indent + "template<RealNumberType Type>\n";
+	code +=
+			indent + "TrialSpace<Type>::AnalysisVector TrialSpace<Type>::applyStiffnessOperator(int dimension, TrialSpace<Type>::AnalysisVector const& input) {\n";
+	indent++;
+	inputs = generateVariableNames("input", S[0][0].size());
+	outputs = generateVariableNames("output", S[0].size());
+	code += indent + "AnalysisVector output;\n";
+	code += std::string(indent);
+	for (int dim = 0; dim < dimensionCount; dim++) {
+		code += "if( dimension == " + std::to_string(dim) + " ) {\n";
+		indent++;
+		code += matrixVectorProduct(outputs, S[dim], inputs);
+		indent--;
+		if (dim + 1 == dimensionCount) {
+			code += indent + "}\n";
+		} else {
+			code += indent + "} else ";
 		}
 	}
-	if (inverse) {
-		for (int m = 0; m < M.size(); m++) {
-			for (auto &value : M[m]) {
-				if (std::abs(value) > tiny) {
-					value = Real(1) / value;
-				}
+	code += indent + "return output;\n";
+	indent--;
+	code += indent + "}\n\n";
+	return code;
+}
+
+std::string generateInverseMassMatrix() {
+	std::string code;
+	std::vector<std::string> inputs, outputs;
+	auto iM = inverseMassMatrix(modeCount);
+	auto const permute = permutationMatrix(modeCount, dimensionCount);
+	iM = matrixMultiply(iM, matrixTranspose(permute));
+	iM = matrixMultiply(permute, iM);
+	code += indent + "template<RealNumberType Type>\n";
+	code += indent + "TrialSpace<Type>::AnalysisVector TrialSpace<Type>::applyInverseMassOperator(TrialSpace<Type>::AnalysisVector const& input) {\n";
+	indent++;
+	inputs = generateVariableNames("input", iM[0].size());
+	outputs = generateVariableNames("output", iM.size());
+	code += indent + "AnalysisVector output;\n";
+	code += matrixVectorProduct(outputs, iM, inputs);
+	code += indent + "return output;\n";
+	indent--;
+	code += indent + "}\n\n";
+	return code;
+}
+
+std::string generateTransform(TransformDirection transformDirection) {
+	std::string code, deferredCode;
+	std::vector<Matrix> matrixFactors;
+	std::vector<int> arraySizes;
+	std::vector<std::string> inputs, outputs;
+	inputs = decltype(inputs)();
+	outputs = decltype(outputs)();
+	bool const isForward = transformDirection == TransformDirection::forward;
+	std::string functionName = isForward ? "analyze" : "synthesize";
+	std::string outputSize = isForward ? std::to_string(modeCount3d) : std::to_string(nodeCount3d);
+	std::string inputSize = isForward ? std::to_string(nodeCount3d) : std::to_string(modeCount3d);
+	int inCount = isForward ? nodeCount3d : modeCount3d;
+	int outCount = isForward ? modeCount3d : nodeCount3d;
+	int bufferSize, currentSize, bufferOffset;
+	outputs = generateVariableNames("input", inCount);
+	code += "\n";
+	if (isForward) {
+		code += indent + "template<RealNumberType Type>\n";
+		code += indent + "TrialSpace<Type>::AnalysisVector TrialSpace<Type>::analyze(TrialSpace<Type>::SynthesisVector const& input) {\n";
+	} else {
+		code += indent + "template<RealNumberType Type>\n";
+		code += indent + "TrialSpace<Type>::SynthesisVector TrialSpace<Type>::synthesize(TrialSpace<Type>::AnalysisVector const& input) {\n";
+	}
+	arraySizes = std::vector<int>(1, inCount);
+	auto const direction = isForward ? TransformDirection::forward : TransformDirection::backward;
+	for (int transformDimension = 0; transformDimension < dimensionCount; transformDimension++) {
+		matrixFactors.push_back(transformMatrix(direction, transformDimension));
+	}
+	if (isForward) {
+		std::reverse(matrixFactors.begin(), matrixFactors.end());
+	}
+	for (int transformDimension = 0; transformDimension < dimensionCount; transformDimension++) {
+		auto const sz = matrixFactors[transformDimension].size();
+		arraySizes.push_back(sz);
+	}
+	bufferSize = *(std::max_element(arraySizes.begin() + 1, arraySizes.end() - 1));
+	currentSize = arraySizes[0] + arraySizes[1];
+	for (int i = 0; i < dimensionCount - 2; i++) {
+		currentSize -= arraySizes[i];
+		currentSize += arraySizes[i + 2];
+		bufferSize = std::max(bufferSize, currentSize);
+	}
+	indent++;
+	code += indent + genArray(bufferSize) + " buffer;\n";
+	bufferOffset = 0;
+	for (int transformDimension = 0; transformDimension < dimensionCount; transformDimension++) {
+		auto const &transformMatrix = matrixFactors[transformDimension];
+		inputs = std::move(outputs);
+		if (transformDimension != (dimensionCount - 1)) {
+			outputs = generateVariableNames("buffer", transformMatrix.size(), bufferOffset);
+			if (bufferOffset == 0) {
+				bufferOffset = transformMatrix.size();
+			} else {
+				bufferOffset = 0;
 			}
+		} else {
+			outputs = generateVariableNames("output", outCount);
+			code += indent + "std::array<Type, " + outputSize + "> output;\n";
 		}
+		deferredCode += matrixVectorProduct(outputs, transformMatrix, inputs);
 	}
-	auto M3d = M;
-	for (int dimension = dimensionCount - 2; dimension >= 0; dimension--) {
-		M3d = kroneckerProduct(M3d, M);
-	}
-	return M3d;
+	code += deferredCode;
+	code += indent + "return output;\n";
+	indent--;
+	code += indent + "}\n\n";
+	return code;
 }
 
 int main(int, char*[]) {
-	constexpr int dimensionCount = DIMENSION_COUNT;
-	std::string cppCode;
-	std::string hppCode;
-	int nodeCount = modeCount + 1;
-	std::unordered_map<int, std::string> realTypenames;
-	for (int width = 1; width <= maximumSimdWidth; width *= 2) {
-		realTypenames[width] = std::string("Real") + std::to_string(width);
-	}
-	hppCode += "#pragma once\n";
-	hppCode += "\n";
-	hppCode += "#include <array>\n";
-	hppCode += "#include <experimental/simd>\n";
-	hppCode += "\n";
-	hppCode += "using Real1 = double;\n";
-	for (int width = 2; width <= maximumSimdWidth; width *= 2) {
-		char *ptr;
-		asprintf(&ptr, "using Real%i = std::experimental::fixed_size_simd<double, %i>;\n", width, width);
-		hppCode += ptr;
-		free(ptr);
-	}
-	int const nodeCount3d = ipow(modeCount + 1, dimensionCount);
-	int const modeCount3d = binco(modeCount + dimensionCount - 1, dimensionCount);
-	for (int width = 1; width <= maximumSimdWidth; width *= 2) {
-		char *ptr;
-		asprintf(&ptr, "using ModalCoefficients%i = std::array<Real%i, %i>;\n", width, width, modeCount3d);
-		hppCode += ptr;
-		free(ptr);
-	}
-	for (int width = 1; width <= maximumSimdWidth; width *= 2) {
-		char *ptr;
-		asprintf(&ptr, "using NodalValues%i = std::array<Real%i, %i>;\n", width, width, nodeCount3d);
-		hppCode += ptr;
-		free(ptr);
-	}
-	hppCode += "\n";
-	int simdWidth = 1;
-	std::vector<Matrix> factors;
-	std::vector<std::string> inputs, outputs;
-	auto realTypename = realTypenames[simdWidth];
-	std::string cppHeader1;
-	std::string cppHeader2;
-	cppHeader1 += "\n";
-	cppHeader1 += "#include \"transforms.hpp\"\n";
-	cppHeader1 += "\n";
-	cppHeader1 += "#include <cmath>\n";
-	cppHeader1 += "\n";
-	hppCode += "\n";
-	auto const genArray = [](std::string typeName, int count) {
-		return std::string("std::array<") + typeName + ", " + std::to_string(count) + ">";
-	};
-	for (int simdWidth = 1; simdWidth <= maximumSimdWidth; simdWidth *= 2) {
-		hppCode += genArray(realTypename, modeCount3d) + " legendreAnalyze(" + genArray(realTypename, nodeCount3d) + " const&);\n";
-	}
-	hppCode += "\n";
-	for (int simdWidth = 1; simdWidth <= maximumSimdWidth; simdWidth *= 2) {
-		hppCode += genArray(realTypename, nodeCount3d) + " legendreSynthesize(" + genArray(realTypename, modeCount3d) + " const&);\n";
-	}
-	hppCode += "\n";
-	for (int simdWidth = 1; simdWidth <= maximumSimdWidth; simdWidth *= 2) {
-		hppCode += genArray(realTypename, modeCount3d) + " applyInverseMass(" + genArray(realTypename, modeCount3d) + " const&);\n";
-	}
-	hppCode += "\n";
-	for (int simdWidth = 1; simdWidth <= maximumSimdWidth; simdWidth *= 2) {
-		hppCode += genArray(realTypename, modeCount3d) + " applyStiffness(" + genArray(realTypename, modeCount3d) + " const&);\n";
-	}
-	hppCode += "\n";
-	std::string auxCode;
-	for (int simdWidth = 1; simdWidth <= maximumSimdWidth; simdWidth *= 2) {
-		auto realTypename = realTypenames[simdWidth];
-		auto M = massMatrix(modeCount, true);
-		auto permute = permutationMatrix(M[0].size(), modeCount, dimensionCount);
-		M = matrixMultiply(M, matrixTranspose(permute));
-		M = matrixMultiply(permute, M);
-		auxCode += indent + genArray(realTypename, modeCount3d) + " applyInverseMass(" + genArray(realTypename, modeCount3d) + " const& input) {\n";
-		indent++;
-		inputs = generateVariableNames("input", M[0].size());
-		outputs = generateVariableNames("output", M.size());
-		auxCode += indent + genArray(realTypename, M.size()) + " output;\n";
-		auxCode += matrixVectorProduct(outputs, M, inputs, simdWidth);
-		auxCode += indent + "return output;\n";
-		indent--;
-		auxCode += indent + "}\n\n";
+//	constexpr int D = 3;
+//	for (int flat = 0; flat < 51; flat++) {
+//		std::array<int, D> i = flat2triangular<D>(flat);
+//		int const flat2 = triangular2flat<D>(i);
+//		printf("%i: ", flat);
+//		for (int j = 0; j < D; j++) {
+//			printf("%i ", i[j]);
+//		}
+//		printf("(%i)\n", flat2);
+//		assert(flat2 == flat);
+//	}
+//	return 0;
 
-		auto S = stiffnessMatrix(modeCount);
-		permute = permutationMatrix(S[0].size(), modeCount, dimensionCount);
-		S = matrixMultiply(S, matrixTranspose(permute));
-		S = matrixMultiply(permute, S);
-		auxCode += indent + genArray(realTypename, modeCount3d) + " applyStiffness(" + genArray(realTypename, modeCount3d) + " const& input) {\n";
-		indent++;
-		inputs = generateVariableNames("input", S[0].size());
-		outputs = generateVariableNames("output", S.size());
-		auxCode += indent + genArray(realTypename, S.size()) + " output;\n";
-		auxCode += matrixVectorProduct(outputs, S, inputs, simdWidth);
-		auxCode += indent + "return output;\n";
-		indent--;
-		auxCode += indent + "}\n\n";
-		for (int dim = 0; dim < dimensionCount - 1; dim++) {
-			auto P = swapMatrix(dim, modeCount);
-			P = matrixMultiply(permute, P);
-			permute = permutationMatrix(P[0].size(), modeCount, dimensionCount);
-			P = matrixMultiply(P, matrixTranspose(permute));
-			auxCode +=
-					indent + genArray(realTypename, modeCount3d) + " applySwap" + std::string(1, 'X' + dim) + "Z(" + genArray(realTypename, modeCount3d) + " const& input) {\n";
-			indent++;
-			inputs = generateVariableNames("input", P[0].size());
-			outputs = generateVariableNames("output", P.size());
-			auxCode += indent + genArray(realTypename, P.size()) + " output;\n";
-			auxCode += matrixVectorProduct(outputs, P, inputs, simdWidth);
-			auxCode += indent + "return output;\n";
-			indent--;
-			auxCode += indent + "}\n\n";
-		}
-		for (int dim = 0; dim < dimensionCount - 1; dim++) {
-			auto P = swapMatrix(dim, nodeCount);
-			auxCode +=
-					indent + genArray(realTypename, nodeCount3d) + " applySwap" + std::string(1, 'X' + dim) + "Z(" + genArray(realTypename, nodeCount3d) + " const& input) {\n";
-			indent++;
-			inputs = generateVariableNames("input", P[0].size());
-			outputs = generateVariableNames("output", P.size());
-			auxCode += indent + genArray(realTypename, P.size()) + " output;\n";
-			auxCode += matrixVectorProduct(outputs, P, inputs, simdWidth);
-			auxCode += indent + "return output;\n";
-			indent--;
-			auxCode += indent + "}\n\n";
-		}
-	}
-	cppCode += "\n\n" + auxCode;
-	auxCode.clear();
-	for (int simdWidth = 1; simdWidth <= maximumSimdWidth; simdWidth *= 2) {
-		inputs = decltype(inputs)();
-		outputs = decltype(outputs)();
-		auto const realTypename = realTypenames[simdWidth];
-		bool isAnalyze;
-		isAnalyze = true;
-		std::string functionName = "legendreAnalyze";
-		int inCount = nodeCount3d;
-		int outCount = modeCount3d;
-SYNTHESIZE:
-		factors.clear();
-		if (!isAnalyze) {
-			functionName = "legendreSynthesize";
-		}
-		outputs = generateVariableNames("input", inCount);
-		cppCode += genArray(realTypename, outCount) + " " + functionName + "(" + genArray(realTypename, inCount) + " const& input) {\n";
-		std::string deferredCode;
-		indent++;
-		std::vector<int> arraySizes;
-		arraySizes = std::vector<int>(1, inCount);
-		factors.clear();
-		auto const direction = isAnalyze ? TransformDirection::forward : TransformDirection::backward;
-		for (int transformDimension = 0; transformDimension < dimensionCount; transformDimension++) {
-			factors.push_back(transformMatrix(direction, transformDimension));
-		}
-		if (isAnalyze) {
-			std::reverse(factors.begin(), factors.end());
-		}
-		for (int transformDimension = 0; transformDimension < dimensionCount; transformDimension++) {
-			auto const sz = factors[transformDimension].size();
-			arraySizes.push_back(sz);
-		}
-		int bufferSize, currentSize;
-		bufferSize = *(std::max_element(arraySizes.begin() + 1, arraySizes.end() - 1));
-		currentSize = arraySizes[0] + arraySizes[1];
-		for (int i = 0; i < dimensionCount - 2; i++) {
-			currentSize -= arraySizes[i];
-			currentSize += arraySizes[i + 2];
-			bufferSize = std::max(bufferSize, currentSize);
-		}
-		cppCode += indent + genArray(realTypename, bufferSize) + " buffer;\n";
-		int bufferOffset;
-		bufferOffset = 0;
-		for (int transformDimension = 0; transformDimension < dimensionCount; transformDimension++) {
-			auto const &A = factors[transformDimension];
-			inputs = std::move(outputs);
-			if (transformDimension != (dimensionCount - 1)) {
-				outputs = generateVariableNames("buffer", A.size(), bufferOffset);
-				if (bufferOffset == 0) {
-					bufferOffset = A.size();
-				} else {
-					bufferOffset = 0;
-				}
-			} else {
-				outputs = generateVariableNames("output", outCount);
-				cppCode += indent + genArray(realTypename, A.size()) + " output;\n";
-			}
-			deferredCode += matrixVectorProduct(outputs, A, inputs, simdWidth);
-		}
-		cppCode += deferredCode;
-		deferredCode.clear();
-		cppCode += indent + "return output;\n";
-		indent--;
-		cppCode += indent + "}\n\n";
-		if (isAnalyze) {
-			isAnalyze = false;
-			std::swap(inCount, outCount);
-			goto SYNTHESIZE;
-		}
-	}
-	for (int simdWidth = 1; simdWidth <= maximumSimdWidth; simdWidth *= 2) {
-		cppHeader2 += std::string(getConstant.getCode(realTypename, simdWidth));
-		cppHeader2 += "\n";
-	}
-	cppCode = cppHeader1 + "\n" + cppHeader2 + "\n" + cppCode + "\n";
-	hppCode += "\n";
+	auto const analyzeCode = generateTransform(TransformDirection::forward);
+	auto const synthesizeCode = generateTransform(TransformDirection::backward);
+	auto const inverseMassCode = generateInverseMassMatrix();
+	auto const stiffnessCode = generateStiffnessMatrix();
+	std::ostringstream code;
+	code << indent << "#pragma once\n";
+	code << indent << "\n";
+	code << indent << "#include <array>\n";
+	code << indent << "#include <concepts>\n";
+	code << indent << "#include <type_traits>\n";
+	code << indent << "#include <experimental/simd>\n";
+	code << indent << "\n";
+	code << indent << "template<typename Type>\n";
+	code << indent << "concept RealNumberType = (\n";
+	indent++;
+	code << indent << "std::floating_point<Type> ||\n";
+	code << indent << "(std::experimental::is_simd<Type>::value && std::floating_point<typename Type::value_type>)\n";
+	indent--;
+	code << indent << ");\n";
+	code << indent << "\n";
+	std::string const constants = std::string(getConstant.getCode());
 
-	toFile(hppCode, "./generated_source/transforms.hpp");
-	toFile(cppCode, "./generated_source/transforms.cpp");
-	getConstant.reset();
+	code << "template<RealNumberType Type, bool = std::is_literal_type_v<Type>>\n"
+			"struct TrialSpaceConstants;\n\n"
+			"template<RealNumberType Type>\n"
+			"struct TrialSpaceConstants<Type, false> {\n"
+			"   inline static const " << constants << "\n"
+			"   };\n"
+			"};\n\n"
+			"template<RealNumberType Type>\n"
+			"struct TrialSpaceConstants<Type, true> {\n"
+			"   inline static constexpr " << constants << "\n"
+			"   };\n"
+			"};\n\n"
+			"";
+	code << indent << "template<RealNumberType Type>\n";
+	code << indent << "struct TrialSpace : public TrialSpaceConstants<Type> {\n\n";
+	indent++;
+	code << indent << "static constexpr int modalSize = " << modeCount3d << ";\n";
+	code << indent << "static constexpr int nodalSize = " << nodeCount3d << ";\n";
+//	code << modalIndicesCode;
+	code << indent << "using TrialSpaceConstants<Type>::constant;\n";
+	code << indent << "using AnalysisVector = std::array<Type, modalSize>;\n";
+	code << indent << "using SynthesisVector = std::array<Type, nodalSize>;\n\n";
+	code << indent << "static AnalysisVector analyze(SynthesisVector const&);\n";
+	code << indent << "static SynthesisVector synthesize(AnalysisVector const&);\n";
+	code << indent << "static AnalysisVector applyInverseMassOperator(AnalysisVector const&);\n";
+	code << indent << "static AnalysisVector applyStiffnessOperator(int, AnalysisVector const&);\n\n";
+	indent--;
+	code << indent << "};\n";
+	code << indent << "\n";
+	code << analyzeCode;
+	code << synthesizeCode;
+	code << inverseMassCode;
+	code << stiffnessCode;
+	toFile(code.str(), "./generated_source/TrialSpace.hpp");
 	return 0;
 }
