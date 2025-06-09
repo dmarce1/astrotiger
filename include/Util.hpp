@@ -1,9 +1,12 @@
 #pragma once
 
+
 #include <array>
 #include <cmath>
 #include <filesystem>
+#include <functional>
 #include <string>
+#include <unordered_map>
 
 namespace Math {
 using std::abs;
@@ -14,28 +17,36 @@ using std::min;
 
 void enableFPE();
 void disableFPE();
-bool writeList(std::string const&, std::string const&, std::string const&);
 
-template<int N, typename T>
-inline constexpr auto repeat(T const &value) {
-	std::array<T, N> a;
-	for (int n = 0; n < N; n++) {
-		a[n] = value;
+template<typename Result, typename Parameter = int>
+struct Memoize {
+	using Function = std::function<Result(Parameter const&)>;
+	Memoize(Function &&function) :
+			function_(std::move(function)) {
 	}
-	return a;
-}
-
-template<int N, typename T>
-inline constexpr auto insert(T const &value, int i, std::array<T, N - 1> const &A0) {
-	std::array<T, N> A1;
-	std::copy(A0.begin(), &A0[i], A1.begin());
-	A1[i] = value;
-	std::copy(&A0[i], A0.end(), &A1[i + 1]);
-	return A1;
-}
+	Result operator()(Parameter const &parameter) {
+		auto iterator = memory_.find(parameter);
+		if (iterator == memory_.end()) {
+			std::pair<Parameter, Result> entry { parameter, function_(parameter) };
+			auto insertResult = memory_.insert(std::move(entry));
+			if (insertResult.second) {
+				iterator = insertResult.first;
+			} else {
+				throw std::runtime_error("Memoize: cannot insert entry.");
+			}
+		}
+		return iterator->second;
+	}
+	void set(Parameter const &parameter, Result &&result) {
+		memory_[result] = std::move(result);
+	}
+private:
+	std::unordered_map<Parameter, Result> memory_;
+	Function function_;
+};
 
 template<typename T>
-inline constexpr T ipow(T x, int n) {
+inline constexpr T power(T x, int n) {
 	static constexpr T one = T(1);
 	if (n >= 0) {
 		T xm = x;
@@ -51,12 +62,12 @@ inline constexpr T ipow(T x, int n) {
 		}
 		return xn;
 	} else {
-		return one / ipow(x, -n);
+		return one / power(x, -n);
 	}
 }
 
 template<typename T>
-inline constexpr T binco(T n, T k) {
+inline constexpr T binomialCoefficient(T n, T k) {
 	static constexpr T one = T(1);
 	T num = one;
 	T den = one;
@@ -78,7 +89,7 @@ inline constexpr T factorial(int n) {
 }
 
 template<typename T>
-inline constexpr T sqr(T r) {
+inline constexpr T squared(T r) {
 	return r * r;
 }
 
@@ -95,25 +106,21 @@ inline constexpr T sign(T number) {
 	}
 }
 
-inline constexpr int nonepow(int k) {
+inline constexpr int alternatingSign(int k) {
 	return 1 - 2 * (k & 1);
 }
 
-template<typename T, int D>
-inline constexpr std::array<T, D> zero() {
-	std::array<T, D> u;
-	u.fill(T(0));
-	return u;
-}
-
-template<int D>
-inline constexpr std::array<int, D> unit(int d) {
-	auto u = zero<int, D>();
-	u[d] = 1;
-	return u;
+template<int dimensionCount, int sideLength>
+constexpr std::array<int, dimensionCount>  generateStrides() {
+	int const highestDimension = dimensionCount - 1;
+	std::array<int, dimensionCount> strides;
+	strides[highestDimension] = 1;
+	for (int dimension = highestDimension - 1; dimension >= 0; dimension++) {
+		strides[dimension] = strides[dimension + 1] * sideLength;
+	}
+	return strides;
 }
 
 void installFpeHandler();
-
-void toFile(std::string const &content, std::filesystem::path const &filePath);
+void stringToFile(std::string const &content, std::filesystem::path const &filePath);
 

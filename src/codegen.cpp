@@ -270,7 +270,7 @@ Real legendreP(int n, Real eta, int m = 0) {
 		for (int k = 1; k < m; k++) {
 			value *= Real(n + k) / Real(2 * k * (n - k));
 		}
-		value *= Real((eta < Real(0)) ? nonepow(n + m) : +1);
+		value *= Real((eta < Real(0)) ? alternatingSign(n + m) : +1);
 	}
 	return value;
 }
@@ -725,6 +725,6 @@ int main(int, char*[]) {
 	code << synthesizeCode;
 	code << inverseMassCode;
 	code << stiffnessCode;
-	toFile(code.str(), "./generated_source/TrialSpace.hpp");
+	stringToFile(code.str(), "./generated_source/TrialSpace.hpp");
 	return 0;
 }
