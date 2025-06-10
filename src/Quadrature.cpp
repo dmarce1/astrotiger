@@ -33,29 +33,3 @@ std::vector<QuadraturePoint> getLobattoQuadraturePoints(int N) {
 	return memoiy(N);
 }
 
-std::vector<QuadraturePoint> getLegendreQuadraturePoints(int N) {
-	static Memoize<std::vector<QuadraturePoint>> memoiy([](int N) {
-		using namespace Constants;
-		std::vector<QuadraturePoint> points;
-		Real const Np1 = Real(N + 1);
-		Real const N_ = Real(N);
-		for (int j = 0; j < N; j++) {
-			Real x = std::cos(pi * (one - (Real(j) + half) / N_));
-			Real prev, Pnp1;
-			do {
-				prev = x;
-				Pnp1 = std::legendre(N + 1, x);
-				Real const Pn = std::legendre(N, x);
-				Real const x2 = squared(x);
-				Real const num = (one - x2) * Pn;
-				Real const den = Np1 * (Pnp1 - x * Pn);
-				x += num / den;
-			} while (Real(x) != Real(prev));
-			Real const dpdx = Np1 * (std::legendre(N + 1, x) - x * std::legendre(N, x)) / (squared(x) - one);
-			Real const w = two / ((one - squared(x)) * squared(dpdx));
-			points.push_back( { Real(x), Real(w) });
-		}
-		return points;
-	});
-	return memoiy(N);
-}
