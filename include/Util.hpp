@@ -34,7 +34,7 @@ inline constexpr auto insert(T const &value, int i, std::array<T, N - 1> const &
 }
 
 template<typename T>
-inline constexpr T ipow(T x, int n) {
+inline constexpr T power(T x, int n) {
 	static constexpr T one = T(1);
 	if (n >= 0) {
 		T xm = x;
@@ -50,7 +50,7 @@ inline constexpr T ipow(T x, int n) {
 		}
 		return xn;
 	} else {
-		return one / ipow(x, -n);
+		return one / power(x, -n);
 	}
 }
 

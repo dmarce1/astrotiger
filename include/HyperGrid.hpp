@@ -1,4 +1,5 @@
 #pragma once
+#include "Analysis.hpp"
 #include "Basis.hpp"
 #include "ContainerArithmetic.hpp"
 #include "Hdf5.hpp"
@@ -15,34 +16,34 @@ inline constexpr Type minmod(Type const &a, Type const &b) {
 	return sgn * mag;
 }
 
-template<typename State, int cellsAcrossInterior, int basisOrder, typename RungeKutta>
+template<typename State, int cellsAcrossInterior, int modeCount, typename RungeKutta>
 class HyperGrid {
 
 	static constexpr int dimensionCount = State::dimCount();
 	static constexpr int ghostWidth = 2;
 	static constexpr int fieldCount = State::fieldCount();
 	static constexpr int rungeKuttaStageCount = RungeKutta::stageCount();
-	static constexpr int basisSize = BasisIndexType<basisOrder, dimensionCount>::count();
+	static constexpr int modalVolume = BasisIndexType<modeCount, dimensionCount>::count();
+	static constexpr int nodeCount = modeCount;
+	static constexpr int nodalVolume = power(nodeCount, dimensionCount);
 	static constexpr int cellsAcrossExterior = cellsAcrossInterior + 2 * ghostWidth;
-	static constexpr int exteriorVolume = ipow(cellsAcrossExterior, dimensionCount);
+	static constexpr int exteriorVolume = power(cellsAcrossExterior, dimensionCount);
 	static constexpr RungeKutta butcherTable { };
-	static constexpr Range<int, dimensionCount> exteriorBox {
-			repeat<dimensionCount>(-ghostWidth),
-			repeat<dimensionCount>(cellsAcrossInterior + ghostWidth) };
-	static constexpr Range<int, dimensionCount> interiorBox {
-			repeat<dimensionCount>(0),
-			repeat<dimensionCount>(cellsAcrossInterior) };
-	static constexpr Quadrature<typename State::value_type, basisOrder, dimensionCount> volumeQuadrature { };
-	static constexpr Basis<typename State::value_type, basisOrder, dimensionCount> orthogonalBasis { };
+	static constexpr Range<int, dimensionCount> exteriorBox { repeat<dimensionCount>(-ghostWidth), repeat<dimensionCount>(cellsAcrossInterior + ghostWidth) };
+	static constexpr Range<int, dimensionCount> interiorBox { repeat<dimensionCount>(0), repeat<dimensionCount>(cellsAcrossInterior) };
+	static constexpr Range<int, dimensionCount> nodalBox { repeat<dimensionCount>(0), repeat<dimensionCount>(nodeCount) };
+	static constexpr Quadrature<typename State::value_type, modeCount, dimensionCount> volumeQuadrature { };
+	static constexpr Basis<typename State::value_type, modeCount, dimensionCount> orthogonalBasis { };
 
 	using Type = State::value_type;
-	using BasisIndex = BasisIndexType<basisOrder, dimensionCount>;
-	using QuadratureType = Quadrature<Type, basisOrder, State::dimCount()>;
+	using ModeIndex = BasisIndexType<modeCount, dimensionCount>;
+	using QuadratureType = Quadrature<Type, modeCount, State::dimCount()>;
 	using InteriorIndex = MultiIndex<exteriorBox, interiorBox>;
+	using NodeIndex = MultiIndex<nodalBox>;
 
-	std::vector<std::array<std::array<std::array<Type, exteriorVolume>, basisSize>, fieldCount>> stageDerivatives_;
-	std::vector<std::array<std::array<Type, exteriorVolume>, basisSize>> nextState;
-	std::vector<std::array<std::array<Type, exteriorVolume>, basisSize>> currentState;
+	std::vector<std::array<std::array<std::array<Type, exteriorVolume>, modalVolume>, fieldCount>> stageDerivatives_;
+	std::vector<std::array<std::array<Type, exteriorVolume>, modalVolume>> nextState;
+	std::vector<std::array<std::array<Type, exteriorVolume>, modalVolume>> currentState;
 	const Type cellWidth;
 	const Type inverseCellWidth;
 
@@ -51,7 +52,7 @@ class HyperGrid {
 		return map[i];
 	}
 	static constexpr int stride(int d) {
-		return ipow(cellsAcrossExterior, dimensionCount - 1 - d);
+		return power(cellsAcrossExterior, dimensionCount - 1 - d);
 	}
 
 public:
@@ -64,32 +65,51 @@ public:
 		auto const inverseMassMatrix = matrixInverse(massMatrix);
 		for (auto cellMultiIndex = InteriorIndex::begin(); cellMultiIndex != InteriorIndex::end(); cellMultiIndex++) {
 			int const cellFlatIndex = cellMultiIndex;
-			for (int basisIndex = 0; basisIndex < basisSize; basisIndex++) {
-				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-					nextState[fieldIndex][basisIndex][cellFlatIndex] = Type(0);
+			std::array<std::array<Type, nodalVolume>, fieldCount> nodalState;
+			constexpr auto quadrature = getLegendreQuadraturePoints<Type, nodeCount>();
+			for (NodeIndex nodeIndex = NodeIndex::begin(); nodeIndex != NodeIndex::end(); nodeIndex++) {
+				std::array<Type, dimensionCount> position;
+				int const flatNodeIndex = nodeIndex;
+				for (int dimension = 0; dimension < dimensionCount; dimension++) {
+					position[dimension] = (Type(2 * cellMultiIndex[dimension] + 1) + quadrature.x[nodeIndex[dimension]]) * halfCellWidth;
 				}
-				for (int quadratureIndex = 0; quadratureIndex < volumeQuadrature.size(); quadratureIndex++) {
-					auto const basis = orthogonalBasis(volumeQuadrature.point(quadratureIndex));
-					auto const weight = volumeQuadrature.weight(quadratureIndex);
-					auto const quadraturePoint = volumeQuadrature.point(quadratureIndex);
-					std::array<Type, dimensionCount> position;
-					for (int dimension = 0; dimension < dimensionCount; dimension++) {
-						position[dimension] = (Type(2 * cellMultiIndex[dimension] + 1) + quadraturePoint[dimension]) * halfCellWidth;
-					}
-					auto const thisState = initialState(position);
-					for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-						nextState[fieldIndex][basisIndex][cellFlatIndex] += weight * basis[basisIndex] * thisState[fieldIndex];
-					}
-				}
+				auto const thisState = initialState(position);
 				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-					nextState[fieldIndex][basisIndex][cellFlatIndex] *= inverseMassMatrix(basisIndex, basisIndex);
+					nodalState[fieldIndex][flatNodeIndex] = thisState[fieldIndex];
 				}
 			}
+			for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
+				auto const modalState = modalAnalysis<Type, dimensionCount, modeCount, nodeCount>(nodalState[fieldIndex]);
+				for(int modalIndex = 0; modalIndex < modalVolume; modalIndex++) {
+					nextState[fieldIndex][modalIndex][cellFlatIndex] = modalState[modalIndex];
+				}
+			}
+			//			for (int basisIndex = 0; basisIndex < basisSize; basisIndex++) {
+			//				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
+			//					nextState[fieldIndex][basisIndex][cellFlatIndex] = Type(0);
+			//				}
+			//				for (int quadratureIndex = 0; quadratureIndex < volumeQuadrature.size(); quadratureIndex++) {
+			//					auto const basis = orthogonalBasis(volumeQuadrature.point(quadratureIndex));
+			//					auto const weight = volumeQuadrature.weight(quadratureIndex);
+			//					auto const quadraturePoint = volumeQuadrature.point(quadratureIndex);
+			//					std::array<Type, dimensionCount> position;
+			//					for (int dimension = 0; dimension < dimensionCount; dimension++) {
+			//						position[dimension] = (Type(2 * cellMultiIndex[dimension] + 1) + quadraturePoint[dimension]) * halfCellWidth;
+			//					}
+			//					auto const thisState = initialState(position);
+			//					for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
+			//						nextState[fieldIndex][basisIndex][cellFlatIndex] += weight * basis[basisIndex] * thisState[fieldIndex];
+			//					}
+			//				}
+			//				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
+			//					nextState[fieldIndex][basisIndex][cellFlatIndex] *= inverseMassMatrix(basisIndex, basisIndex);
+			//				}
+			//			}
 		}
 	}
 	void output(const char *filenameBase, int timeStepNumber, Type const &time) {
 		std::string filename = std::string(filenameBase) + "." + std::to_string(timeStepNumber) + ".h5";
-		writeHdf5<Type, dimensionCount, cellsAcrossInterior, basisOrder, ghostWidth>(filename, cellWidth, nextState, State::getFieldNames());
+		writeHdf5<Type, dimensionCount, cellsAcrossInterior, modeCount, ghostWidth>(filename, cellWidth, nextState, State::getFieldNames());
 		writeList("X.visit", "!NBLOCKS 1\n", filename + ".xmf");
 	}
 	void enforceBoundaryConditions() {
@@ -111,7 +131,7 @@ public:
 				continue;
 			}
 			for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-				for (int basisIndex = 0; basisIndex < basisSize; basisIndex++) {
+				for (int basisIndex = 0; basisIndex < modalVolume; basisIndex++) {
 					nextState[fieldIndex][basisIndex][ghostZoneIndex] = nextState[fieldIndex][basisIndex][interiorIndex];
 				}
 			}
@@ -131,7 +151,7 @@ public:
 				auto const basis = orthogonalBasis(volumeQuadrature.point(quadratureIndex));
 				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
 					thisState[fieldIndex] = Type(0);
-					for (int modeIndex = 0; modeIndex < basisSize; modeIndex++) {
+					for (int modeIndex = 0; modeIndex < modalVolume; modeIndex++) {
 						thisState[fieldIndex] += nextState[fieldIndex][modeIndex][cellFlatIndex] * basis[modeIndex];
 					}
 				}
@@ -147,13 +167,13 @@ public:
 		for (int dimension = 0; dimension < dimensionCount; dimension++) {
 			maximumEigenvalueSum += maximumEigenvalue[dimension];
 		}
-		Type const timeStepSize = (cellWidth * butcherTable.cfl()) / (Type(2 * basisOrder - 1) * maximumEigenvalueSum);
+		Type const timeStepSize = (cellWidth * butcherTable.cfl()) / (Type(2 * modeCount - 1) * maximumEigenvalueSum);
 		return timeStepSize;
 	}
 	void subStep(Type const &timeStepSize, int stageIndex) {
 		nextState = currentState;
 		for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-			for (int modeIndex = 0; modeIndex < basisSize; modeIndex++) {
+			for (int modeIndex = 0; modeIndex < modalVolume; modeIndex++) {
 				for (int thisStage = 0; thisStage < stageIndex; thisStage++) {
 					for (auto cellMultiIndex = InteriorIndex::begin(); cellMultiIndex != InteriorIndex::end(); cellMultiIndex++) {
 						int const cellFlatIndex = cellMultiIndex;
@@ -170,7 +190,7 @@ public:
 	}
 	void endStep() {
 		for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-			for (auto modeMultiIndex = BasisIndex::begin(); modeMultiIndex != BasisIndex::end(); modeMultiIndex++) {
+			for (auto modeMultiIndex = ModeIndex::begin(); modeMultiIndex != ModeIndex::end(); modeMultiIndex++) {
 				int const modeFlatIndex = modeMultiIndex;
 				for (auto cellMultiIndex = InteriorIndex::begin(); cellMultiIndex != InteriorIndex::end(); cellMultiIndex++) {
 					int const cellFlatIndex = cellMultiIndex;
@@ -187,21 +207,19 @@ public:
 	}
 	void applyLimiter() {
 		constexpr auto limiterCoefficients = []() {
-			std::array<Type, basisOrder> limiterCoefficients;
-			for (int orderIndex = 0; orderIndex < basisOrder; orderIndex++) {
+			std::array<Type, modeCount> limiterCoefficients;
+			for (int orderIndex = 0; orderIndex < modeCount; orderIndex++) {
 				limiterCoefficients[orderIndex] = Type(1) / Type(2 * orderIndex + 1);
 			}
 			return limiterCoefficients;
 		}();
 
-		constexpr Range<int, dimensionCount> limiterBox {
-				repeat<dimensionCount>(-1),
-				repeat<dimensionCount>(cellsAcrossInterior + 1) };
+		constexpr Range<int, dimensionCount> limiterBox { repeat<dimensionCount>(-1), repeat<dimensionCount>(cellsAcrossInterior + 1) };
 
 		using LimiterIndex = MultiIndex<exteriorBox, limiterBox>;
 
-		for (int polynomialDegree = basisOrder - 1; polynomialDegree > 0; polynomialDegree--) {
-			for (auto targetModeIndex = BasisIndex::begin(); targetModeIndex != BasisIndex::end(); targetModeIndex++) {
+		for (int polynomialDegree = modeCount - 1; polynomialDegree > 0; polynomialDegree--) {
+			for (auto targetModeIndex = ModeIndex::begin(); targetModeIndex != ModeIndex::end(); targetModeIndex++) {
 				for (int dimension = 0; dimension < dimensionCount; dimension++) {
 
 					int totalDegree = 0;
@@ -258,16 +276,15 @@ public:
 	}
 
 	template<int ... dimension>
-	void computeDudt(Type timeStepSize, std::array<std::array<std::array<Type, exteriorVolume>, basisSize>, fieldCount> &stateDerivative,
+	void computeDudt(Type timeStepSize, std::array<std::array<std::array<Type, exteriorVolume>, modalVolume>, fieldCount> &stateDerivative,
 			std::integer_sequence<int, dimension...>) {
 		(computeDudtByDim<dimension>(timeStepSize, stateDerivative), ...);
 	}
 	template<int dimension>
-	void computeDudtByDim(Type timeStepSize, std::array<std::array<std::array<Type, exteriorVolume>, basisSize>, fieldCount> &stateDerivative) {
-		constexpr Range<int, dimensionCount> interiorBoxPlusOne {
-				repeat<dimensionCount>(0),
-				repeat<dimensionCount>(cellsAcrossInterior) + unit<dimensionCount>(dimension) };
-		constexpr Quadrature<Type, basisOrder, dimensionCount - 1> surfaceQuadrature;
+	void computeDudtByDim(Type timeStepSize, std::array<std::array<std::array<Type, exteriorVolume>, modalVolume>, fieldCount> &stateDerivative) {
+		constexpr Range<int, dimensionCount> interiorBoxPlusOne { repeat<dimensionCount>(0), repeat<dimensionCount>(cellsAcrossInterior) + unit<dimensionCount>(
+				dimension) };
+		constexpr Quadrature<Type, modeCount, dimensionCount - 1> surfaceQuadrature;
 		using FluxIndexType = MultiIndex<exteriorBox, interiorBoxPlusOne>;
 		Type const lambda = Type(2) * timeStepSize * inverseCellWidth;
 		for (auto cellMultIndex = FluxIndexType::begin(); cellMultIndex != FluxIndexType::end(); cellMultIndex++) {
@@ -283,7 +300,7 @@ public:
 				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
 					stateRight[fieldIndex] = Type(0);
 					stateLeft[fieldIndex] = Type(0);
-					for (int modeIndex = 0; modeIndex < basisSize; modeIndex++) {
+					for (int modeIndex = 0; modeIndex < modalVolume; modeIndex++) {
 						stateLeft[fieldIndex] += nextState[fieldIndex][modeIndex][leftInterfaceIndex] * basisLeft[modeIndex];
 						stateRight[fieldIndex] += nextState[fieldIndex][modeIndex][rightInterfaceIndex] * basisRight[modeIndex];
 					}
@@ -291,14 +308,14 @@ public:
 				auto const riemannFlux = solveRiemannProblem(stateLeft, stateRight, dimension);
 				if (cellMultIndex[dimension] > 0) {
 					for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-						for (int modeIndex = 0; modeIndex < basisSize; modeIndex++) {
+						for (int modeIndex = 0; modeIndex < modalVolume; modeIndex++) {
 							stateDerivative[fieldIndex][modeIndex][leftInterfaceIndex] -= quadratureWeight * lambda * riemannFlux[fieldIndex] * basisLeft[modeIndex];
 						}
 					}
 				}
 				if (cellMultIndex[dimension] < cellsAcrossInterior) {
 					for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-						for (int modeIndex = 0; modeIndex < basisSize; modeIndex++) {
+						for (int modeIndex = 0; modeIndex < modalVolume; modeIndex++) {
 							stateDerivative[fieldIndex][modeIndex][rightInterfaceIndex] += quadratureWeight * lambda * riemannFlux[fieldIndex] * basisRight[modeIndex];
 						}
 					}
@@ -315,13 +332,13 @@ public:
 				State state;
 				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
 					state[fieldIndex] = Type(0);
-					for (int basisIndex = 0; basisIndex < basisSize; basisIndex++) {
+					for (int basisIndex = 0; basisIndex < modalVolume; basisIndex++) {
 						state[fieldIndex] += nextState[fieldIndex][basisIndex][cellFlatIndex] * basis[basisIndex];
 					}
 				}
 				auto const flux = state.flux(dimension);
 				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-					for (int basisIndex = 0; basisIndex < basisSize; basisIndex++) {
+					for (int basisIndex = 0; basisIndex < modalVolume; basisIndex++) {
 						stateDerivative[fieldIndex][basisIndex][cellFlatIndex] += quadratureWeight * lambda * flux[fieldIndex] * basisDerivative[basisIndex];
 					}
 				}
@@ -330,7 +347,7 @@ public:
 		for (auto cellMultiIndex = InteriorIndex::begin(); cellMultiIndex != InteriorIndex::end(); cellMultiIndex++) {
 			int const cellFlatIndex = cellMultiIndex;
 			for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-				for (auto basisMultiIndex = BasisIndex::begin(); basisMultiIndex != BasisIndex::end(); basisMultiIndex++) {
+				for (auto basisMultiIndex = ModeIndex::begin(); basisMultiIndex != ModeIndex::end(); basisMultiIndex++) {
 					int const basisIndex = basisMultiIndex;
 					stateDerivative[fieldIndex][basisIndex][cellFlatIndex] *= Type(0.5) * Type(2 * basisMultiIndex[dimension] + 1);
 				}

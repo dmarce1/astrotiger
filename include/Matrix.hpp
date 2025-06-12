@@ -203,7 +203,7 @@ struct Matrix {
 		return !(*this == A);
 	}
 
-	static constexpr std::enable_if_t<RowCount == ColumnCount, Matrix> identity() {
+	static constexpr Matrix identity() {
 		Matrix I;
 		for (int n = 0; n < RowCount; n++) {
 			for (int m = 0; m < ColumnCount; m++) {

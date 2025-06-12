@@ -45,7 +45,7 @@ set_property(TARGET astrotiger PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 target_compile_options(
     astrotiger
     PUBLIC
-    $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>: ${CXX_FLAGS} -O0 -g -fno-omit-frame-pointer >>
+    $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>: ${CXX_FLAGS} -O0 -g -fno-omit-frame-pointer>>
     $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>: ${CXX_FLAGS} -O3 >>
     $<$<CONFIG:Profile>:$<$<COMPILE_LANGUAGE:CXX>: ${CXX_FLAGS} -g -pg -DNDEBUG>>
     $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CUDA>: ${CUDA_FLAGS} -G >>
