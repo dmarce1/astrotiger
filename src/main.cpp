@@ -10,10 +10,38 @@ int hpx_main(int argc, char *argv[]) {
 	enableFPE();
 	printf("Reading options...\n");
 	processOptions(argc, argv);
-	using T = Real;
+	using T = double;
 	constexpr int P = 3;
 	constexpr int D = 2;
 	constexpr int N = 128;
+//	using Index = BasisIndexType<P, D>;
+//	constexpr Quadrature<T, P, D - 1> surfaceQuadrature;
+//	static constexpr Basis<T, P, D> orthogonalBasis { };
+//	static constexpr int basisSize = Index::count();
+//	std::array<T, P> X{};
+//	std::array<T, 6> Y{};
+//	X.fill(1);
+//	Y.fill(0);
+//	X[2] = 0;
+//	constexpr int DT = 0;
+//	for (int qi = 0; qi < surfaceQuadrature.size(); qi++) {
+//		T const w = surfaceQuadrature.weight(qi);
+//		auto const pos = insert<D>(T(-1), DT, surfaceQuadrature.point(qi));
+//		auto const basis = orthogonalBasis(pos);
+//		for (int mi = 0; mi < basisSize; mi++) {
+//			Y[mi] += w * X[qi] * basis[mi];
+//		}
+//	}
+//	auto Z = dgTraceInverse<T, D, P>(2 * DT + 0, dgAnalyze<T, D - 1, P>(X));
+//	for(int d = 0; d < Y.size(); d++) {
+//		printf( "%e ", Y[d]);
+//	}
+//	printf( "\n");
+//	for(int d = 0; d < Z.size(); d++) {
+//		printf( "%e ", Z[d]);
+//	}
+//	printf( "\n");
+//
 	using RK = typename RungeKutta<T, P>::type;
 	using S = EulerState<T, D>;
 	HyperGrid<S, N, P, RK> grid;
