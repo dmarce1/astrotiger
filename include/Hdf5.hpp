@@ -19,7 +19,7 @@
 #include "Util.hpp"
 
 template<typename T, int D, int N, int P, int BW>
-void writeHdf5(std::string filename, T const &h, std::vector<std::array<std::array<T, ipow(N + 2 * BW, D)>, BasisIndexType<P, D>::count()>> const &fieldData,
+void writeHdf5(std::string filename, T const &h, std::vector<std::array<std::array<T, ipow(N + 2 * BW, D)>, TriIndex<P, D>::count()>> const &fieldData,
 		std::vector<std::string> const &fieldNames) {
 	constexpr Range<int, D> Box { repeat<D>(-BW), repeat<D>(N + BW) };
 	using hindex_t = MultiIndex<Box>;
@@ -62,7 +62,7 @@ void writeHdf5(std::string filename, T const &h, std::vector<std::array<std::arr
 	for (int d = 0; d < D; d++) {
 		N3 *= dims[d];
 	}
-	using index_type = BasisIndexType<P, D>;
+	using index_type = TriIndex<P, D>;
 	int const nf = fieldNames.size();
 	std::vector<T> buffer(N3);
 	for (int fi = 0; fi < nf; fi++) {
