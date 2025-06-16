@@ -56,7 +56,7 @@ struct Constants {
 	std::string getCode() const {
 		std::ostringstream code;
 		std::ostringstream line;
-		for (int i = 0; i < values_.size(); i++) {
+		for (int i = 0; i < (int) values_.size(); i++) {
 			code << indent + "static const T " + name_ + std::to_string(i) + " = ";
 			code << "T(" << std::setprecision(std::numeric_limits<double>::max_digits10 - 1) << std::scientific << values_[i] << ");\n";
 		}
@@ -300,8 +300,7 @@ Matrix transformMatrix1D(TransformDirection transformDirection, int modeCount, i
 			for (int nodeIndex = 0; nodeIndex < nodeCount; nodeIndex++) {
 				Real const position = quadratureRules[nodeIndex].position;
 				Real const weight = quadratureRules[nodeIndex].weight;
-				Real const inverseMass = Real(2 * modeIndex + 1) / Real(2);
-				transform[modeIndex][nodeIndex] = weight /* * inverseMass*/* legendreP(modeIndex, position, dOrder);
+				transform[modeIndex][nodeIndex] = weight * legendreP(modeIndex, position, dOrder);
 			}
 		}
 	} else {
@@ -398,7 +397,6 @@ Matrix permutationMatrix(int N, int modeCount, int triIndexCount) {
 		}
 	}
 	Matrix P = createMatrix(M, N);
-	int m = 0;
 	for (int n = 0; n < N; n++) {
 		if (ones[n] >= 0) {
 			P[ones[n]][n] = Real(1.0);
@@ -442,8 +440,8 @@ Matrix traceMatrix(int D, int modeCount, int traceFace, bool inverse = false) {
 		}
 	}
 	//printf("%i %i\n", to.size(), smallSize);
-	assert(to.size() == smallSize);
-	assert(from.size() == bigSize);
+	assert((int ) to.size() == smallSize);
+	assert((int ) from.size() == bigSize);
 	Matrix P = createMatrix(smallSize, bigSize);
 	for (int n = 0; n < smallSize; n++) {
 		for (int m = 0; m < bigSize; m++) {
@@ -597,7 +595,7 @@ Matrix massMatrix(int dimensionCount, int N, bool inverse) {
 		}
 	}
 	if (inverse) {
-		for (int m = 0; m < M.size(); m++) {
+		for (int m = 0; m < (int) M.size(); m++) {
 			for (auto &value : M[m]) {
 				if (std::abs(value) > tiny) {
 					value = Real(1) / value;
@@ -677,7 +675,9 @@ SYNTHESIZE:
 		currentSize += arraySizes[i + 2];
 		bufferSize = std::max(bufferSize, currentSize);
 	}
-	hppCode += indent + genArray("T", bufferSize) + " buffer;\n";
+	if (dimensionCount > 1) {
+		hppCode += indent + genArray("T", bufferSize) + " buffer;\n";
+	}
 	int bufferOffset;
 	bufferOffset = 0;
 	for (int transformDimension = 0; transformDimension < dimensionCount; transformDimension++) {
@@ -955,8 +955,8 @@ int main(int, char*[]) {
 				}
 				hppCode += "{";
 				for (int d = 0; d < dim; d++) {
-					char* ptr;
-					if(std::abs(Q[I[d]].position) < 1e-14) {
+					char *ptr;
+					if (std::abs(Q[I[d]].position) < 1e-14) {
 						Q[I[d]].position = 0.0;
 					}
 					asprintf(&ptr, "T(%24.17e)", double(Q[I[d]].position));
@@ -968,7 +968,7 @@ int main(int, char*[]) {
 				}
 				hppCode += "}";
 				cnt++;
-		}
+			}
 			indent--;
 			hppCode += "\n" + std::string(indent) + "}};\n";
 			hppCode += indent + "return map[flatIndex];\n";

@@ -16,7 +16,6 @@ set(astrotiger_src
 
 set(astrotiger_header
 	include/Array.hpp
-	include/Basis.hpp
 	include/ContainerArithmetic.hpp
 	include/EulerState.hpp
 	include/Hdf5.hpp
@@ -27,7 +26,6 @@ set(astrotiger_header
 	include/MultiIndex.hpp
 	include/Octant.hpp
 	include/Options.hpp
-	include/Quadrature.hpp
 	include/Range.hpp
 	include/Real.hpp
 	include/RungeKutta.hpp
