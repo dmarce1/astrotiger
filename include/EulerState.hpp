@@ -136,16 +136,14 @@ struct EulerState: public std::array<T, 2 + D> {
 	}
 	friend constexpr EulerState solveRiemannProblem(const EulerState &uL, const EulerState &uR, int dim) noexcept {
 		using std::sqrt;
-		using state_t = EulerState;
+		using std::max;
 		constexpr int N2 = 2;
-		constexpr int N3 = 3;
 		constexpr int L = 0;
 		constexpr int R = 1;
-		constexpr int STAR = 2;
-		std::array<state_t, N3> u = {uL, uR};
-		std::array<state_t, N2> f;
+		std::array<EulerState, N2> u = {uL, uR};
+		std::array<EulerState, N2> f;
 		std::array<T, N2> irho, v, ek, ei, a;
-		std::array<T, N3> s, p;
+		std::array<T, N2> s, p;
 		for(int i = 0; i < N2; i++) {
 			irho[i] = T(1) / u[i].rho;
 			v[i] = irho[i] * u[i].S[dim];
@@ -159,31 +157,63 @@ struct EulerState: public std::array<T, 2 + D> {
 		}
 		s[L] = std::min(v[L] - a[L], v[R] - a[R]);
 		s[R] = std::max(v[L] + a[L], v[R] + a[R]);
-		T const num = p[R] - p[L] + u[L].rho * v[L] * (s[L] - v[L]) - u[R].rho * v[R] * (s[R] - v[R]);
-		T const den = u[L].rho * (s[L] - v[L]) - u[R].rho * (s[R] - v[R]);
-		s[STAR] = num / den;
 		for(int i = 0; i < N2; i++) {
+			s[i] = std::abs(s[i]);
 			f[i] = u[i].flux(dim);
 		}
-		if (T(0) < s[L]) {
-			return f[L];
-		} else if (T(0) > s[R]) {
-			return f[R];
-		} else {
-			int const i = ((s[STAR] > T(0)) ? L : R);
-			u[STAR].rho = u[i].rho * (s[i] - v[i]) / (s[i] - s[STAR]);
-			for(int dir = 0; dir < D; dir++) {
-				if(dim != dir ) {
-					u[STAR].S[dir] = u[STAR].rho * irho[i] * u[i].S[dir];
-				} else {
-					u[STAR].S[dir] = u[STAR].rho * s[STAR];
-				}
-			}
-			p[STAR] = p[i] + u[i].rho * (s[i] - v[i]) * (s[STAR] - v[i]);
-			u[STAR].eg = ((s[i] - v[i]) * u[i].eg - p[i] * v[i] + p[STAR] * s[STAR]) / (s[i] - s[STAR]);
-			return f[i] + s[i] * (u[STAR] - u[i]);
-		}
+		T const cs = max(s[R], s[L]);
+		return EulerState{T(0.5) * (f[R] + f[L] - cs * (uR - uL))};
 	}
+//	friend constexpr EulerState solveRiemannProblem(const EulerState &uL, const EulerState &uR, int dim) noexcept {
+//		using std::sqrt;
+//		using state_t = EulerState;
+//		constexpr int N2 = 2;
+//		constexpr int N3 = 3;
+//		constexpr int L = 0;
+//		constexpr int R = 1;
+//		constexpr int STAR = 2;
+//		std::array<state_t, N3> u = {uL, uR};
+//		std::array<state_t, N2> f;
+//		std::array<T, N2> irho, v, ek, ei, a;
+//		std::array<T, N3> s, p;
+//		for(int i = 0; i < N2; i++) {
+//			irho[i] = T(1) / u[i].rho;
+//			v[i] = irho[i] * u[i].S[dim];
+//			ek[i] = T(0);
+//			for(int d = 0; d < D; d++) {
+//				ek[i] += T(0.5) * irho[i] * sqr(u[i].S[d]);
+//			}
+//			ei[i] = std::max(T(0), u[i].eg - ek[i]);
+//			p[i] = (gamma - T(1)) * ei[i];
+//			a[i] = sqrt(gamma * p[i] * irho[i]);
+//		}
+//		s[L] = std::min(v[L] - a[L], v[R] - a[R]);
+//		s[R] = std::max(v[L] + a[L], v[R] + a[R]);
+//		T const num = p[R] - p[L] + u[L].rho * v[L] * (s[L] - v[L]) - u[R].rho * v[R] * (s[R] - v[R]);
+//		T const den = u[L].rho * (s[L] - v[L]) - u[R].rho * (s[R] - v[R]);
+//		s[STAR] = num / den;
+//		for(int i = 0; i < N2; i++) {
+//			f[i] = u[i].flux(dim);
+//		}
+//		if (T(0) < s[L]) {
+//			return f[L];
+//		} else if (T(0) > s[R]) {
+//			return f[R];
+//		} else {
+//			int const i = ((s[STAR] > T(0)) ? L : R);
+//			u[STAR].rho = u[i].rho * (s[i] - v[i]) / (s[i] - s[STAR]);
+//			for(int dir = 0; dir < D; dir++) {
+//				if(dim != dir ) {
+//					u[STAR].S[dir] = u[STAR].rho * irho[i] * u[i].S[dir];
+//				} else {
+//					u[STAR].S[dir] = u[STAR].rho * s[STAR];
+//				}
+//			}
+//			p[STAR] = p[i] + u[i].rho * (s[i] - v[i]) * (s[STAR] - v[i]);
+//			u[STAR].eg = ((s[i] - v[i]) * u[i].eg - p[i] * v[i] + p[STAR] * s[STAR]) / (s[i] - s[STAR]);
+//			return f[i] + s[i] * (u[STAR] - u[i]);
+//		}
+//	}
 	constexpr T const& getDensity() const {
 		return rho;
 	}
@@ -231,8 +261,6 @@ template<typename T, int D>
 struct CanDoArithmetic<EulerState<T, D>> {
 	static constexpr bool value = true;
 };
-
-
 
 template<typename T, int D>
 EulerState<T, D> initSodShockTube(std::array<T, D> x) {

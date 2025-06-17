@@ -160,7 +160,7 @@ struct HyperGrid {
 		std::valarray<size_t> strides0(D);
 		int stride = 1;
 		for (int d = 0; d < D; d++) {
-			strides0[d] = stride;
+			strides0[D - d - 1] = stride;
 			stride *= N + 2 * nB;
 		}
 		constexpr int nMlo = binco(O + D - 2, D);
@@ -221,6 +221,108 @@ struct HyperGrid {
 		}
 		T const dt = (dx_ * rk.cfl()) / (T(2 * O - 1) * lambdaSum);
 		return dt;
+	}
+	void subStep(T dt, int ki) {
+		T const lambda = T(2) * dt / dx_;
+		Um_ = Um0_;
+		for (int si = 0; si < ki; si++) {
+			Um_ += rk.a(ki, si) * dUm_[si];
+		}
+		dUm_[ki] = T(0);
+		enforceBoundaryConditions();
+		applyLimiter();
+		std::valarray<size_t> sizes0(N + 2, D);
+		std::valarray<size_t> strides0(D);
+		int stride = 1;
+		for (int d = 0; d < D; d++) {
+			strides0[D - d - 1] = stride;
+			stride *= N + 2 * nB;
+		}
+		std::valarray<T> sL(nF * nN);
+		std::valarray<T> sR(nF * nN);
+		constexpr int nM2 = binco(O + D - 2, D);
+		constexpr int nN2 = ipow(O, D - 1);
+		std::valarray<T> sModeStateR(nM2);
+		std::valarray<T> sModeStateL(nM2);
+		std::valarray<T> sModeFlux(nM2);
+		std::valarray<T> sNodeStateR(nN2 * nF);
+		std::valarray<T> sNodeStateL(nN2 * nF);
+		std::valarray<T> vNodeState(nN * nF);
+		std::valarray<T> vModeState(nM);
+		std::valarray<T> sNodeFlux(nN2 * nF);
+		for (int dim = 0; dim < D; dim++) {
+			using Index = MultiIndex<exteriorBox_>;
+			for (auto iI = Index::begin(); iI < Index::end(); iI++) {
+				bool flag = true;
+				for (int d = 0; d < D; d++) {
+					flag = flag && (iI[d] >= 0);
+					flag = flag && (iI[d] < ((d == dim) ? (N + 1) : N));
+				}
+				if (!flag) {
+					continue;
+				}
+				int const iR = iI;
+				int const iL = iR - strides0[dim];
+				for (int fi = 0; fi < nF; fi++) {
+					auto const tmpL = std::valarray<T>(Um_[std::gslice(iL + fi * nM * nV, { nM }, { nV })]);
+					auto const tmpR = std::valarray<T>(Um_[std::gslice(iR + fi * nM * nV, { nM }, { nV })]);
+					dgTrace<T, D, O>(2 * dim + 1, std::begin(tmpL), std::begin(sModeStateL));
+					dgTrace<T, D, O>(2 * dim + 0, std::begin(tmpR), std::begin(sModeStateR));
+					dgSynthesize<T, D - 1, O>(std::begin(sModeStateL), std::begin(sNodeStateL) + fi * nN2);
+					dgSynthesize<T, D - 1, O>(std::begin(sModeStateR), std::begin(sNodeStateR) + fi * nN2);
+				}
+				std::valarray<T> const tmpR = sNodeStateR;
+				std::valarray<T> const tmpL = sNodeStateL;
+				sNodeStateR[std::gslice(0, { nF, nN2 }, { 1, nF })] = tmpR;
+				sNodeStateL[std::gslice(0, { nF, nN2 }, { 1, nF })] = tmpL;
+				for (int ni = 0; ni < nN2; ni++) {
+					ScalarState uR, uL, fRiemann;
+					std::copy_n(std::begin(sNodeStateR) + nF * ni, nF, uR.begin());
+					std::copy_n(std::begin(sNodeStateL) + nF * ni, nF, uL.begin());
+					fRiemann = solveRiemannProblem(uL, uR, dim);
+					std::copy_n(fRiemann.begin(), nF, std::begin(sNodeFlux) + nF * ni);
+				}
+				std::valarray<T> tmp = sNodeFlux;
+				sNodeFlux = tmp[std::gslice(0, { nN2, nF }, { 1, nN2 })];
+				for (int fi = 0; fi < nF; fi++) {
+					dgAnalyze<T, D - 1, O>(std::begin(sNodeFlux) + fi * nN2, std::begin(sModeFlux));
+					dgTraceInverse<T, D, O>(2 * dim + 1, std::begin(sModeFlux), std::begin(sModeStateL));
+					dgTraceInverse<T, D, O>(2 * dim + 0, std::begin(sModeFlux), std::begin(sModeStateR));
+					auto const tmpL = sModeStateL;
+					auto const tmpR = sModeStateR;
+					dgMassInverse<T, D, O>(std::begin(sModeStateL), std::begin(sModeStateL));
+					dgMassInverse<T, D, O>(std::begin(sModeStateR), std::begin(sModeStateR));
+					dUm_[ki][std::gslice(iR + fi * nM * nV, { nM }, { nV })] += lambda * sModeStateR;
+					dUm_[ki][std::gslice(iL + fi * nM * nV, { nM }, { nV })] -= lambda * sModeStateL;
+				}
+				int const i = iI;
+				if(iI[dim] == N) {
+					continue;
+				}
+				for (int fi = 0; fi < nF; fi++) {
+					auto const tmp = std::valarray<T>(Um_[std::gslice(i + fi * nM * nV, { nM }, { nV })]);
+					dgSynthesize<T, D - 1, O>(std::begin(tmp), std::begin(vNodeState) + fi * nN);
+				}
+				tmp = vNodeState;
+				vNodeState[std::gslice(0, { nF, nN }, { 1, nF })] = tmp;
+				for (int ni = 0; ni < nN; ni++) {
+					ScalarState u;
+					std::copy_n(std::begin(vNodeState) + nF * ni, nF, u.begin());
+					auto const f = u.flux(dim);
+					std::copy_n(f.begin(), nF, std::begin(vNodeState) + nF * ni);
+				}
+				tmp = vNodeState;
+				vNodeState = tmp[std::gslice(0, { nN, nF }, { 1, nN })];
+				for (int fi = 0; fi < nF; fi++) {
+					dgAnalyze<T, D, O>(std::begin(vNodeState) + fi * nN, std::begin(vModeState));
+					auto tmp = vModeState;
+					dgStiffness<T, D, O>(dim, std::begin(tmp), std::begin(vModeState));
+					tmp = vModeState;
+					dgMassInverse<T, D, O>(std::begin(tmp), std::begin(vModeState));
+					dUm_[ki][std::gslice(i + fi * nM * nV, { nM }, { nV })] += lambda * vModeState;
+				}
+			}
+		}
 	}
 private:
 	std::valarray<T> Um_;

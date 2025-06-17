@@ -30,10 +30,10 @@ int hpx_main(int argc, char *argv[]) {
 		std::cout << "  t = " << std::to_string(t);
 		dt = grid.beginStep();
 		std::cout << "  dt = " << dt << std::endl;
-//		for (int s = 0; s < rk.stageCount(); s++) {
-//			grid.subStep(dt, s);
-//			grid.enforceBoundaryConditions();
-//		}
+		for (int s = 0; s < rk.stageCount(); s++) {
+			grid.subStep(dt, s);
+			grid.enforceBoundaryConditions();
+		}
 //		grid.endStep();
 //		grid.enforceBoundaryConditions();
 		iter++;
