@@ -641,15 +641,9 @@ SYNTHESIZE:
 	}
 	hppCode += "template<typename T>\n";
 	outputs = generateVariableNames("input", inCount);
-	if (isAnalyze) {
-		hppCode += "std::array<T, triangleSize<" + std::to_string(dimensionCount) + ", " + std::to_string(modeCount) + ">> ";
-		hppCode += functionName;
-		hppCode += "(std::array<T, squareSize<" + std::to_string(dimensionCount) + ", " + std::to_string(modeCount) + ">> const& input) {\n";
-	} else {
-		hppCode += "std::array<T, squareSize<" + std::to_string(dimensionCount) + ", " + std::to_string(modeCount) + ">> ";
-		hppCode += functionName;
-		hppCode += "(std::array<T, triangleSize<" + std::to_string(dimensionCount) + ", " + std::to_string(modeCount) + ">> const& input) {\n";
-	}
+	hppCode += "void ";
+	hppCode += functionName;
+	hppCode += "(T const* input, T* output) {\n";
 	std::string deferredCode;
 	indent++;
 	std::vector<int> arraySizes;
@@ -692,7 +686,6 @@ SYNTHESIZE:
 			}
 		} else {
 			outputs = generateVariableNames("output", outCount);
-			hppCode += indent + genArray("T", A.size()) + " output;\n";
 		}
 		deferredCode += matrixVectorProduct(outputs, A, inputs);
 	}
@@ -700,7 +693,6 @@ SYNTHESIZE:
 	getConstant.reset();
 	hppCode += deferredCode;
 	deferredCode.clear();
-	hppCode += indent + "return output;\n";
 	indent--;
 	hppCode += indent + "}\n\n";
 	if (isAnalyze) {
@@ -715,20 +707,15 @@ SYNTHESIZE:
 std::string genMassMatrix(int dimensionCount, int modeCount) {
 	std::string hppCode, code1, code2;
 	int const size = binco(modeCount + dimensionCount - 1, dimensionCount);
-	std::string arrayType = "std::array<T, triangleSize<" + std::to_string(dimensionCount) + ", " + std::to_string(modeCount) + ">>";
 	code1 += "template<typename T>\n";
 	auto inputs = generateVariableNames("input", size);
 	auto outputs = generateVariableNames("output", size);
-	code1 += indent + arrayType + " ";
-	code1 += "dgMassInverse" + tag(dimensionCount, modeCount);
-	code1 += "(" + arrayType + " const& input) {\n";
+	code1 += indent + "void dgMassInverse" + tag(dimensionCount, modeCount) + "(T const* input, T* output) {\n";
 	indent++;
-	code2 += indent + arrayType + " output;\n";
 	auto A = massMatrix(dimensionCount, modeCount, true);
 	code2 += matrixVectorProduct(outputs, A, inputs);
 	hppCode += code1 + std::string(getConstant.getCode()) + code2;
 	getConstant.reset();
-	hppCode += indent + "return output;\n";
 	indent--;
 	hppCode += "}\n";
 	return hppCode;
@@ -737,16 +724,12 @@ std::string genMassMatrix(int dimensionCount, int modeCount) {
 std::string genStiffnessMatrix(int dimensionCount, int modeCount) {
 	std::string hppCode, code1, code2;
 	int const size = binco(modeCount + dimensionCount - 1, dimensionCount);
-	std::string arrayType = "std::array<T, triangleSize<" + std::to_string(dimensionCount) + ", " + std::to_string(modeCount) + ">>";
 	code1 += "\n";
 	code1 += "template<typename T>\n";
 	auto inputs = generateVariableNames("input", size);
 	auto outputs = generateVariableNames("output", size);
-	code1 += indent + arrayType + " ";
-	code1 += "dgStiffness" + tag(dimensionCount, modeCount);
-	code1 += "(int dimension, " + arrayType + " const& input) {\n";
+	code1 += indent + "void dgStiffness" + tag(dimensionCount, modeCount) + "(int dimension, T const* input, T* output) {\n";
 	indent++;
-	code2 += indent + arrayType + " output;\n";
 	if (dimensionCount > 1) {
 		code2 += std::string(indent);
 	}
@@ -777,7 +760,6 @@ std::string genStiffnessMatrix(int dimensionCount, int modeCount) {
 	hppCode += code1 + std::string(getConstant.getCode()) + code2;
 
 	getConstant.reset();
-	hppCode += indent + "return output;\n";
 	indent--;
 	hppCode += "}\n";
 	return hppCode;
@@ -791,17 +773,11 @@ std::string genTrace(int dimensionCount, int modeCount, bool inverse) {
 	if (inverse) {
 		std::swap(size1, size2);
 	}
-	std::string arrayType2 = "std::array<T, triangleSize<" + std::to_string(dimensionCount - int(inverse)) + ", " + std::to_string(modeCount) + ">>";
-	std::string arrayType1 = "std::array<T, triangleSize<" + std::to_string(dimensionCount + int(inverse) - 1) + ", " + std::to_string(modeCount) + ">>";
 	code1 += "\ntemplate<typename T>\n";
 	auto inputs = generateVariableNames("input", size1);
 	auto outputs = generateVariableNames("output", size2);
-	code1 += indent + arrayType1 + " ";
-	code1 += "dgTrace" + std::string(inverse ? "Inverse" : "");
-	code1 += tag(dimensionCount, modeCount);
-	code1 += "(int face, " + arrayType2 + " const& input) {\n";
+	code1 += indent + "void dgTrace" + std::string(inverse ? "Inverse" : "") + tag(dimensionCount, modeCount) + "(int face, T const* input, T* output) {\n";
 	indent++;
-	code2 += indent + arrayType1 + " output;\n";
 	code2 += std::string(indent);
 	for (int face = 0; face < 2 * dimensionCount; face++) {
 		if (face == 2 * dimensionCount - 1) {
@@ -825,7 +801,6 @@ std::string genTrace(int dimensionCount, int modeCount, bool inverse) {
 	}
 	hppCode += code1 + std::string(getConstant.getCode()) + code2;
 	getConstant.reset();
-	hppCode += indent + "return output;\n";
 	indent--;
 	hppCode += "}\n";
 	return hppCode;
@@ -861,25 +836,25 @@ int main(int, char*[]) {
 		std::string fname, varname;
 		if (iter == 0) {
 			fname = "dgAnalyze";
-			hppCode += "std::array<T, triangleSize<D, O>> " + fname + "(std::array<T, squareSize<D, O>> const& input) {\n";
+			hppCode += "void " + fname + "(T const* input, T* output) {\n";
 		} else if (iter == 1) {
 			fname = "dgSynthesize";
-			hppCode += "std::array<T, squareSize<D, O>> " + fname + "(std::array<T, triangleSize<D, O>> const& input) {\n";
+			hppCode += "void " + fname + "(T const* input, T* output) {\n";
 		} else if (iter == 2) {
 			fname = "dgMassInverse";
-			hppCode += "std::array<T, triangleSize<D, O>> " + fname + "(std::array<T, triangleSize<D, O>> const& input) {\n";
+			hppCode += "void " + fname + "(T const* input, T* output) {\n";
 		} else if (iter == 3) {
 			fname = "dgStiffness";
 			varname = "dimension, ";
-			hppCode += "std::array<T, triangleSize<D, O>> " + fname + "(int dimension, std::array<T, triangleSize<D, O>> const& input) {\n";
+			hppCode += "void " + fname + "(int dimension, T const* input, T* output) {\n";
 		} else if (iter == 4) {
 			varname = "face, ";
 			fname = "dgTrace";
-			hppCode += "std::array<T, triangleSize<D - 1, O>> " + fname + "(int face, std::array<T, triangleSize<D, O>> const& input) {\n";
+			hppCode += "void " + fname + "(int face, T const* input, T* output) {\n";
 		} else if (iter == 5) {
 			varname = "face, ";
 			fname = "dgTraceInverse";
-			hppCode += "std::array<T, triangleSize<D, O>> " + fname + "(int face, std::array<T, triangleSize<D - 1, O>> const& input) {\n";
+			hppCode += "void " + fname + "(int face, T const* input, T* output) {\n";
 		}
 		indent++;
 		for (int dim = 1; dim <= 3; dim++) {
@@ -894,7 +869,7 @@ int main(int, char*[]) {
 				}
 				hppCode += "if constexpr(O == " + std::to_string(order) + ") {\n";
 				indent++;
-				hppCode += indent + "return " + fname + tag(dim, order) + "(" + varname + "input);\n";
+				hppCode += indent + fname + tag(dim, order) + "(" + varname + "input, output);\n";
 				indent--;
 				hppCode += indent + "}";
 				if (order < 4) {
@@ -1067,7 +1042,7 @@ int main(int, char*[]) {
 	hppCode += indent + "}\n";
 	hppCode += "\n";
 	hppCode += "template<int D, int O>\n"
-			"std::array<int, D> triangularToFlat(std::array<int, D> const &ti) {\n"
+			"int triangularToFlat(std::array<int, D> ti) {\n"
 			"\tstd::array<int, D> num, den;\n"
 			"\tfor (int d = D - 1; d > 0; d--) {\n"
 			"\t\tti[d - 1] += ti[d];\n"
