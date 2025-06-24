@@ -1101,7 +1101,7 @@ int main(int, char*[]) {
 			hppCode += "if constexpr(O == " + std::to_string(order) + ") {\n";
 			indent++;
 			bool first = true;
-			hppCode += indent + "constexpr std::array<int, triangleSize<D, O>> map = {\n";
+			hppCode += indent + "constexpr std::array<std::array<int, D>, triangleSize<D, O>> map{{\n";
 			indent++;
 			hppCode += std::string(indent);
 			int cnt = 0;
@@ -1138,7 +1138,7 @@ int main(int, char*[]) {
 				}
 			}
 			indent--;
-			hppCode += "\n" + std::string(indent) + "};\n";
+			hppCode += "\n" + std::string(indent) + "}};\n";
 			hppCode += indent + "return map[flatIndex];\n";
 			indent--;
 			hppCode += indent + "}";
@@ -1160,7 +1160,7 @@ int main(int, char*[]) {
 	hppCode += indent + "}\n";
 	hppCode += "\n";
 	hppCode += "template<int D, int O>\n"
-			"std::array<int, D> triangularToFlat(std::array<int, D> const &ti) {\n"
+			"int triangularToFlat(std::array<int, D> ti) {\n"
 			"\tstd::array<int, D> num, den;\n"
 			"\tfor (int d = D - 1; d > 0; d--) {\n"
 			"\t\tti[d - 1] += ti[d];\n"

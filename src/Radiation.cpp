@@ -698,7 +698,7 @@ RadiationState<T, D> initRadiationFront(std::array<T, D> x) {
 }
 
 template<typename T, int D>
-RadiationState<T, D> initRadiationDiffusion(std::array<T, D> x) {
+RadiationState<T, D> initRadiationDiffusion(std::array<T, D> x, T time = T(0)) {
 	/*********************************************************/
 	RadiationState<T, D> u;
 	T const erg = T(physicalUnits.getCode2erg());
@@ -709,21 +709,37 @@ RadiationState<T, D> initRadiationDiffusion(std::array<T, D> x) {
 		x[d] -= T(0.5);
 		x[d] *= cm;
 	}
-	T t0 = 1.0;
+	T t0 = 1.0 + time;
 	T diff = T(1e-13) * sqr(cm) / s;
 	T r = norm(x);
-	T Er = E0 * exp(-T(0.25) * sqr(r) / (t0 * diff));
-	T F = T(0);
-	const T dx = x[0] / r;
-	const T dy = x[0] / r;
-	const T dz = x[0] / r;
-	u.setFlux(0, T(F * dx));
-	u.setFlux(1, T(F * dy));
-	u.setFlux(2, T(F * dz));
+	T Er = (1.0 / (time + 1.0)) * E0 * exp(-T(0.25) * sqr(r) / (t0 * diff));
+	u.setFlux(0, T(0));
+	u.setFlux(1, T(0));
+	u.setFlux(2, T(0));
 	u.setEnergy(Er);
 	return u;
 }
 
+template<class T, int D>
+void compareDiffusion(T time, auto grid) {
+	constexpr int N = grid.getCellsAcross();
+	T const dx = grid.getCellWidth();
+	std::array<int, NDIM> x;
+	std::array<T, NDIM> y0;
+	x.fill(N / 2);
+	FILE* fp = fopen( "compare.txt", "wt");
+	for (int i = 0; i < N; i++) {
+		x[0] = i;
+		for(int d = 0; d < D; d++) {
+			y0[d] = (T(x[d]) + T(0.5)) * dx;
+		}
+		auto const fn = grid.getFieldValue(D, x);
+		auto const fa = initRadiationDiffusion<T, D>(y0, time)[D];
+		auto const err = (fn - fa) / fa;
+		fprintf(fp, "%e %e %e %e\n", y0[0], fa, fn, err);
+	}
+	fclose(fp);
+}
 
 template<typename T, int D>
 void analyticRadiationDiffusion() {
@@ -733,13 +749,14 @@ void analyticRadiationDiffusion() {
 	T const E0 = erg / (cm * sqr(cm));
 	T t0 = 1.0;
 	T diff = T(1e-13) * sqr(cm) / s;
-	printf( "%e * (%e / (%e + time)) * exp(-((1.0 / (4.0 * %e * (%e + time))) * ((coords[0]-0.5)^2 + (coords[1]-0.5)^2 + (coords[2]-0.5)^2)))\n", E0, t0, t0, diff, t0);
+	printf("%e * (%e / (%e + time)) * exp(-((1.0 / (4.0 * %e * (%e + time))) * ((coords[0]-0.5)^2 + (coords[1]-0.5)^2 + (coords[2]-0.5)^2)))\n", E0, t0, t0,
+			diff, t0);
 }
 
 void testRadiation() {
 	constexpr int D = 3;
-	constexpr int N = 64;
-	constexpr int P = 3;
+	constexpr int N = 128;
+	constexpr int P = 1;
 	using RK = typename RungeKutta<T, P>::type;
 	using S = RadiationState<T, NDIM, true>;
 	HyperGrid<S, N, P, RK> grid;
@@ -750,7 +767,7 @@ void testRadiation() {
 	grid.initialize(initRadiationDiffusion<T, D>);
 	grid.enforceBoundaryConditions();
 	T t = T(0);
-	T tmax = T(.15);
+	T tmax = T(1);
 	T dt;
 	RK const rk;
 	int iter = 0;
@@ -758,7 +775,7 @@ void testRadiation() {
 		grid.output("X", iter, t);
 		printf("i = %i", iter);
 		printf("  t = %e", t);
-		dt = grid.beginStep();
+		dt = std::min(grid.beginStep(), tmax - t);
 		printf("  dt = %e\n", dt);
 		for (int s = 0; s < rk.stageCount(); s++) {
 			grid.subStep(dt, s);
@@ -770,6 +787,7 @@ void testRadiation() {
 		t += dt;
 	}
 	std::cout << physicalUnits << "\n";
+	compareDiffusion<T, NDIM>(t, grid);
 	return;
 	int ntrial = 2000;
 //	double err_max = 0.0;

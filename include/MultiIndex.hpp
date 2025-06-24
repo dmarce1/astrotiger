@@ -3,6 +3,7 @@
 #include "ContainerArithmetic.hpp"
 #include "Range.hpp"
 #include <cassert>
+#include <vector>
 
 template<auto firstArgument, auto secondArgument = firstArgument>
 struct MultiIndex {
@@ -125,7 +126,7 @@ template<auto outerRange, auto innerRange = outerRange>
 auto createMultiIndexMap() {
 	constexpr int N = rangeVolume(innerRange);
 	using index_type = MultiIndex<outerRange, innerRange>;
-	std::array<index_type, N> map;
+	std::vector<index_type> map(N);
 	index_type I = index_type::begin();
 	for (int i = 0; i < N; i++) {
 		map[i] = I;

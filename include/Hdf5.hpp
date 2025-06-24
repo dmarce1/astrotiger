@@ -19,7 +19,7 @@
 #include "Util.hpp"
 
 template<typename T, int D, int N, int P, int BW>
-void writeHdf5(std::string filename, T time, T const &h, std::vector<std::array<std::array<T, ipow(N + 2 * BW, D)>, BasisIndexType<P, D>::count()>> const &fieldData,
+void writeHdf5(std::string filename, T time, T const &h, std::vector<std::vector<std::array<T, ipow(N + 2 * BW, D)>>> const &fieldData,
 		std::vector<std::string> const &fieldNames) {
 	constexpr Range<int, D> Box { repeat<D>(-BW), repeat<D>(N + BW) };
 	using hindex_t = MultiIndex<Box>;
@@ -71,6 +71,7 @@ void writeHdf5(std::string filename, T time, T const &h, std::vector<std::array<
 			dataspace_id = H5Screate_simple(D, dims.data(), NULL);
 			dataset_id = H5Dcreate(file_id, name.c_str(), H5T_data_type, dataspace_id, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 			auto const &field = fieldData[fi][Q];
+			assert(field.begin() && buffer.data());
 			reverseMultiIndexData<Box>(field.begin(), field.end(), buffer.data());
 			H5Dwrite(dataset_id, H5T_data_type, H5S_ALL, H5S_ALL, H5P_DEFAULT, buffer.data());
 			H5Dclose(dataset_id);
