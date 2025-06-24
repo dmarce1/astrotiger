@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <stacktrace>
+//#include <stacktrace>
 
 #include <fenv.h>
 #include <signal.h>
@@ -59,7 +59,7 @@ void toFile(std::string const &content, std::filesystem::path const &filePath) {
 #ifndef NDEBUG
 
 void fpeHandler(int, siginfo_t*, void*) {
-	std::cerr << "SIGFPE!\n" << std::stacktrace::current() << std::endl;
+	std::cerr << "SIGFPE!\n" << std::endl;
 	std::_Exit(1);
 }
 

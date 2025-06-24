@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
-#include <stacktrace>
+//#include <stacktrace>
 #include <type_traits>
 #include "ContainerArithmetic.hpp"
 
@@ -314,7 +314,7 @@ struct Matrix<Type, RowCount, 1> {
 		return B;
 	}
 	constexpr Matrix operator/(Type const &a) const {
-		static constexpr Type one = Type(1);
+		constexpr Type one = Type(1);
 		Matrix B;
 		Type const aInv = one / a;
 		for (std::size_t k = 0; k < size(); k++)
@@ -461,7 +461,7 @@ struct Matrix<Type, 1, 1> {
 		return B;
 	}
 	constexpr Matrix operator/(Type const &a) const {
-		static constexpr Type one = Type(1);
+		constexpr Type one = Type(1);
 		Matrix B;
 		B.value = (one / a) * value;
 		return B;

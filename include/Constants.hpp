@@ -1,6 +1,7 @@
 #ifndef PHYSICAL_CONSTANTS_CGS_HPP
 #define PHYSICAL_CONSTANTS_CGS_HPP
 
+#include "Util.hpp"
 #include <ostream>
 #include <iomanip>
 
@@ -55,6 +56,9 @@ public:
 	}
 	Type getCode2g() const {
 		return code2g_;
+	}
+	Type getCode2erg() const {
+		return code2g_ * sqr(code2cm_ / code2s_) ;
 	}
 
 	PhysicalConstants<Type> getPhysicalConstants() const {

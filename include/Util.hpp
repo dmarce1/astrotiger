@@ -41,7 +41,7 @@ inline constexpr auto insert(T const &value, int i, std::array<T, N - 1> const &
 
 template<typename T>
 inline constexpr T ipow(T x, int n) {
-	static constexpr T one = T(1);
+	constexpr T one = T(1);
 	if (n >= 0) {
 		T xm = x;
 		T xn = one;
@@ -62,7 +62,7 @@ inline constexpr T ipow(T x, int n) {
 
 template<typename T>
 inline constexpr T binco(T n, T k) {
-	static constexpr T one = T(1);
+	constexpr T one = T(1);
 	T num = one;
 	T den = one;
 	for (int i = 1; i <= k; i++) {
@@ -74,7 +74,7 @@ inline constexpr T binco(T n, T k) {
 
 template<typename T>
 inline constexpr T factorial(int n) {
-	static constexpr T one = T(1);
+	constexpr T one = T(1);
 	if (n <= 1) {
 		return one;
 	} else {
@@ -89,8 +89,8 @@ inline constexpr T sqr(T r) {
 
 template<typename T>
 inline constexpr T sign(T number) {
-	static constexpr T zero = T(0);
-	static constexpr T one = T(1);
+	constexpr T zero = T(0);
+	constexpr T one = T(1);
 	if (number > zero) {
 		return +one;
 	} else if (number < zero) {

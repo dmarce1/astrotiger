@@ -1,17 +1,19 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(astrotiger CXX CUDA)
+project(astrotiger C CXX CUDA)
 
-set(ALL_FLAGS -std=c++23 -Wall -Wno-comma-subscript -I${PROJECT_SOURCE_DIR}/include)
+set(ALL_FLAGS -std=c++20 -Wall -Wno-comma-subscript -I${PROJECT_SOURCE_DIR}/include)
 set(CXX_FLAGS  ${ALL_FLAGS} -march=native)
 set(CUDA_FLAGS ${ALL_FLAGS} -Xcompiler -march=native)
 
 find_package(HDF5 REQUIRED COMPONENTS C CXX)
-find_package(HPX  REQUIRED)
+find_package(REQUIRED)
+
+include_directories(/usr/include/hdf5/serial)
+link_directories(/usr/lib/x86_64-linux-gnu/hdf5/serial)
 
 set(astrotiger_src
   src/main.cpp
-  src/Options.cpp
   src/Util.cpp
   src/Radiation.cpp
 )
@@ -25,7 +27,6 @@ set(astrotiger_header
   include/EulerState.hpp
   include/Hdf5.hpp
   include/HyperGrid.hpp
-  include/HydroGrid.hpp
   include/Legendre.hpp
   include/Matrix.hpp
   include/MultiIndex.hpp
@@ -50,10 +51,6 @@ add_executable(codegen
 
 target_include_directories(codegen PRIVATE
   ${PROJECT_SOURCE_DIR}/include
-)
-
-target_link_libraries(codegen PUBLIC
-   stdc++_libbacktrace
 )
 
 target_compile_options(codegen PUBLIC
@@ -94,18 +91,15 @@ file(GLOB_RECURSE GENERATED_SOURCES
   "${GENERATED_SOURCE_DIR}/*.cpp"
 )
 
-add_hpx_executable(
+add_executable(
    astrotiger
-   DEPENDENCIES
-      HDF5::HDF5
-      siloh5
-      stdc++_libbacktrace
-   SOURCES
       ${astrotiger_src}
       ${GENERATED_SOURCES}
-   HEADERS
       ${astrotiger_header}
 )
+
+
+target_link_libraries(astrotiger PUBLIC hdf5)
 
 add_dependencies(astrotiger generate_code)
 
@@ -131,23 +125,4 @@ target_link_options(astrotiger PUBLIC
    $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -rdynamic>>
 )
 
-enable_testing()
-include(GoogleTest)
 
-add_executable(unit_tests
-  src/test.cpp
-)
-
-target_include_directories(unit_tests PRIVATE
-  ${PROJECT_SOURCE_DIR}/include
-  ${CMAKE_BINARY_DIR}/generated_source
-)
-
-target_link_libraries(unit_tests PRIVATE gtest gtest_main)
-
-target_compile_options(unit_tests PRIVATE
-   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fno-omit-frame-pointer>>
-   $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3>>
-)
-
-gtest_discover_tests(unit_tests)

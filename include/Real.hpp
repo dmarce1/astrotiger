@@ -7,7 +7,7 @@
 #include <iostream>
 #include <limits>
 #include <numbers>
-#include <stacktrace>
+//#include <stacktrace>
 #include <stdexcept>
 #include <type_traits>
 
@@ -131,7 +131,7 @@ struct Real {
 		a.value = std::copysign(a.value, b.value);
 		return a;
 	}
-	friend inline constexpr Real legendre(int n, Real a) {
+	friend inline Real legendre(int n, Real a) {
 		debug_check(a);
 		a.value = std::legendre(n, a.value);
 		return a;
@@ -214,42 +214,42 @@ struct Real {
 	Type value = std::numeric_limits<Type>::signaling_NaN();
 	static inline constexpr void nonneg_check(Real a) {
 		if (a.value < 0.0) {
-			std::string errorString = "FATAL ERROR: Illegal operation on negative number.\n";
-			errorString += "Stack trace:\n";
-			errorString += std::to_string(std::stacktrace::current());
-			std::cout << errorString;
+//			std::string errorString = "FATAL ERROR: Illegal operation on negative number.\n";
+//			errorString += "Stack trace:\n";
+//			errorString += std::to_string(std::stacktrace::current());
+//			std::cout << errorString;
 			assert(false);
-			throw std::invalid_argument(errorString);
+			throw std::invalid_argument("FATAL ERROR: Illegal operation on negative number.\n");
 		}
 	}
 	static inline constexpr void zero_check(Real a) {
 		if (a.value == 0.0) {
-			std::string errorString = "FATAL ERROR: Divide by zero\n";
-			errorString += "Stack trace:\n";
-			errorString += std::to_string(std::stacktrace::current());
-			std::cout << errorString;
+//			std::string errorString = "FATAL ERROR: Divide by zero\n";
+//			errorString += "Stack trace:\n";
+//			errorString += std::to_string(std::stacktrace::current());
+//			std::cout << errorString;
 			assert(false);
-			throw std::invalid_argument(errorString);
+			throw std::invalid_argument("FATAL ERROR: Divide by zero\n");
 		}
 	}
 	static inline constexpr void debug_check(Real a) {
 		if (!std::isfinite(a.value)) {
-			std::string errorString = "FATAL ERROR: Operation on NaN\n";
-			errorString += "Stack trace:\n";
-			errorString += std::to_string(std::stacktrace::current());
-			std::cout << errorString;
+//			std::string errorString = "FATAL ERROR: Operation on NaN\n";
+//			errorString += "Stack trace:\n";
+//			errorString += std::to_string(std::stacktrace::current());
+//			std::cout << errorString;
 			assert(false);
-			throw std::invalid_argument(errorString);
+			throw std::invalid_argument("FATAL ERROR: Operation on NaN\n");
 		}
 	}
 	static inline constexpr void range_check(Real a, Real b, Real c) {
 		if ((b < a) || (b > c)) {
-			std::string errorString = "FATAL ERROR: Range violation\n";
-			errorString += "Stack trace:\n";
-			errorString += std::to_string(std::stacktrace::current());
-			std::cout << errorString;
+//			std::string errorString = "FATAL ERROR: Range violation\n";
+//			errorString += "Stack trace:\n";
+//			errorString += std::to_string(std::stacktrace::current());
+//			std::cout << errorString;
 			assert(false);
-			throw std::invalid_argument(errorString);
+			throw std::invalid_argument("FATAL ERROR: Range violation\n");
 		}
 	}
 };

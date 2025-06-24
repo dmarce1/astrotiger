@@ -70,7 +70,7 @@ struct MultiIndex {
 	}
 	constexpr operator int() const {
 		if constexpr (dimensionCount) {
-			static constexpr auto span = rangeSpan(exteriorRange);
+			constexpr auto span = rangeSpan(exteriorRange);
 			int i = indexValues_[0] - exteriorRange.begin[0];
 			for (int d = 1; d < dimensionCount; d++) {
 				i = i * span[d] + indexValues_[d] - exteriorRange.begin[d];

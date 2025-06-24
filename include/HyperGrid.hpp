@@ -45,6 +45,7 @@ class HyperGrid {
 	static constexpr int nodeVolume = ipow(basisOrder, dimensionCount);
 	static constexpr int cellsAcrossExterior = cellsAcrossInterior + 2 * ghostWidth;
 	static constexpr int exteriorVolume = ipow(cellsAcrossExterior, dimensionCount);
+	static constexpr Range<int, dimensionCount> limiterBox { repeat<dimensionCount>(-1), repeat<dimensionCount>(cellsAcrossInterior + 1) };
 	static constexpr RungeKutta butcherTable { };
 	static constexpr Range<int, dimensionCount> exteriorBox { repeat<dimensionCount>(-ghostWidth), repeat<dimensionCount>(cellsAcrossInterior + ghostWidth) };
 	static constexpr Range<int, dimensionCount> interiorBox { repeat<dimensionCount>(0), repeat<dimensionCount>(cellsAcrossInterior) };
@@ -63,7 +64,7 @@ class HyperGrid {
 	const Type inverseCellWidth;
 
 	static constexpr auto interiorIndexMap(int i) {
-		static constexpr auto map = createMultiIndexMap<exteriorBox, interiorBox>();
+		constexpr auto map = createMultiIndexMap<exteriorBox, interiorBox>();
 		return map[i];
 	}
 	static constexpr int stride(int d) {
@@ -99,7 +100,7 @@ public:
 	}
 	void output(const char *filenameBase, int timeStepNumber, Type const &time) {
 		std::string filename = std::string(filenameBase) + "." + std::to_string(timeStepNumber) + ".h5";
-		writeHdf5<Type, dimensionCount, cellsAcrossInterior, basisOrder, ghostWidth>(filename, cellWidth, nextState, State::getFieldNames());
+		writeHdf5<Type, dimensionCount, cellsAcrossInterior, basisOrder, ghostWidth>(filename, time, cellWidth, nextState, State::getFieldNames());
 		writeList("X.visit", "!NBLOCKS 1\n", filename + ".xmf");
 	}
 	void enforceBoundaryConditions() {
@@ -171,8 +172,8 @@ public:
 				for (int thisStage = 0; thisStage < stageIndex; thisStage++) {
 					for (auto cellMultiIndex = InteriorIndex::begin(); cellMultiIndex != InteriorIndex::end(); cellMultiIndex++) {
 						int const cellFlatIndex = cellMultiIndex;
-						nextState[fieldIndex][modeIndex][cellFlatIndex] +=
-								butcherTable.a(stageIndex, thisStage) * stageDerivatives_[thisStage][fieldIndex][modeIndex][cellFlatIndex];
+						nextState[fieldIndex][modeIndex][cellFlatIndex] += butcherTable.a(stageIndex, thisStage)
+								* stageDerivatives_[thisStage][fieldIndex][modeIndex][cellFlatIndex];
 					}
 				}
 				stageDerivatives_[stageIndex][fieldIndex][modeIndex].fill(Type(0));
@@ -190,8 +191,8 @@ public:
 					int const cellFlatIndex = cellMultiIndex;
 					nextState[fieldIndex][modeFlatIndex][cellFlatIndex] = currentState[fieldIndex][modeFlatIndex][cellFlatIndex];
 					for (int stageIndex = 0; stageIndex < rungeKuttaStageCount; stageIndex++) {
-						nextState[fieldIndex][modeFlatIndex][cellFlatIndex] +=
-								butcherTable.b(stageIndex) * stageDerivatives_[stageIndex][fieldIndex][modeFlatIndex][cellFlatIndex];
+						nextState[fieldIndex][modeFlatIndex][cellFlatIndex] += butcherTable.b(stageIndex)
+								* stageDerivatives_[stageIndex][fieldIndex][modeFlatIndex][cellFlatIndex];
 					}
 				}
 			}
@@ -202,14 +203,13 @@ public:
 	void applyLimiter() {
 		using std::min;
 		constexpr auto limiterCoefficients = []() {
-			std::array<Type, basisOrder> limiterCoefficients;
+			std::array < Type, basisOrder > limiterCoefficients;
 			for (int orderIndex = 0; orderIndex < basisOrder; orderIndex++) {
 				limiterCoefficients[orderIndex] = Type(1) / Type(2 * orderIndex + 1);
 			}
 			return limiterCoefficients;
 		}();
 
-		constexpr Range<int, dimensionCount> limiterBox { repeat<dimensionCount>(-1), repeat<dimensionCount>(cellsAcrossInterior + 1) };
 //		bool sanityFlag = true;
 		using LimiterIndex = MultiIndex<exteriorBox, limiterBox>;
 		for (int polynomialDegree = basisOrder - 1; polynomialDegree > 0; polynomialDegree--) {
@@ -264,39 +264,70 @@ public:
 				}
 			}
 		}
-		constexpr int thisNodeVolume = ipow(basisOrder + 1, dimensionCount);
-		for (auto cellMultiIndex = LimiterIndex::begin(); cellMultiIndex != LimiterIndex::end(); cellMultiIndex++) {
-			int const flatIndex = cellMultiIndex;
+		applyPositivityLimiter(std::make_integer_sequence<int, dimensionCount> { });
+	}
+	template<int ... dimension>
+	void applyPositivityLimiter(
+			std::integer_sequence<int, dimension...>) {
+		(applyPositivityLimiterByDim<dimension>(), ...);
+	}
+	template<int dimension>
+	void applyPositivityLimiterByDim() {
+		using std::min;
+		using LimiterIndex = MultiIndex<exteriorBox, limiterBox>;
+		for (auto cellMultIndex = LimiterIndex::begin(); cellMultIndex != LimiterIndex::end(); cellMultIndex++) {
+			int const flatCellIndex = cellMultIndex;
+
 			std::array<std::array<Type, triangleSize<dimensionCount, basisOrder>>, fieldCount> volumeModes;
-			std::array<std::array<Type, thisNodeVolume>, fieldCount> volumeNodes;
+			std::array<std::array<Type, squareSize<dimensionCount - 1, basisOrder>>, fieldCount> surfaceNodesLeft, surfaceNodesRight;
 			for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
 				for (int modeIndex = 0; modeIndex < modeVolume; modeIndex++) {
-					volumeModes[fieldIndex][modeIndex] = nextState[fieldIndex][modeIndex][flatIndex];
+					volumeModes[fieldIndex][modeIndex] = nextState[fieldIndex][modeIndex][flatCellIndex];
 				}
-				volumeNodes[fieldIndex] = dgSynthesize<Type, dimensionCount, basisOrder, Quadrature::gaussLobatto>(volumeModes[fieldIndex]);
+				surfaceNodesLeft[fieldIndex] = dgSynthesize<Type, dimensionCount - 1, basisOrder>(
+						dgTrace<Type, dimensionCount, basisOrder>(2 * dimension + 1, volumeModes[fieldIndex]));
+				surfaceNodesRight[fieldIndex] = dgSynthesize<Type, dimensionCount - 1, basisOrder>(
+						dgTrace<Type, dimensionCount, basisOrder>(2 * dimension + 0, volumeModes[fieldIndex]));
 			}
 			State stateMean;
 			for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
 				stateMean[fieldIndex] = volumeModes[fieldIndex][0];
 			}
 			Type theta = Type(1);
-			for (int nodeIndex = 0; nodeIndex < thisNodeVolume; nodeIndex++) {
-				State stateAtNode;
+			for (int nodeIndex = 0; nodeIndex<squareSize < dimensionCount - 1, basisOrder> ; nodeIndex++) {
+				State stateRight, stateLeft;
 				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
-					stateAtNode[fieldIndex] = volumeNodes[fieldIndex][nodeIndex];
+					stateLeft[fieldIndex] = surfaceNodesLeft[fieldIndex][nodeIndex];
+					stateRight[fieldIndex] = surfaceNodesRight[fieldIndex][nodeIndex];
 				}
-				theta = min(theta, findPositivityPreservingTheta(stateMean, stateAtNode));
+				theta = min(theta, findPositivityPreservingTheta(stateMean, stateRight));
+				theta = min(theta, findPositivityPreservingTheta(stateMean, stateLeft));
+			}
+			if (dimension == 0) {
+				std::array<State, nodeVolume> nodeStates;
+				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
+					std::array<Type, modeVolume> modalState;
+					for (int modeIndex = 0; modeIndex < modeVolume; modeIndex++) {
+						modalState[modeIndex] = nextState[fieldIndex][modeIndex][flatCellIndex];
+					}
+					auto thisValue = dgSynthesize<Type, dimensionCount, basisOrder>(modalState);
+					for (int nodeIndex = 0; nodeIndex < nodeVolume; nodeIndex++) {
+						nodeStates[nodeIndex][fieldIndex] = thisValue[nodeIndex];
+					}
+				}
+				for (int nodeIndex = 0; nodeIndex<squareSize < dimensionCount, basisOrder> ; nodeIndex++) {
+					theta = min(theta, findPositivityPreservingTheta(stateMean, nodeStates[nodeIndex]));
+				}
 			}
 			if (theta < Type(1)) {
 				for (int fieldIndex = 0; fieldIndex < fieldCount; fieldIndex++) {
 					for (int modeIndex = 1; modeIndex < modeVolume; modeIndex++) {
-						nextState[fieldIndex][modeIndex][flatIndex] *= theta;
+						nextState[fieldIndex][modeIndex][flatCellIndex] *= theta;
 					}
 				}
 			}
 		}
 	}
-
 	template<int ... dimension>
 	void computeDudt(Type timeStepSize, std::array<std::array<std::array<Type, exteriorVolume>, modeVolume>, fieldCount> &stateDerivative,
 			std::integer_sequence<int, dimension...>) {
@@ -304,8 +335,8 @@ public:
 	}
 	template<int dimension>
 	void computeDudtByDim(Type timeStepSize, std::array<std::array<std::array<Type, exteriorVolume>, modeVolume>, fieldCount> &stateDerivative) {
-		constexpr Range<int, dimensionCount> interiorBoxPlusOne { repeat<dimensionCount>(0), repeat<dimensionCount>(cellsAcrossInterior) + unit<dimensionCount>(
-				dimension) };
+		constexpr Range<int, dimensionCount> interiorBoxPlusOne { repeat<dimensionCount>(0), repeat<dimensionCount>(cellsAcrossInterior)
+				+ unit<dimensionCount>(dimension) };
 		using FluxIndexType = MultiIndex<exteriorBox, interiorBoxPlusOne>;
 		Type const lambda = Type(2) * timeStepSize * inverseCellWidth;
 		for (auto cellMultIndex = FluxIndexType::begin(); cellMultIndex != FluxIndexType::end(); cellMultIndex++) {

@@ -19,7 +19,7 @@
 #include "Util.hpp"
 
 template<typename T, int D, int N, int P, int BW>
-void writeHdf5(std::string filename, T const &h, std::vector<std::array<std::array<T, ipow(N + 2 * BW, D)>, BasisIndexType<P, D>::count()>> const &fieldData,
+void writeHdf5(std::string filename, T time, T const &h, std::vector<std::array<std::array<T, ipow(N + 2 * BW, D)>, BasisIndexType<P, D>::count()>> const &fieldData,
 		std::vector<std::string> const &fieldNames) {
 	constexpr Range<int, D> Box { repeat<D>(-BW), repeat<D>(N + BW) };
 	using hindex_t = MultiIndex<Box>;
@@ -78,6 +78,13 @@ void writeHdf5(std::string filename, T const &h, std::vector<std::array<std::arr
 		}
 
 	}
+	{
+	    hid_t attr_space = H5Screate(H5S_SCALAR);
+	    hid_t attr = H5Acreate(file_id, "time", H5T_data_type, attr_space, H5P_DEFAULT, H5P_DEFAULT);
+	    H5Awrite(attr, H5T_data_type, &time);
+	    H5Aclose(attr);
+	    H5Sclose(attr_space);
+	}
 	for (int d = 0; d < D; d++) {
 		free(coordArrays[d]);
 	}
@@ -106,6 +113,7 @@ void writeHdf5(std::string filename, T const &h, std::vector<std::array<std::arr
 	xmfFile << "<Xdmf Version=\"2.0\">" << std::endl;
 	xmfFile << " <Domain>" << std::endl;
 	xmfFile << "  <Grid Name=\"mesh\" GridType=\"Uniform\">" << std::endl;
+	xmfFile << "   <Time Value=\"" << time << "\"/>" << std::endl;
 	xmfFile << "   <Topology TopologyType=\"" << topology << "\" Dimensions=\"" << nDimensions << "\"/>" << std::endl;
 	xmfFile << "    <Geometry GeometryType=\"" << geometry << "\">" << std::endl;
 	std::string minStr;
