@@ -19,7 +19,7 @@ struct ArrayHash {
 	size_t operator()(std::array<T, dimensionCount> const &arr) const {
 		size_t seed = dimensionCount;
 		for (T const &val : arr) {
-			seed ^= std::hash<T> { }(val) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+			seed ^= std::hash<T> { }(val+42) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 		}
 		return seed;
 	}

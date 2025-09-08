@@ -10,6 +10,10 @@
 #include <string>
 #include <valarray>
 #include <quadmath.h>
+#include <array>
+#include <cmath>
+#include <iostream>
+#include <map>
 
 #define THROW(msg)                                                                                      \
     throw std::runtime_error(static_cast<std::ostringstream&&>(                                         \
@@ -161,7 +165,6 @@ inline constexpr T ipow(T x, int n) {
 	}
 }
 
-
 template<typename T = std::int64_t>
 inline constexpr T binco(T n, T k) {
 	T num = 1;
@@ -218,6 +221,15 @@ inline constexpr T risingFactorial(T x, int n) {
 }
 
 template<typename T>
+inline constexpr T factorialPower(T q, int n) {
+	T fpwr = 1;
+	for (int i = 0; i < n; i++) {
+		fpwr *= q - T(i);
+	}
+	return fpwr;
+}
+
+template<typename T>
 inline constexpr auto sqr(T r) {
 	return r * r;
 }
@@ -253,7 +265,7 @@ inline constexpr std::array<int, D> zeroArray() {
 
 template<int D>
 inline constexpr std::array<int, D> unitArray(int d) {
-	auto u = zeroArray<int, D>();
+	auto u = zeroArray<D>();
 	u[d] = 1;
 	return u;
 }
@@ -449,5 +461,382 @@ long long ulpDistance(T a, T b) {
 
 	long long diff = static_cast<long long>(ua > ub ? ua - ub : ub - ua);
 	return diff;
+}
+
+template<typename T>
+struct KahnSum {
+	KahnSum() = default;
+	KahnSum(T const &a) {
+		sum_ = a;
+		c_ = T(0);
+	}
+	KahnSum& operator+=(T const &x) {
+		T const y = x - c_;
+		T const t = sum_ + y;
+		c_ = (t - sum_) - y;
+		sum_ = t;
+		return *this;
+	}
+	KahnSum& operator-=(T const &x) {
+		*this += -x;
+		return *this;
+	}
+	KahnSum operator+(T const &x) const {
+		KahnSum a = *this;
+		a += x;
+		return a;
+	}
+	KahnSum operator-(T const &x) const {
+		KahnSum a = *this;
+		a -= x;
+		return a;
+	}
+	operator T() const {
+		return sum_;
+	}
+	bool operator==(KahnSum const &other) const {
+		return (sum_ == other.sum_) && (c_ == other.c_);
+	}
+	bool operator<(KahnSum const &other) const {
+		if (sum_ < other.sum_) {
+			return true;
+		}
+		return (c_ > other.c_);
+	}
+	bool operator!=(KahnSum const &other) const {
+		return !(*this == other);
+	}
+	bool operator>=(KahnSum const &other) const {
+		return !(*this < other);
+	}
+	friend bool operator>(KahnSum const &a, KahnSum const &b) {
+		return b < a;
+	}
+	friend bool operator<=(KahnSum const &a, KahnSum const &b) {
+		return b >= a;
+	}
+private:
+	T sum_ { 0 };
+	T c_ { 0 };
+};
+
+template<typename T, size_t N>
+class Auto {
+	T value_;
+	std::array<T, N> gradient_;
+
+public:
+
+	constexpr Auto() :
+			value_(T(0)) {
+		gradient_.fill(T(0));
+	}
+
+	constexpr Auto(T val, size_t varIndex) :
+			value_(val) {
+		gradient_.fill(T(0));
+		gradient_[varIndex] = T { 1 };
+	}
+
+	constexpr operator T() const {
+		return value_;
+	}
+
+	constexpr auto gradient() const {
+		return gradient_;
+	}
+
+	constexpr T gradient(int i) const {
+		return gradient_[i];
+	}
+
+	constexpr Auto operator+() const {
+		return *this;
+	}
+
+	constexpr Auto operator-() const {
+		Auto res;
+		res.value_ = -value_;
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = -gradient_[i];
+		}
+		return res;
+	}
+
+	constexpr Auto operator+(Auto const &other) const {
+		Auto res;
+		res.value_ = value_ + other.value_;
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = gradient_[i] + other.gradient_[i];
+		}
+		return res;
+	}
+
+	constexpr Auto operator-(Auto const &other) const {
+		Auto res;
+		res.value_ = value_ - other.value_;
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = gradient_[i] - other.gradient_[i];
+		}
+		return res;
+	}
+
+	constexpr Auto operator*(Auto const &other) const {
+		Auto res;
+		res.value_ = value_ * other.value_;
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = value_ * other.gradient_[i] + gradient_[i] * other.value_;
+		}
+		return res;
+	}
+
+	constexpr Auto operator/(Auto const &other) const {
+		Auto res;
+		res.value_ = value_ / other.value_;
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = (gradient_[i] * other.value_ - value_ * other.gradient_[i]) / (other.value_ * other.value_);
+		}
+		return res;
+	}
+
+	constexpr Auto& operator+=(Auto const &other) {
+		value_ += other.value_;
+		for (size_t i = 0; i < N; ++i) {
+			gradient_[i] += other.gradient_[i];
+		}
+		return *this;
+	}
+
+	constexpr Auto& operator-=(Auto const &other) {
+		value_ -= other.value_;
+		for (size_t i = 0; i < N; ++i) {
+			gradient_[i] -= other.gradient_[i];
+		}
+		return *this;
+	}
+
+	constexpr Auto& operator*=(Auto const &other) {
+		T newVal = value_ * other.value_;
+		for (size_t i = 0; i < N; ++i) {
+			gradient_[i] = value_ * other.gradient_[i] + gradient_[i] * other.value_;
+		}
+		value_ = newVal;
+		return *this;
+	}
+
+	constexpr Auto& operator/=(Auto const &other) {
+		T denom = other.value_ * other.value_;
+		T newVal = value_ / other.value_;
+		for (size_t i = 0; i < N; ++i) {
+			gradient_[i] = (gradient_[i] * other.value_ - value_ * other.gradient_[i]) / denom;
+		}
+		value_ = newVal;
+		return *this;
+	}
+
+	constexpr Auto operator*(T scalar) const {
+		Auto res;
+		res.value_ = value_ * scalar;
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = gradient_[i] * scalar;
+		}
+		return res;
+	}
+
+	constexpr Auto operator/(T scalar) const {
+		Auto res;
+		res.value_ = value_ / scalar;
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = gradient_[i] / scalar;
+		}
+		return res;
+	}
+
+	constexpr Auto& operator*=(T scalar) {
+		value_ *= scalar;
+		for (size_t i = 0; i < N; ++i) {
+			gradient_[i] *= scalar;
+		}
+		return *this;
+	}
+
+	constexpr Auto& operator/=(T scalar) {
+		value_ /= scalar;
+		for (size_t i = 0; i < N; ++i) {
+			gradient_[i] /= scalar;
+		}
+		return *this;
+	}
+
+	friend constexpr Auto sin(Auto const &x) {
+		Auto res;
+		res.value_ = std::sin(x.value_);
+		T deriv = std::cos(x.value_);
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = deriv * x.gradient_[i];
+		}
+		return res;
+	}
+
+	friend constexpr Auto cos(Auto const &x) {
+		Auto res;
+		res.value_ = std::cos(x.value_);
+		T deriv = -std::sin(x.value_);
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = deriv * x.gradient_[i];
+		}
+		return res;
+	}
+
+	friend constexpr Auto sqrt(Auto const &x) {
+		Auto res;
+		res.value_ = std::sqrt(x.value_);
+		T deriv = T { 0.5 } / res.value_;
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = deriv * x.gradient_[i];
+		}
+		return res;
+	}
+
+	friend constexpr Auto exp(Auto const &x) {
+		Auto res;
+		res.value_ = std::exp(x.value_);
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = res.value_ * x.gradient_[i];
+		}
+		return res;
+	}
+
+	friend constexpr Auto pow(Auto const &base, Auto const &exponent) {
+		Auto res;
+		res.value_ = std::pow(base.value_, exponent.value_);
+		T logBase = std::log(base.value_);
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = res.value_ * (exponent.gradient_[i] * logBase + exponent.value_ * base.gradient_[i] / base.value_);
+		}
+		return res;
+	}
+
+	friend constexpr Auto pow(Auto const &base, T exponent) {
+		Auto res;
+		res.value_ = std::pow(base.value_, exponent);
+		T coeff = exponent * std::pow(base.value_, exponent - T { 1 });
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = coeff * base.gradient_[i];
+		}
+		return res;
+	}
+
+	friend constexpr Auto pow(T base, Auto const &exponent) {
+		Auto res;
+		res.value_ = std::pow(base, exponent.value_);
+		T logBase = std::log(base);
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = res.value_ * logBase * exponent.gradient_[i];
+		}
+		return res;
+	}
+
+	friend constexpr Auto operator*(T scalar, Auto const &x) {
+		return x * scalar;
+	}
+
+	friend constexpr Auto operator/(T scalar, Auto const &x) {
+		Auto res;
+		T const inv = T(1) / x.value_;
+		res.value_ = scalar * inv;
+		T coeff = T(-1) / (inv * inv);
+		for (size_t i = 0; i < N; ++i) {
+			res.gradient_[i] = coeff * x.gradient_[i];
+		}
+		return res;
+	}
+};
+
+#include <functional>
+
+template<int maxOrder>
+struct BellPolynomials {
+	MultivariatePolynomial<double, maxOrder + 1>& operator()(int n, int k) {
+		return B_[n * (n + 1) / 2 + k];
+	}
+	std::array<MultivariatePolynomial<double, maxOrder + 1>, (maxOrder + 2) * (maxOrder + 1) / 2> B_;
+public:
+	BellPolynomials() {
+		auto &B = *this;
+		std::array<int, maxOrder + 1> index;
+		MultivariatePolynomial<double, maxOrder + 1> zero { };
+		MultivariatePolynomial<double, maxOrder + 1> one;
+		std::array<MultivariatePolynomial<double, maxOrder + 1>, maxOrder + 1> Xi;
+		index.fill(0);
+		one[index] = 1.0;
+		for (int n = 0; n <= maxOrder; n++) {
+			index[n] = 1;
+			Xi[n][index] = 1.0;
+			index[n] = 0;
+		}
+		B(0, 0) = one;
+		for (int n = 1; n <= maxOrder; n++) {
+			B(n, 0) = zero;
+			B(0, n) = zero;
+		}
+		for (int n = 0; n < maxOrder; n++) {
+			for (int k = 0; k <= n; k++) {
+				for (int i = 0; i <= n - k; i++) {
+					B(n + 1, k + 1) += binco(n, i) * Xi[i + 1] * B(n - i, k);
+				}
+			}
+		}
+
+	}
+	MultivariatePolynomial<double, maxOrder + 1> const& operator()(int n, int k) const {
+		return B_[n * (n + 1) / 2 + k];
+	}
+};
+
+inline constexpr int pentagonalNumber(int n) {
+	return (3 * n * n - n) / 2;
+}
+
+inline constexpr int generalizedPentagonalNumber(int n) {
+	return pentagonalNumber((nonepow(n) * (n - (n % 2))) >> 1);
+}
+
+inline constexpr long long partitionFunction(long long n) {
+	if (n < 0) {
+		return 0;
+	} else if ((0 <= n) && (n < 2)) {
+		return 1;
+	}
+	long long p = 0;
+	for (long long k = 1;; k++) {
+		int const q = 3 * k * k;
+		int const x1 = n - ((q - k) >> 1);
+		int const x2 = n - ((q + k) >> 1);
+		int const dp1 = nonepow(k - 1) * partitionFunction(x1);
+		int const dp2 = nonepow(k + 1) * partitionFunction(x2);
+		p += dp1 + dp2;
+		if ((x1 <= 0) && (x2 <= 0)) {
+			break;
+		}
+	}
+	return p;
+}
+
+inline constexpr long long cumulativePartitionFunction(long long n) {
+	long long q = 0;
+	for (int k = 0; k <= n; k++) {
+		q += partitionFunction(k);
+	}
+	return q;
+}
+
+template<typename ...Args>
+std::string print2string(char const *format, Args &&...args) {
+	char *buffer;
+	asprintf(&buffer, format, std::forward<Args>(args)...);
+	std::string str(buffer);
+	free(buffer);
+	return str;
 }
 

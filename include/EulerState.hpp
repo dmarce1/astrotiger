@@ -1,8 +1,8 @@
 #pragma once
 
+#include "Util.hpp"
 #include "ContainerArithmetic.hpp"
 #include "Matrix.hpp"
-#include "Util.hpp"
 #include <array>
 #include <cmath>
 #include <vector>

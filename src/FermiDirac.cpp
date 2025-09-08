@@ -1,4 +1,5 @@
-#include "AutoDifferentiation.hpp"
+#include "DifferentialPolynomial.hpp"
+#include "AutoDiff.hpp"
 #include "PadeApproximant.hpp"
 #include <cmath>
 #include <limits>
@@ -7,7 +8,6 @@
 #include "HalfInteger.hpp"
 #include "FermiDirac.hpp"
 #include "Polynomial.hpp"
-#include "DifferentialEquation.hpp"
 
 static constexpr int nInterp = 3;
 // ρ = g(η(ρ, β, β)
@@ -22,7 +22,6 @@ static double constexpr me = 9.109383701500000e-28;
 static double constexpr mH = 1.67353271600000e-24;
 static double constexpr π = 4.0 * atan(1.0);
 static int constexpr dCount = 3;
-
 
 constexpr int stirling1(int n, int k) {
 	if (k == 0) {
@@ -139,24 +138,24 @@ double FD(HalfInteger<int> const &k, double η, double β, double α = 1.0);
 
 double Nele(double η, double β, int dηN = 0, int dβN = 0) {
 	static double const N0 = 8.0 * sqrt(2.0) * π * ipow(me * c / h, 3);
-	return N0 * FD(half, η, β);
+	return N0; //* FD(half, η, β);
 }
 
 double Npos(double η, double β, int dηN = 0, int dβN = 0) {
 	static double const N0 = 8.0 * sqrt(2.0) * π * ipow(me * c / h, 3);
 	η += 2 / β;
-	return N0 * FD(half, -η, β);
+	return N0; // * FD(half, -η, β);
 }
 
 double Pele(double η, double β, int dηN = 0, int dβN = 0) {
 	static double const N0 = 8.0 * sqrt(2.0) * π * ipow(me * c / h, 3);
-	return N0 * FD(3 * half, η, β);
+	return N0; //* FD(3 * half, η, β);
 }
 
 double Ppos(double η, double β, int dηN = 0, int dβN = 0) {
 	static double const N0 = 8.0 * sqrt(2.0) * π * ipow(me * c / h, 3);
 	η += 2 / β;
-	return N0 * FD(3 * half, -η, β);
+	return N0; //* FD(3 * half, -η, β);
 
 }
 
@@ -293,7 +292,6 @@ void printPartition(std::vector<std::vector<int>> const &p) {
 	std::cout << " }" << '\n';
 }
 
-
 //template<int N, int D, int M>
 //double faàDiBruno(std::function<double(std::array<double, M>, std::array<int, M> n)>const &f,
 //		std::array<std::function<double(std::array<double, D>, std::array<int, D>)>, M> const &g, std::array<double, D> x) {
@@ -362,23 +360,23 @@ void printPartition(std::vector<std::vector<int>> const &p) {
 //	return sum;
 //}
 
-template<typename T, int N>
-struct PowerSeries {
-	PowerSeries(std::function<T(int)> const &f) {
-		for (int n = 0; n <= N; n++) {
-			an[N - n] = f(n);
-		}
-	}
-	T operator()(double x) const {
-		double y = an[0];
-		for (int n = 1; n <= N; n++) {
-			y = x * y + an[n];
-		}
-		return y;
-	}
-private:
-	std::array<double, N + 1> an;
-};
+//template<typename T, int N>
+//struct PowerSeries {
+//	PowerSeries(std::function<T(int)> const &f) {
+//		for (int n = 0; n <= N; n++) {
+//			an[N - n] = f(n);
+//		}
+//	}
+//	T operator()(double x) const {
+//		double y = an[0];
+//		for (int n = 1; n <= N; n++) {
+//			y = x * y + an[n];
+//		}
+//		return y;
+//	}
+//private:
+//	std::array<double, N + 1> an;
+//};
 
 //std::complex<double> iBeta(double x, HalfInteger<int> a, HalfInteger<int> b) {
 //	constexpr std::complex<double> i(0, 1);
@@ -437,7 +435,76 @@ std::complex<double> iBeta(double x, HalfInteger<int> a, HalfInteger<int> b) {
 	return exp(double(a) * loga) * exp(double(b) * logb) / den;
 }
 
-double FD(HalfInteger<int> const &k, double η, double β, double α) {
+//double FD(HalfInteger<int> const &k, double η, double β, double α) {
+//	using std::pow;
+//	using std::sqrt;
+//	constexpr int qOrder = 24;
+//	static auto const gaussLaguerre = gaussLaguerreQuadraturePoints<double>(qOrder);
+//	static auto const gaussLegendre = gaussLegendreQuadraturePoints<double>(qOrder);
+//	constexpr double D = 3.3609;
+//	constexpr double σ = 9.1186e-2;
+//	constexpr double a1 = 6.7774;
+//	constexpr double b1 = 1.1418;
+//	constexpr double c1 = 2.9826;
+//	constexpr double a2 = 3.7601;
+//	constexpr double b2 = 9.3719e-2;
+//	constexpr double c2 = 2.1063e-2;
+//	constexpr double d2 = 3.1084e1;
+//	constexpr double e2 = 1.0056;
+//	constexpr double a3 = 7.5669;
+//	constexpr double b3 = 1.1695;
+//	constexpr double c3 = 7.5416e-1;
+//	constexpr double d3 = 6.6558;
+//	constexpr double e3 = -1.2819e-1;
+//	auto const Exp = [](double x) {
+//		constexpr double zero = 0.0;
+//		constexpr double χmax = std::log(std::numeric_limits<double>::max());
+//		if (x > χmax) {
+//			return zero;
+//		} else if (x < -χmax) {
+//			return zero;
+//		} else {
+//			return std::exp(x);
+//		}
+//	};
+//	double const ξ = log1p(Exp(σ * (η - D))) / σ;
+//	double const Xa = ((a1 + b1 * ξ + c1 * ξ * ξ) / (1.0 + c1 * ξ));
+//	double const Xb = ((a2 + b2 * ξ + c2 * d2 * ξ * ξ) / (1.0 + e2 * ξ + c2 * ξ * ξ));
+//	double const Xc = ((a3 + b3 * ξ + c3 * d3 * ξ * ξ) / (1.0 + e3 * ξ + c3 * ξ * ξ));
+//	double const S1 = Xa - Xb;
+//	double const S2 = Xa;
+//	double const S3 = Xa + Xc;
+//	double const ha = sqrt(S1);
+//	double const hb = (S2 - S1);
+//	double const hc = (S3 - S2);
+//	KahnSum<double> Ia, Ib, Ic, Id;
+//	Ia = 0.0;
+//	Ib = 0.0;
+//	Ic = 0.0;
+//	Id = 0.0;
+//	for (int q = 0; q < qOrder; q++) {
+//		double const x = gaussLegendre[q].position;
+//		double const wp = 0.5 * gaussLegendre[q].weight;
+//		double const xd = (S3 + gaussLaguerre[q].position);
+//		double const wl = gaussLaguerre[q].weight;
+//		double const τ = 0.5 * (x + 1.0);
+//		double const xa = τ * ha;
+//		double const xb = (S1 + τ * hb);
+//		double const xc = (S2 + τ * hc);
+//		double const x2 = xa * xa;
+//		Ia += wp * pow(x2, k) * (1 + α * β * x2) * sqrt(1 + 0.5 * β * x2) / (1 + Exp(x2 - η)) * ha * 2.0 * xa;
+//		Ib += wp * pow(xb, k) * (1 + α * β * xb) * sqrt(1 + 0.5 * β * xb) / (1 + Exp(xb - η)) * hb;
+//		Ic += wp * pow(xc, k) * (1 + α * β * xc) * sqrt(1 + 0.5 * β * xc) / (1 + Exp(xc - η)) * hc;
+//		Id += wl * pow(xd, k) * (1 + α * β * xd) * sqrt(1 + 0.5 * β * xd) / (1 + Exp(xd - η)) * Exp(xd - S3);
+//	}
+////	printf("%e %e %e %e\n", double(Ia), double(Ib), double(Ic), double(Id));
+//	return (Ia + Ib + Ic + Id);
+//}
+
+template<int O>
+auto FD(HalfInteger<int> const &k, double η, double β, double α) {
+//	Jet<double, O, 1, 2> η = Jet<double, O, 1, 2>::generate(0) * η_;
+//	Jet<double, O,1,  2> β = Jet<double, O, 1, 2>::generate(1) * β_;
 	using std::pow;
 	using std::sqrt;
 	constexpr int qOrder = 24;
@@ -458,49 +525,49 @@ double FD(HalfInteger<int> const &k, double η, double β, double α) {
 	constexpr double c3 = 7.5416e-1;
 	constexpr double d3 = 6.6558;
 	constexpr double e3 = -1.2819e-1;
-	auto const Exp = [](double x) {
-		constexpr double zero = 0.0;
-		constexpr double χmax = std::log(std::numeric_limits<double>::max());
-		if (x > χmax) {
-			return zero;
-		} else if (x < -χmax) {
-			return zero;
-		} else {
-			return std::exp(x);
-		}
-	};
-	double const ξ = log1p(Exp(σ * (η - D))) / σ;
-	double const Xa = ((a1 + b1 * ξ + c1 * ξ * ξ) / (1.0 + c1 * ξ));
-	double const Xb = ((a2 + b2 * ξ + c2 * d2 * ξ * ξ) / (1.0 + e2 * ξ + c2 * ξ * ξ));
-	double const Xc = ((a3 + b3 * ξ + c3 * d3 * ξ * ξ) / (1.0 + e3 * ξ + c3 * ξ * ξ));
-	double const S1 = Xa - Xb;
-	double const S2 = Xa;
-	double const S3 = Xa + Xc;
-	double const ha = sqrt(S1);
-	double const hb = (S2 - S1);
-	double const hc = (S3 - S2);
-	KahnSum<double> Ia, Ib, Ic, Id;
-	Ia = 0.0;
-	Ib = 0.0;
-	Ic = 0.0;
-	Id = 0.0;
+//	auto const Exp = [](double x) {
+//		constexpr double zero = 0.0;
+//		constexpr double χmax = std::log(std::numeric_limits<double>::max());
+//		if (x > χmax) {
+//			return zero;
+//		} else if (x < -χmax) {
+//			return zero;
+//		} else {
+//			return std::exp(x);
+//		}
+//	};
+//	double const ξ = log1p(exp(σ * (η_ - D))) / σ;
+//	double const Xa = ((a1 + b1 * ξ + c1 * ξ * ξ) / (1.0 + c1 * ξ));
+//	double const Xb = ((a2 + b2 * ξ + c2 * d2 * ξ * ξ) / (1.0 + e2 * ξ + c2 * ξ * ξ));
+//	double const Xc = ((a3 + b3 * ξ + c3 * d3 * ξ * ξ) / (1.0 + e3 * ξ + c3 * ξ * ξ));
+//	double const S1 = Xa - Xb;
+//	double const S2 = Xa;
+//	double const S3 = Xa + Xc;
+//	double const ha = sqrt(S1);
+//	double const hb = (S2 - S1);
+//	double const hc = (S3 - S2);
+//	Jet<double, O, 1,2> Ia, Ib, Ic, Id;
+//	Ia = 0.0;
+//	Ib = 0.0;
+//	Ic = 0.0;
+//	Id = 0.0;
 	for (int q = 0; q < qOrder; q++) {
-		double const x = gaussLegendre[q].position;
-		double const wp = 0.5 * gaussLegendre[q].weight;
-		double const xd = (S3 + gaussLaguerre[q].position);
-		double const wl = gaussLaguerre[q].weight;
-		double const τ = 0.5 * (x + 1.0);
-		double const xa = τ * ha;
-		double const xb = (S1 + τ * hb);
-		double const xc = (S2 + τ * hc);
-		double const x2 = xa * xa;
-		Ia += wp * pow(x2, k) * (1 + α * β * x2) * sqrt(1 + 0.5 * β * x2) / (1 + Exp(x2 - η)) * ha * 2.0 * xa;
-		Ib += wp * pow(xb, k) * (1 + α * β * xb) * sqrt(1 + 0.5 * β * xb) / (1 + Exp(xb - η)) * hb;
-		Ic += wp * pow(xc, k) * (1 + α * β * xc) * sqrt(1 + 0.5 * β * xc) / (1 + Exp(xc - η)) * hc;
-		Id += wl * pow(xd, k) * (1 + α * β * xd) * sqrt(1 + 0.5 * β * xd) / (1 + Exp(xd - η)) * Exp(xd - S3);
+//		double const x = gaussLegendre[q].position;
+//		double const wp = 0.5 * gaussLegendre[q].weight;
+//		double const xd = (S3 + gaussLaguerre[q].position);
+//		double const wl = gaussLaguerre[q].weight;
+//		double const τ = 0.5 * (x + 1.0);
+//		double const xa = τ * ha;
+//		double const xb = (S1 + τ * hb);
+//		double const xc = (S2 + τ * hc);
+//		double const x2 = xa * xa;
+//		Ia += wp * pow(x2, k) * (1 + α * β * x2) * sqrt(1 + 0.5 * β * x2) / (1 + exp(x2 - η)) * ha * 2.0 * xa;
+//		Ib += wp * pow(xb, k) * (1 + α * β * xb) * sqrt(1 + 0.5 * β * xb) / (1 + exp(xb - η)) * hb;
+//		Ic += wp * pow(xc, k) * (1 + α * β * xc) * sqrt(1 + 0.5 * β * xc) / (1 + exp(xc - η)) * hc;
+//		Id += wl * pow(xd, k) * (1 + α * β * xd) * sqrt(1 + 0.5 * β * xd) / (1 + exp(xd - η)) * exp(xd - S3);
 	}
 //	printf("%e %e %e %e\n", double(Ia), double(Ib), double(Ic), double(Id));
-	return (Ia + Ib + Ic + Id);
+//	return (Ia + Ib + Ic + Id);
 }
 
 #include <vector>
@@ -589,9 +656,27 @@ double fermiDirac(HalfInteger<int> s, double η, double β) {
 	return sum;
 }
 
-
 #include <cstdint>
 auto test() {
+	constexpr int N = 12;
+	using PolyType = DifferentialPolynomial<int, N, 1, 1>;
+	PolyType G = PolyType::getMonomial();
+	PolyType dGdx = differentiate(G);
+	std::vector<PolyType> B0, B1;
+	B0.push_back(dGdx);
+	for(int n = 1; n < N; n++){
+		B1.resize(n + 1);
+		B1[0] = differentiate(B0[0]);
+		for(int k = 1; k < n; k++){
+			B1[k] = dGdx * B0[k - 1] + differentiate(B0[k]);
+		}
+		B1[n] = dGdx * B0[n - 1];
+		for(int k = 0; k <= n; k++){
+			std::cout << print2string("B%i%i = ", n + 1, k + 1);
+			std::cout << B1[k] << "\n";
+		}
+		std::swap(B1, B0);
+	}
 
 //	std::complex<double> I(0, 1);
 //	for (double x = 10.0; x < 101.0; x *= 1.1) {
@@ -599,63 +684,144 @@ auto test() {
 //				(I * iBeta(-0.5 * x, 7 * half, 3 * half)).real());
 //	}
 //	return;
-	double β = 1e-6;
-	HalfInteger<int> k = half * 3;
-	PadeApproximant<16> pade([k](long double x, int n) {
-		double const arr[33] = {66.03346919316417,151.83272672423314,372.5892539872859,928.6137153408156,
-				   2319.424125055658,5795.195148371597,14502.08872272234,36254.118005093675,90315.18570453653,
-				   226427.78660756798,575607.5146336989,1.4086630584417323e6,3.1082090920605077e6,
-				   8.896740796184724e6,4.756492715955744e7,1.1399453026039888e8,-1.6890141681888695e9,
-				   -1.2090409978887466e10,1.407866098280436e11,2.0760130019224863e12,-8.537240490744178e12,
-				   -3.250372665992431e14,-3.264586214853177e14,4.93526789471258e16,3.2041012812560666e17,
-				   -7.158018902280004e18,-1.0281900584085494e20,9.406948652791451e20,2.8185218104198913e22,
-				   -9.150120925819329e22,-7.784494928026343e24,-6.148371657113851e24,2.392619084675169e27};
-		return arr[n];
-	}, std::exp(1));
-	for (double η = 1; η < 100; η += 0.01) {
-		auto fd1 = FD(k, η, 0.0);
-		auto fd2 = pade(log(η)- 2);
-		double e1 = fd2 - fd1;
-		printf("%e %e %e %e\n", η, fd1, fd2, e1);
-	}
-	return;
-	//fermiDirac(half, 1.0, 1.0);
-	return;
-	constexpr double s = 1.5;
-	PowerSeries<double, 1024> polylog([s](int n) {
-		if (n > 0) {
-			return std::pow(n, -s);
-		}
-		return 0.0;
-	});
-	for (double z = -0.5; z < 0.5; z += 0.01) {
-		printf("%e %e\n", z, polylog(z));
-	}
-	return;
-	constexpr int N = 32;
-	double ρa = 1e-12;
-	double ρb = 1e+12;
-	double dρ = (log(ρb) - log(ρa)) / N;
-	double Ta = 1e3;
-	double Tb = 1e12;
-	double dT = (log(Tb) - log(Ta)) / N;
-	for (double logρ = log(ρa); logρ <= log(ρb); logρ += dρ) {
-		double const ρ = exp(logρ);
-		for (double logT = log(Ta); logT <= log(Tb); logT += dT) {
-			double const T = exp(logT);
-			auto const η = solve4η(ρ, 2.0, T);
-			printf("%i %e %e %e\n", N, exp(logρ), exp(logT), η);
-			fflush(stdout);
-		}
-	}
+//	double β = 1e-6;
+//	HalfInteger<int> k = half * 3;
+//	PadeApproximant<16> pade([k](long double x, int n) {
+//		double const arr[33] = { 66.03346919316417, 151.83272672423314, 372.5892539872859, 928.6137153408156, 2319.424125055658, 5795.195148371597,
+//				14502.08872272234, 36254.118005093675, 90315.18570453653, 226427.78660756798, 575607.5146336989, 1.4086630584417323e6, 3.1082090920605077e6,
+//				8.896740796184724e6, 4.756492715955744e7, 1.1399453026039888e8, -1.6890141681888695e9, -1.2090409978887466e10, 1.407866098280436e11,
+//				2.0760130019224863e12, -8.537240490744178e12, -3.250372665992431e14, -3.264586214853177e14, 4.93526789471258e16, 3.2041012812560666e17,
+//				-7.158018902280004e18, -1.0281900584085494e20, 9.406948652791451e20, 2.8185218104198913e22, -9.150120925819329e22, -7.784494928026343e24,
+//				-6.148371657113851e24, 2.392619084675169e27 };
+//		return arr[n];
+//	}, std::exp(1));
+//	for (double η = 1; η < 100; η += 0.01) {
+//		auto fd1 = FD(k, η, 0.0);
+//		auto fd2 = pade(log(η) - 2);
+//		double e1 = fd2 - fd1;
+//		printf("%e %e %e %e\n", η, fd1, fd2, e1);
+//	}
+//	return;
+//	//fermiDirac(half, 1.0, 1.0);
+//	return;
+//	constexpr double s = 1.5;
+//	PowerSeries<double, 1024> polylog([s](int n) {
+//		if (n > 0) {
+//			return std::pow(n, -s);
+//		}
+//		return 0.0;
+//	});
+//	for (double z = -0.5; z < 0.5; z += 0.01) {
+//		printf("%e %e\n", z, polylog(z));
+//	}
+//	return;
+//	constexpr int N = 32;
+//	double ρa = 1e-12;
+//	double ρb = 1e+12;
+//	double dρ = (log(ρb) - log(ρa)) / N;
+//	double Ta = 1e3;
+//	double Tb = 1e12;
+//	double dT = (log(Tb) - log(Ta)) / N;
+//	for (double logρ = log(ρa); logρ <= log(ρb); logρ += dρ) {
+//		double const ρ = exp(logρ);
+//		for (double logT = log(Ta); logT <= log(Tb); logT += dT) {
+//			double const T = exp(logT);
+//			auto const η = solve4η(ρ, 2.0, T);
+//			printf("%i %e %e %e\n", N, exp(logρ), exp(logT), η);
+//			fflush(stdout);
+//		}
+//	}
 	return;
 }
 ;
 
+template<int N>
+int init() {
+	Multidices<N> indices;
+	for (int k = 0; k < N; k++) {
+		indices[k] = 0;
+	}
+	int j;
+	int count = 0;
+	do {
+		count++;
+		int sum = 0;
+		for (int j = 0; j < N; j++) {
+			sum += (j + 1) * indices[j];
+		}
+		j = 0;
+		do {
+			indices[j]++;
+			sum += j + 1;
+			if ((sum > N) || (indices[j] * (j + 1) > N)) {
+				sum -= indices[j] * (j + 1);
+				indices[j] = 0;
+				j++;
+			} else {
+				break;
+			}
+		} while (j < N);
+	} while (j < N);
+	printf("%i %i\n", N, count);
+	return count;
+}
+
+
+
 void polytest() {
-	constexpr int N = 8;
-	auto f = Jet<double, N - 1>::genVar(1);
-	std::cout << exp(f * f);
+	test();
+	constexpr int N = 12;
+	constexpr int D = 1;
+//	DerivativeIndex<N> a;
+//	DifferentialPolynomial<double, N, D> test;
+//	test.show();
+//	constexpr int D = 1;
+//	auto x1 = Jet<double, N, D>::genVar(1);
+//
+//	auto x2 = Jet<double, N, D>::genVar(1);
+//	std::cout << exp(x1*x1) << "\n\n";
+
+	//MultivariateBellPolynomials<N, 1, 2> mbell;
+//	for(int n = 0; n < 10; n++) {
+//		std::cout << x1 << "\n\n";
+//		x1 = sqr(x1);
+//	}
+	//	MultivariateBellPolynomials<N, 1, D> Bs { };
+//	using Index = JetIndex<N, D>;
+//	using Index1 = JetIndex<N, 1>;
+//	using Index2 = JetIndex<N, D>;
+//	Index indices = Index::begin();
+//	for (int n = 1; n < N; n++) {
+//		for (auto k = Index::begin(); k != Index::end(); k++) {
+//			auto Bnk = Bs(n, k);
+//			printf("\nN = %i k = %i\n", n, k[0]);
+//			std::cout << Bnk << "\n";
+//		}
+//	}
+//	return;
+//	using JetType = Jet<double, N, 1, D>;
+//	using Index = JetIndex<N, D>;
+//	Jet x = JetType::generate(1.0, 0);
+//	Jet y = JetType::generate(0.0, 1);
+//	std::cout << exp(x);
+//	for (int n = 0; n < ipow(N, D); n++) {
+//	}
+//	JetType x = JetType::generate();
+//	auto const f = cos(x);
+//	auto const series = [f](double x) {
+//		double sum = 0.0;
+//		double xn = 1.0;
+//		for (int n = 0; n < N; n++) {
+//			JetIndex<N, D> i;
+//			i[0] = n;
+//			sum += xn * f[i] / factorial(n);
+//			xn *= x;
+//		}
+//		return sum;
+//	};
+//	double const η = 0.0;
+//	for (double x = 0.5; x < 2; x += 0.01) {
+//		printf("%e %e %e %e\n", x, cos(x), series(x), cos(x)- series(x));
+//	}
 	return;
-//	test();
 }

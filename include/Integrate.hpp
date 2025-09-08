@@ -10,63 +10,6 @@
 #include "Quadrature.hpp"
 #include "Util.hpp"
 
-template<typename T>
-struct KahnSum {
-	KahnSum() = default;
-	KahnSum(T const &a) {
-		sum_ = a;
-		c_ = T(0);
-	}
-	KahnSum& operator+=(T const &x) {
-		T const y = x - c_;
-		T const t = sum_ + y;
-		c_ = (t - sum_) - y;
-		sum_ = t;
-		return *this;
-	}
-	KahnSum& operator-=(T const &x) {
-		*this += -x;
-		return *this;
-	}
-	KahnSum operator+(T const &x) const {
-		KahnSum a = *this;
-		a += x;
-		return a;
-	}
-	KahnSum operator-(T const &x) const {
-		KahnSum a = *this;
-		a -= x;
-		return a;
-	}
-	operator T() const {
-		return sum_;
-	}
-	bool operator==(KahnSum const &other) const {
-		return (sum_ == other.sum_) && (c_ == other.c_);
-	}
-	bool operator<(KahnSum const &other) const {
-		if (sum_ < other.sum_) {
-			return true;
-		}
-		return (c_ > other.c_);
-	}
-	bool operator!=(KahnSum const &other) const {
-		return !(*this == other);
-	}
-	bool operator>=(KahnSum const &other) const {
-		return !(*this < other);
-	}
-	friend bool operator>(KahnSum const &a, KahnSum const &b) {
-		return b < a;
-	}
-	friend bool operator<=(KahnSum const &a, KahnSum const &b) {
-		return b >= a;
-	}
-private:
-	T sum_ { 0 };
-	T c_ { 0 };
-};
-
 #define frac(n, d) (T(n)/T(d))
 
 //template<typename T, int nq = 100>

@@ -7,7 +7,8 @@
 
 #include "Util.hpp"
 
-template<typename T>
+
+template<typename T, auto = int(0)>
 struct CanDoArithmetic {
 	static constexpr bool value = false;
 };

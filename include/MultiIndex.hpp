@@ -1,5 +1,7 @@
 #pragma once
 
+
+
 #include "ContainerArithmetic.hpp"
 #include "Range.hpp"
 #include <cassert>
@@ -16,18 +18,14 @@ struct MultiIndex {
 	static constexpr int dimensionCount = initializeDimensionCount();
 	static constexpr auto initializeInteriorRange() {
 		if constexpr (std::is_integral<decltype(firstArgument)>::value) {
-			return Range<int, dimensionCount> {
-					repeat<dimensionCount>(0),
-					repeat<dimensionCount>(firstArgument) };
+			return Range<int, dimensionCount> { repeat<dimensionCount>(0), repeat<dimensionCount>(firstArgument) };
 		} else {
 			return secondArgument;
 		}
 	}
 	static constexpr auto initializeExteriorRange() {
 		if constexpr (std::is_integral<decltype(firstArgument)>::value) {
-			return Range<int, dimensionCount> {
-					repeat<dimensionCount>(0),
-					repeat<dimensionCount>(firstArgument) };
+			return Range<int, dimensionCount> { repeat<dimensionCount>(0), repeat<dimensionCount>(firstArgument) };
 		} else {
 			return firstArgument;
 		}
@@ -41,6 +39,20 @@ struct MultiIndex {
 	MultiIndex& operator=(MultiIndex&&) = default;
 	constexpr MultiIndex(std::array<int, dimensionCount> const &other) :
 			indexValues_(other) {
+	}
+	constexpr MultiIndex operator-(MultiIndex const &B) const {
+		MultiIndex A = *this;
+		for (int d = 0; d < dimensionCount; d++) {
+			A[d] -= B[d];
+		}
+		return A;
+	}
+	constexpr MultiIndex operator+(MultiIndex const &B) const {
+		MultiIndex A = *this;
+		for (int d = 0; d < dimensionCount; d++) {
+			A[d] += B[d];
+		}
+		return A;
 	}
 	constexpr MultiIndex& operator++() {
 		int dim = dimensionCount - 1;
@@ -57,7 +69,7 @@ struct MultiIndex {
 	static constexpr std::array<int, dimensionCount> strides() {
 		std::array<int, dimensionCount> strides;
 		int stride = 1;
-		for( int dimensionIndex = 0; dimensionIndex < dimensionCount; dimensionIndex++) {
+		for (int dimensionIndex = 0; dimensionIndex < dimensionCount; dimensionIndex++) {
 			strides[dimensionIndex] = stride;
 			stride *= exteriorRange.end[dimensionIndex] - exteriorRange.begin[dimensionIndex];
 		}
@@ -112,9 +124,26 @@ struct MultiIndex {
 		os << ")";
 		return os;
 	}
+	int sum() const {
+		return std::accumulate(indexValues_.begin(), indexValues_.end(), 0);
+	}
+	int max() const {
+		return *std::max_element(indexValues_.begin(), indexValues_.end());
+	}
+	int maxIndex() const {
+		return std::distance(std::max_element(indexValues_.begin(), indexValues_.end()), indexValues_.begin());
+	}
+	int minIndex() const {
+		return std::distance(std::min_element(indexValues_.begin(), indexValues_.end()), indexValues_.begin());
+	}
 private:
 	std::array<int, dimensionCount> indexValues_;
 };
+
+template<auto A, auto B>
+auto abs(MultiIndex<A, B> const &i) {
+	return i.sum();
+}
 
 template<auto outerRange, auto innerRange>
 struct CanDoArithmetic<MultiIndex<outerRange, innerRange>> {
@@ -148,8 +177,7 @@ void reverseMultiIndexData(InputIt srcBegin, InputIt srcEnd, OutputIt dstBegin) 
 		for (int d = 0; d < D; ++d) {
 			rev[d] = idx[D - 1 - d];
 		}
-		index_type revIdx {
-				rev };
+		index_type revIdx { rev };
 		*(dstBegin + static_cast<int>(revIdx)) = value;
 	}
 }
