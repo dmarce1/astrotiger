@@ -46,14 +46,14 @@ struct Multidices {
 		return A;
 	}
 	constexpr Multidices operator*(Multidices other) const {
-		Multidices A;
+		Multidices A = *this;
 		for (int d = 0; d < D; d++) {
 			A[d] *= other[d];
 		}
 		return A;
 	}
 	constexpr Multidices operator*(int other) const {
-		Multidices A;
+		Multidices A = *this;
 		for (int d = 0; d < D; d++) {
 			A[d] *= other;
 		}
@@ -95,6 +95,14 @@ struct Multidices {
 	constexpr bool operator<(Multidices const &other) const {
 		for (int d = 0; d < D; d++) {
 			if (indices_[d] >= other[d]) {
+				return false;
+			}
+		}
+		return true;
+	}
+	constexpr bool operator<=(Multidices const &other) const {
+		for (int d = 0; d < D; d++) {
+			if (indices_[d] > other[d]) {
 				return false;
 			}
 		}
@@ -215,7 +223,7 @@ struct Multidices {
 		}
 		return result;
 	}
-	friend std::ostream& operator<<(std::ostream &os, Multidices<D> const &A) {
+	friend std::ostream& operator<<(std::ostream &os, Multidices const &A) {
 		os << "(";
 		for (int d = 0; d < D - 1; d++) {
 			os << A[d] << ", ";
@@ -232,6 +240,20 @@ private:
 	std::array<int, D> indices_;
 };
 
+template<int N>
+struct std::hash<Multidices<N>> {
+	size_t operator()(Multidices<N> const &indices) const {
+		constexpr size_t n = ((size_t(1) << size_t(31)) - size_t(1));
+		constexpr size_t a = 48271;
+		constexpr size_t b = 16807;
+		std::hash<int> keyGen;
+		size_t key = 42;
+		for (int i = 0; i < N; i++) {
+			key = ((a * key) % n) ^ ((b * keyGen(i)) % n);
+		}
+		return key;
+	}
+};
 
 
 #endif /* INCLUDE_MULTIDICES_HPP_ */

@@ -655,29 +655,83 @@ double fermiDirac(HalfInteger<int> s, double η, double β) {
 	}
 	return sum;
 }
+// Α,α,Β,β,Γ,γ,Δ,δ,Ε,ε,Ζ,ζ,Η,η,Θ,θ,ϑ,Ι,ι,Κ,κ,ϰ,Λ,λ,Μ,μ,Ν,ν,Ξ,ξ,Ο,ο,Π,π,ϖ,Ρ,ρ,ϱ,Σ,σ,ς,Τ,τ,Υ,υ,Φ,φ,ϕ,Χ,χ,Ψ,ψ,Ω,ω
+
+//template<int D1, int D2>
+//auto const& multivariateBellPolynomial(Multidices<D1> const &N, Multidices<D2> const &K) {
+//	using TermType = std::vector<std::pair<Multidices<D1>, Multidices<D2>>>;
+//	using ResultType = std::vector<TermType>;
+//	using MBMapType = std::unordered_map<Multidices<D1>, Multidices<D2>>;
+//	static thread_local std::unordered_map<Multidices<D1>, std::unordered_map<Multidices<D2>, std::shared_ptr<ResultType>>> memory;
+//	auto const& mapN = memory[N];
+//	auto iterator = mapN.find(K);
+//	if (iterator == mapN.end()) {
+//		MBMapType J2K;
+//		std::vector<MBMapType> J2Ks;
+//		std::function<void(Multidices<D1>, Multidices<D1> const&, Multidices<D2> const&)> recurse;
+//		recurse = [&recurse, &J2K, &J2Ks](Multidices<D1> J, Multidices<D1> const &N, Multidices<D2> const &K) {
+//			for (Multidices<D2> Kj = 0; J * abs(Kj) <= N; Kj++) {
+//				auto const JabsK = J * abs(Kj);
+//				if ((JabsK <= N) && (Kj <= K)) {
+//					auto const N1 = N - JabsK;
+//					auto const K1 = K - Kj;
+//					if (abs(Kj) > 0) {
+//						J2K[J] = Kj;
+//					}
+//					if ((abs(N1) == 0) && (abs(K1) == 0)) {
+//						J2Ks.push_back(J2K);
+//					} else {
+//						bool end = false;
+//						auto J1 = J;
+//						do {
+//							J1++;
+//							if (!(abs(J1) <= abs(N))) {
+//								end = true;
+//								break;
+//							}
+//						} while (!(J1 <= N));
+//						if (!end) {
+//							recurse(J1, N1, K1);
+//						}
+//					}
+//				}
+//			}
+//			J2K.erase(J);
+//		};
+//		recurse(Multidices<D1>(1), N, K);
+//		ResultType result;
+//		for (auto const &j2k : J2Ks) {
+//			TermType term;
+//			for (auto const &t : j2k) {
+//				term.push_back(t);
+//			}
+//			result.push_back(std::move(term));
+//		}
+//		iterator->second = std::make_shared<ResultType>(std::move(result));
+//	}
+//	return *iterator->second;
+//}
 
 #include <cstdint>
 auto test() {
-	constexpr int N = 12;
-	using PolyType = DifferentialPolynomial<int, N, 1, 1>;
-	PolyType G = PolyType::getMonomial();
-	PolyType dGdx = differentiate(G);
-	std::vector<PolyType> B0, B1;
-	B0.push_back(dGdx);
-	for(int n = 1; n < N; n++){
-		B1.resize(n + 1);
-		B1[0] = differentiate(B0[0]);
-		for(int k = 1; k < n; k++){
-			B1[k] = dGdx * B0[k - 1] + differentiate(B0[k]);
-		}
-		B1[n] = dGdx * B0[n - 1];
-		for(int k = 0; k <= n; k++){
-			std::cout << print2string("B%i%i = ", n + 1, k + 1);
-			std::cout << B1[k] << "\n";
-		}
-		std::swap(B1, B0);
-	}
-
+	constexpr int O = 8;
+	constexpr int D1 = 1;
+	constexpr int D2 = 1;
+	Multidices<D1> N;
+	Multidices<D2> K;
+	N[0] = 4;
+//	N[1] = 4;
+//	N[2] = 4;
+	K[0] = 2;
+//	K[1] = 2;
+//	K[2] = 2;
+//	auto mb = multivariateBellPolynomial<D1, D2>(N, K);
+//	for (auto map : mb) {
+//		for (auto entry : map) {
+//			std::cout << entry.first << " --> " << entry.second << ",  ";
+//		}
+//		std::cout << "\n";
+//	}
 //	std::complex<double> I(0, 1);
 //	for (double x = 10.0; x < 101.0; x *= 1.1) {
 //		printf("%e %e %e %e\n", x, (I * iBeta(-0.5 * x, 3 * half, 3 * half)).real(), (I * iBeta(-0.5 * x, 5 * half, 3 * half)).real(),
@@ -766,12 +820,24 @@ int init() {
 	return count;
 }
 
-
+template<int D1, int D2>
+struct BellPolynomial {
+	Multidices<D1> N;
+	Multidices<D2> K;
+	std::vector<Multidices<D2>> Kj;
+	std::vector<Multidices<D1>> J;
+};
 
 void polytest() {
-	test();
-	constexpr int N = 12;
+	constexpr int N = 6;
 	constexpr int D = 1;
+	AutoDiff<double, N, D> x, y, z;
+	x = AutoDiff<double, N, D>::generateVariable(0.5);
+	y = exp(x * x);
+	z = exp(x);
+	std::cout << x;
+	std::cout << y;
+	std::cout << z;
 //	DerivativeIndex<N> a;
 //	DifferentialPolynomial<double, N, D> test;
 //	test.show();
