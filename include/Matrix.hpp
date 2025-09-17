@@ -488,7 +488,6 @@ private:
 	Type value;
 };
 
-
 template<typename T, int N, int M, int L>
 Matrix<T, N, L> operator*(Matrix<T, N, M> const &A, Matrix<T, M, L> const &B) {
 	Matrix<T, N, L> C;
@@ -517,6 +516,20 @@ SquareMatrix<Type, Ndim> operator*=(SquareMatrix<Type, Ndim> &A, SquareMatrix<Ty
 	return A;
 }
 
+template<typename Type, int N>
+Type matrixDiagonalDominance(SquareMatrix<Type, N> const &A) {
+	Type pSum = Type(0);
+	Type nSum = Type(0);
+	for(int n = 0; n < N; n++) {
+		pSum += std::abs(A(n, n));
+		for(int m = 0; m < N; m++) {
+			nSum += std::abs(A(n, m));
+		}
+	}
+	nSum -= pSum;
+	return (pSum - nSum)/(pSum + nSum);
+}
+
 template<typename Type, int R, int C>
 auto matrixRow(Matrix<Type, R, C> const &A, int r) {
 	Matrix<Type, 1, C> row;
@@ -535,6 +548,30 @@ Matrix<Type, R, 1> matrixColumn(Matrix<Type, R, C> const &A, int c) {
 	return col;
 }
 
+template<typename Type, int R>
+struct ColumnVector : public Matrix<Type, R, 1> {
+	ColumnVector& operator=(ColumnVector const&) = default;
+	ColumnVector& operator=(Matrix<Type, R, 1> const& other) {
+		static_cast<Matrix<Type, R, 1>&>(*this) = other;
+		return *this;
+	}
+	Type operator[](int i) const {
+		return static_cast<Matrix<Type, R, 1> const&>(*this)(i, 0);
+	}
+	Type& operator[](int i) {
+		return static_cast<Matrix<Type, R, 1>&>(*this)(i, 0);
+	}
+};
+
+template<typename Type, int C>
+struct RowVector : public Matrix<Type, 1, C> {
+	Type operator[](int i) const {
+		return static_cast<Matrix<Type, 1, C> const&>(*this)(0, i);
+	}
+	Type& operator[](int i) {
+		return static_cast<Matrix<Type, 1, C>&>(*this)(0, i);
+	}
+};
 
 template<typename T, int N>
 T matrixInverseAndDeterminant(SquareMatrix<T, N> &A) {
@@ -656,9 +693,12 @@ constexpr T matrixDeterminant(SquareMatrix<T, N> const &A) {
 	if constexpr (N > 1) {
 		T sum = A(0, 0) * matrixCofactor(A, 0, 0);
 		for (int c = 1; c < N; c++) {
-			T cof = matrixCofactor(A, 0, c);
-			T const tmp = A(0, c) * cof;
-			sum += tmp;
+			auto const ac = A(0, c);
+			if (ac != T(0)) {
+				T cof = matrixCofactor(A, 0, c);
+				T const tmp = A(0, c) * cof;
+				sum += tmp;
+			}
 		}
 		return sum;
 	} else {
@@ -717,7 +757,7 @@ void matrixQRDecomposition(SquareMatrix<T, N> const &A, SquareMatrix<T, N> &Q, S
 }
 
 template<typename T, int N>
-std::array<T, N> matrixEigenvalues(SquareMatrix<T, N> const& A, int maxIters = 1000, T tol = 1e-12) {
+std::array<T, N> matrixEigenvalues(SquareMatrix<T, N> const &A, int maxIters = 1000, T tol = 1e-12) {
 	SquareMatrix<T, N> Ak = A;
 	SquareMatrix<T, N> Q, R;
 	for (int iter = 0; iter < maxIters; ++iter) {
@@ -728,7 +768,7 @@ std::array<T, N> matrixEigenvalues(SquareMatrix<T, N> const& A, int maxIters = 1
 		for (int i = 1; i < N && converged; ++i) {
 			for (int j = 0; j < i; ++j) {
 				if (std::abs(Ak(i, j)) > tol) {
-					printf( "%i %i %e\n", i, j, std::abs(Ak(i, j)));
+					printf("%i %i %e\n", i, j, std::abs(Ak(i, j)));
 					converged = false;
 					break;
 				}

@@ -1,13 +1,525 @@
+#include "AutoDiff.hpp"
 #include "HyperSubgrid.hpp"
 #include "RadiationState.hpp"
 #include "Constants.hpp"
 #include "EulerState.hpp"
+#include "DoubleReal.hpp"
 #include "Real.hpp"
 #include "RungeKutta.hpp"
 #include <array>
 #include <iostream>
 using T = double;
+// Α,α,Β,β,Γ,γ,Δ,δ,Ε,ε,Ζ,ζ,Η,η,Θ,θ,ϑ,Ι,ι,Κ,κ,ϰ,Λ,λ,Μ,μ,Ν,ν,Ξ,ξ,Ο,ο,Π,π,ϖ,Ρ,ρ,ϱ,Σ,σ,ς,Τ,τ,Υ,υ,Φ,φ,ϕ,Χ,χ,Ψ,ψ,Ω,ω
 
+//constexpr double zero(0), one(1), two(2), three(3), four(4), five(5);
+//constexpr double half = one / two;
+//constexpr double third = one / three;
+//constexpr double quarter = one / four;
+//constexpr double π = four * atan(one);
+//constexpr double c = 2.99792458e10;
+//constexpr double aR = 7.565767e-15;
+//constexpr double kB = 1.380649e-16;
+//constexpr double mp = 1.67262192369e-24;
+//constexpr double ℎ = 6.62607015e-27;
+//constexpr double ℏ = ℎ / (two * π);
+//constexpr double Γ = five * third;
+//constexpr double ic = one / c;
+//constexpr double c2 = sqr(c);
+//constexpr double tiny = 1e-100;
+//constexpr double huge = std::numeric_limits<double>::max();
+//constexpr double eps = std::numeric_limits<double>::epsilon();
+
+//template<typename Type, int ndim>
+//Type gasSpecificEntropy(Type ρ, Type μ, std::array<Type, ndim + 1> const &gas4Mom) {
+//
+//	std::array<Type, ndim> β;
+//	Type const iρ = one / ρ;
+//	Type const Eg = gas4Mom[ndim];
+//	for (int j = 0; j < ndim; j++) {
+//		β[j] = iρ * ic * gas4Mom[j];
+//	}
+//	Type β2 = dot(β, β);
+//	Type γ = one / sqrt(one - β2);
+//	Type γ2 = sqr(γ);
+//	Type const ε = iρ * (Eg - ρ * γ2 * c2) / (one + (γ2 - one) * Γ);
+//	Type const n = ρ / (μ * mp);
+//	Type const num = pow(four * π * μ * sqr(mp) * ε, three * half);
+//	Type const den = n * pow(three * sqr(ℎ), three * half);
+//	return kB * (log(num / den) + five * half);
+//}
+//template<typename Type, int ndim>
+//Type radiationEntropy(std::array<Type, ndim + 1> const &rad4Mom) {
+//
+//	Type const Er = rad4Mom[ndim];
+//	return four * third * pow(aR, quarter) * pow(Er, three * quarter);
+//}
+//
+//template<typename Type, int ndim>
+//auto implicitGas(std::array<Type, ndim + 1> gas4Mom, std::array<Type, ndim + 1> radiation4Mom, Type ρ, Type μ, Type κ, Type χ) {
+//
+//	constexpr Type Cgas = ((Γ - one) * mp / kB);
+//	using Auto = AutoDiff<Type,
+//	2, ndim + 1>;
+//	std::array<Type, ndim + 1> const total4Mom = gas4Mom + radiation4Mom;
+//	std::array<std::array<Auto, ndim>, ndim> P;
+//	std::array<std::array<Auto, ndim + 1>, ndim + 1> Rco, Rlab, Λ;
+//	std::array<Auto, ndim + 1> Glab;
+//	std::array<Auto, ndim + 1> Gco;
+//	std::array<Auto, ndim> F, β, n;
+//	Auto Er, iEr, Eg, iρ, β2, iβ2, F2, absF, iabsF, f2, ξ, Ωdif, Ωstr, γ, γ2, ε, T, T2, T4, Bp, dτ;
+//	iρ = one / ρ;
+//
+//	Eg = Auto(gas4Mom[ndim], ndim);
+//	Er = total4Mom[ndim] - Eg;
+//	for (int j = 0; j < ndim; j++) {
+//		β[j] = Auto(gas4Mom[j], j);
+//		F[j] = c * (total4Mom[j] - ρ * c * β[j]);
+//	}
+//	β2 = dot(β, β);
+//	γ = one / sqrt(one - β2);
+//	γ2 = sqr(γ);
+//	ε = iρ * (Eg - ρ * γ2 * c2) / (one + (γ2 - one) * Γ);
+//	iEr = one / Er;
+//	T = μ * Cgas * ε;
+//	T2 = sqr(T);
+//	T4 = sqr(T2);
+//	Bp = aR * T4;
+//	iβ2 = one / (β2 + tiny);
+//	F2 = dot(F, F);
+//	absF = sqrt(F2 + tiny);
+//	iabsF = one / absF;
+//	f2 = F2 * sqr(iEr);
+//	ξ = (three + four * f2) / (five + two * sqrt(four - three * f2));
+//	Ωdif = half * (one - ξ);
+//	Ωstr = half * (three * ξ - one);
+//	n = F * iabsF;
+//	for (int j = 0; j < ndim; j++) {
+//		for (int k = 0; k <= j; k++) {
+//			P[j][k] = P[k][j] = Er * Ωstr * n[j] * n[k];
+//		}
+//		P[j][j] += Er * Ωdif;
+//	}
+//	Rlab[ndim][ndim] = Er;
+//	for (int j = 0; j < ndim; j++) {
+//		Rlab[j][ndim] = Rlab[ndim][j] = F[j];
+//	}
+//	for (int j = 0; j < ndim; j++) {
+//		for (int k = 0; k < ndim; k++) {
+//			Rlab[j][k] = P[j][k];
+//		}
+//	}
+//	Λ[ndim][ndim] = γ;
+//	for (int j = 0; j < ndim; j++) {
+//		Λ[j][ndim] = Λ[ndim][j] = -γ * β[j];
+//	}
+//	for (int j = 0; j < ndim; j++) {
+//		for (int k = 0; k < ndim; k++) {
+//			Λ[j][k] = Λ[k][j] = (γ - one) * β[j] * β[k] * iβ2;
+//		}
+//		Λ[j][j] += one;
+//	}
+//	for (int j = 0; j <= ndim; j++) {
+//		for (int k = 0; k <= ndim; k++) {
+//			Rco[j][k] = zero;
+//			for (int m = 0; m <= ndim; m++) {
+//				for (int n = 0; n <= ndim; n++) {
+//					Rco[j][k] += Λ[j][n] * Rlab[n][m] * Λ[m][k];
+//				}
+//			}
+//		}
+//	}
+//	Gco[ndim] = ρ * κ * (Rco[ndim][ndim] - 4.0 * π * Bp);
+//	for (int d = 0; d < ndim; d++) {
+//		Gco[d] = ρ * χ * Rco[d][ndim];
+//	}
+//	for (int j = 0; j <= ndim; j++) {
+//		Λ[ndim][j] = -Λ[ndim][j];
+//		Λ[j][ndim] = -Λ[j][ndim];
+//	}
+//	for (int j = 0; j <= ndim; j++) {
+//		Glab[j] = zero;
+//		for (int m = 0; m <= ndim; m++) {
+//			Glab[j] += Gco[m] * Λ[m][j];
+//		}
+//	}
+//	return Glab;
+//}
+
+template<typename Type, int ndim>
+struct ImplicitRadiation {
+	static constexpr Type half = Type(1) / Type(2);
+	static constexpr Type third = Type(1) / Type(3);
+	static constexpr Type quarter = Type(1) / Type(4);
+	static constexpr Type π = 4 * atan(1);
+	static constexpr Type C1 = 2.99792458e10;                   // c
+	static constexpr Type C2 = sqr(C1);                         // c^2
+	static constexpr Type C3 = C2 * C1;                         // c^3
+	static constexpr Type aR = 7.565767e-15 / C2;
+	static constexpr Type kB = 1.380649e-16 / C2;
+	static constexpr Type mp = 1.67262192369e-24;
+	static constexpr Type Γ = 5 * third;
+	static constexpr Type tiny = sqrt(std::numeric_limits<Type>::min());
+	static constexpr Type huge = std::numeric_limits<Type>::max();
+	static constexpr Type eps = std::numeric_limits<Type>::epsilon();
+	static constexpr Type l2n = 1;       // cm → cm
+	static constexpr Type s2n = C1;      // s → cm
+	static constexpr Type g2n = 1;       // g → g
+	static constexpr Type K2n = 1;       // Kelvin unchanged
+	static constexpr Type erg2n = 1.0 / C2; // erg → g
+
+	Type ρ;
+	Type μ;
+	Type κ;
+	Type χ;
+
+	using Auto = AutoDiff<Type, 2, 2 * (ndim + 1)>;
+
+	ImplicitRadiation(Type ρ_, Type μ_, Type κ_, Type χ_) :
+			ρ(g2n / (l2n * sqr(l2n)) * ρ_), μ(μ_), κ(l2n * l2n / g2n * κ_), χ(l2n * l2n / g2n * χ_) {
+	}
+
+	auto gasCon2Prim(Type D, std::array<Type, ndim + 1> const &U) {
+		using AutoType = AutoDiff<Type, 2, 1>;
+		std::array<Type, ndim + 1> V;
+		std::array<Type, ndim> S;
+		for (int j = 0; j < ndim; j++) {
+			S[j] = U[j];
+		}
+		Type S2 = dot(S, S);
+		Type const E = U[ndim];
+		AutoType W(0, 1);
+		do {
+			AutoType const iγ2 = 1 - S2 / sqr(W);
+			AutoType const iγ = sqrt(iγ2);
+			AutoType const p = (Γ - 1) / Γ * (W * iγ2 - D * iγ);
+			AutoType const f = W - p - E;
+			Type const dfdW = f[1];
+			Type const dW = -Type(f) / dfdW;
+			W += dW;
+		} while (1);
+		Type const γ = 1 / sqrt(1 - S2 / sqr(Type(W)));
+		Type const iγ = 1 / γ;
+		auto const v = S / Type(W);
+		Type const ρ = D / γ;
+		Type const T = (Γ - 1) * (μ * mp) * (W * iγ - D) / (kB * γ * Γ);
+		for (int d = 0; d < ndim; d++) {
+			V[d] = v[d];
+		}
+		V[ndim] = T;
+		return std::make_pair(D, V);
+	}
+
+	template<typename Atype>
+	auto gasPrim2Con(Type ρ, std::array<Atype, ndim + 1> const &V) {
+		std::array<Atype, ndim + 1> U;
+		std::array<Atype, ndim> β;
+		for (int j = 0; j < ndim; j++) {
+			β[j] = V[j];
+		}
+		Atype const T = V[ndim];
+		Atype const ε = (kB / (μ * mp)) * (T / (Γ - 1));
+		Atype const iρ = 1 / ρ;
+		Atype const β2 = dot(β, β);
+		Atype const γ = 1 / sqrt(1 - β2);
+		Atype const γ2 = sqr(γ);
+		Atype const p = (Γ - 1) * ρ * ε;
+		Atype const h = Atype(1) + ε + p * iρ;
+		U[ndim] = ρ * γ2 * h - p;
+		for (int i = 0; i < ndim; i++) {
+			U[i] = ρ * γ2 * h * β[i];
+		}
+		Atype const D = γ * ρ;
+		return std::make_pair(D, U);
+	}
+
+	auto radCon2Prim(std::array<Type, ndim + 1> const &U) {
+		std::array<Type, ndim + 1> V;
+		std::array<Type, ndim> F;
+		Type const E = U[ndim];
+		for (int d = 0; d < ndim; d++) {
+			F[d] = U[d];
+		}
+		Type const iE = 1 / E;
+		Type const T = pow(E / aR, Type(1) / Type(4));
+		for (int d = 0; d < ndim; d++) {
+			V[d] = F[d] * iE;
+		}
+		return V;
+	}
+
+	template<typename Atype>
+	auto radPrim2Con(std::array<Atype, ndim + 1> const &V) {
+		std::array<Atype, ndim + 1> U;
+		std::array<Atype, ndim> f;
+		Atype const T = V[ndim];
+		for (int d = 0; d < ndim; d++) {
+			f[d] = V[d];
+		}
+		Atype const E = aR * sqr(sqr(T));
+		for (int d = 0; d < ndim; d++) {
+			U[d] = f[d] * E;
+		}
+		U[ndim] = E;
+		return U;
+	}
+
+	auto equilibriumTemperature(Type T_, Type E) {
+		using std::abs;
+		Type const C0 = aR;
+		Type const C1 = kB / ((Γ - 1) * μ * mp);
+
+		using AutoType = AutoDiff<Type, 2, 1>;
+		AutoType T(T_, 0);
+		while (1) {
+			AutoType f = C0 * sqr(sqr(T)) + C1 * ρ * T + ρ - E;
+			Type const dfdT = f[1];
+			Type dT = -Type(f) / dfdT;
+			//		printf("T = %e dT = %e\n", Type(T), dT);
+			T += dT;
+			if (abs(dT / Type(T)) < Type(1e-10)) {
+				break;
+			}
+		}
+		return Type(T);
+
+	}
+
+	auto operator()(std::array<Type, ndim + 1> &vg, std::array<Type, ndim + 1> &vr, Type dt) {
+		dt *= s2n;
+		auto const g = source(vg, vr);
+		auto Ug = gasPrim2Con(ρ, vg);
+		auto Ur = radPrim2Con(vr);
+		Type dtMax;
+		Type t = dt;
+		do {
+			dtMax = t;
+			for (int j = 0; j <= ndim; j++) {
+				int const k = j + 1 + ndim;
+				dtMax = std::min(dtMax, 8.0 * std::min(fabs(Ur[j] / g[j]), fabs(Ug.second[j] / g[k])));
+//			printf( "dt%i = %e\n", j, Ur[j] / g[j]/s2n);
+//			printf( "dt%i = %e\n", k, Ug.second[j] / g[k]/s2n);
+			}
+			printf("t = %e dt = %e\n", dt - t, dtMax);
+			solve(vg, vr, dtMax);
+			t -= dtMax;
+		} while (t > 0.0);
+	}
+	auto solve(std::array<Type, ndim + 1> &vg, std::array<Type, ndim + 1> &vr, Type dt) {
+		const Type toler = sqrt(eps);
+		constexpr int nVar = 2 * (ndim + 1);
+		SquareMatrix<Type, nVar> iJ, J, P, iP;
+		ColumnVector<Auto, nVar> f;
+		ColumnVector<Type, nVar> dx;
+		std::array<Multidices<nVar>, nVar> I;
+		std::array<Auto, ndim + 1> Vg, Vr;
+		auto const [D0, Ug0] = gasPrim2Con(ρ, vg);
+		auto const Ur0 = radPrim2Con(vr);
+		auto const Teq = equilibriumTemperature(half * (vr[ndim] + vg[ndim]), Ur0[ndim] + Ug0[ndim]);
+		printf("Teq = %e\n", Teq);
+		for (int j = 0; j <= ndim; j++) {
+			int const k = ndim + 1 + j;
+			Vr[j] = Auto(vr[j], j);
+			Vg[j] = Auto(vg[j], k);
+		}
+
+		for (int i = 0; i < nVar; i++) {
+			I[i][nVar - i - 1] = 1;
+		}
+		Type error = huge;
+
+		for (int iter = 0;; iter++) {
+			printf("%i %e | ", iter, error);
+			for (int d = 0; d <= ndim; d++) {
+				printf("%e ", Vg[d][0]);
+			}
+			if (error < toler) {
+				printf("\n");
+				break;
+			}
+			printf(" | ");
+			for (int d = 0; d <= ndim; d++) {
+				printf("%e ", Vr[d][0]);
+			}
+			auto const G = source(Vg, Vr);
+			auto Ur = radPrim2Con(Vr);
+			auto [D, Ug] = gasPrim2Con(ρ, Vg);
+			for (int i = 0; i <= ndim; i++) {
+				int const m = i + 1 + ndim;
+				auto const fR = Ur[i] - Ur0[i] + dt * G[i];
+				auto const fG = Ug[i] - Ug0[i] - dt * G[i];
+				f[m] = fR + fG;
+				f[i] = fR - fG;
+			}
+			for (int i = 0; i < nVar; i++) {
+				for (int j = 0; j < nVar; j++) {
+					J(i, j) = f[i][I[j]];
+				}
+			}
+//			for (int i = 0; i < nVar; i++) {
+//				for (int j = 0; j < nVar; j++) {
+//					P(i, j) = (i == j) * J(i, j);
+//				}
+//			}
+//
+//			iP = matrixInverse(P);
+//			J = J * iP;
+			iJ = matrixInverse(J);
+			for (int n = 0; n < nVar; n++) {
+				dx[n] = 0;
+				for (int m = 0; m < nVar; m++) {
+					dx[n] -= iJ(n, m) * Type(f[m]);
+				}
+			}
+//			for (int n = 0; n < nVar; n++) {
+//				dy[n] = 0;
+//				for (int m = 0; m < nVar; m++) {
+//					dy[n] -= iJ(n, m) * Type(f[m]);
+//				}
+//			}
+//			dx = iP * dy;
+			std::array<Type, ndim + 1> const eNorm = { 1.0, 1.0, 1.0, Teq };
+			error = 0.0;
+			for (int j = 0; j < ndim; j++) {
+				int const k = j + 1 + ndim;
+				vr[j] += (Type) dx[j];
+				vg[j] += (Type) dx[k];
+				error = std::max(error, sqr(dx[k] / eNorm[j]));
+				error = std::max(error, sqr(dx[j] / eNorm[j]));
+			}
+			for (int j = 0; j < ndim; j++) {
+				int const k = j + 1 + ndim;
+				Vr[j] = Auto(vr[j], j);
+				Vg[j] = Auto(vg[j], k);
+			}
+			int const j = ndim;
+			int const k = j + 1 + ndim;
+			vr[j] += (Type) dx[j];
+			vg[j] += (Type) dx[k];
+			Vr[j] = Auto(vr[j], j);
+			Vg[j] = Auto(vg[j], k);
+			error = std::max(error, sqr(dx[k] / eNorm[j]));
+			error = std::max(error, sqr(dx[j] / eNorm[j]));
+			error = sqrt(error);
+			printf("\n");
+		}
+	}
+
+	template<typename T>
+	auto source(std::array<T, ndim + 1> Vg, std::array<T, ndim + 1> Vr) {
+		std::array<std::array<T, ndim>, ndim> P;
+		std::array<std::array<T, ndim + 1>, ndim + 1> Rco, Rlab, Λ;
+		std::array<T, ndim + 1> Glab;
+		std::array<T, ndim + 1> Gco;
+		std::array<T, ndim> f, β, F;
+		T const Tr = Vr[ndim];
+		T const Tg = Vg[ndim];
+		for (int j = 0; j < ndim; j++) {
+			f[j] = Vr[j];
+			β[j] = Vg[j];
+		}
+		T const β2 = dot(β, β);
+		T const iβ2 = 1 / (β2 + tiny);
+		T const γ = 1 / sqrt(1 - β2);
+		T const Er = aR * sqr(sqr(Tr));
+		T const Bp = aR * sqr(sqr(Tg));
+		T const ƒ2 = dot(f, f);
+		T const ƒ = sqrt(ƒ2 + tiny);
+		T const iƒ = 1 / ƒ;
+		T const ξ = (3 + 4 * ƒ2) / (5 + 2 * sqrt(4 - 3 * ƒ2));
+		T const Ωdif = half * (1 - ξ);
+		T const Ωstr = half * (3 * ξ - 1);
+		auto const n = f * iƒ;
+		for (int j = 0; j < ndim; j++) {
+			F[j] = f[j] * Er;
+			for (int k = 0; k <= j; k++) {
+				P[j][k] = P[k][j] = Er * Ωstr * n[j] * n[k];
+			}
+			P[j][j] += Er * Ωdif;
+		}
+		Rlab[ndim][ndim] = Er;
+		for (int j = 0; j < ndim; j++) {
+			Rlab[j][ndim] = Rlab[ndim][j] = F[j];
+		}
+		for (int j = 0; j < ndim; j++) {
+			for (int k = 0; k < ndim; k++) {
+				Rlab[j][k] = P[j][k];
+			}
+		}
+		Λ[ndim][ndim] = γ;
+		for (int j = 0; j < ndim; j++) {
+			Λ[j][ndim] = Λ[ndim][j] = -γ * β[j];
+		}
+		for (int j = 0; j < ndim; j++) {
+			for (int k = 0; k < ndim; k++) {
+				Λ[j][k] = Λ[k][j] = (γ - 1) * β[j] * β[k] * iβ2;
+			}
+			Λ[j][j] += 1;
+		}
+		for (int j = 0; j <= ndim; j++) {
+			for (int k = 0; k <= ndim; k++) {
+				Rco[j][k] = 0;
+				for (int m = 0; m <= ndim; m++) {
+					for (int n = 0; n <= ndim; n++) {
+						Rco[j][k] += Λ[j][n] * Rlab[n][m] * Λ[m][k];
+					}
+				}
+			}
+		}
+		Gco[ndim] = ρ * κ * (Rco[ndim][ndim] - Bp);
+		for (int d = 0; d < ndim; d++) {
+			Gco[d] = ρ * χ * Rco[d][ndim];
+		}
+		for (int j = 0; j <= ndim; j++) {
+			Λ[ndim][j] = -Λ[ndim][j];
+			Λ[j][ndim] = -Λ[j][ndim];
+		}
+		for (int j = 0; j <= ndim; j++) {
+			Glab[j] = 0;
+			for (int m = 0; m <= ndim; m++) {
+				Glab[j] += Gco[m] * Λ[m][j];
+			}
+		}
+		return Glab;
+	}
+};
+
+void testCaseA() {
+	// Α,α,Β,β,Γ,γ,Δ,δ,Ε,ε,Ζ,ζ,Η,η,Θ,θ,ϑ,Ι,ι,Κ,κ,ϰ,Λ,λ,Μ,μ,Ν,ν,Ξ,ξ,Ο,ο,Π,π,ϖ,Ρ,ρ,ϱ,Σ,σ,ς,Τ,τ,Υ,υ,Φ,φ,ϕ,Χ,χ,Ψ,ψ,Ω,ω
+
+	double ρ = 1.0e-6;
+	double T = 1.0e7;
+	double μ = 1.0;
+	double β = 0.99;
+	double Θβ = 15;
+	double ϕβ = 195;
+	double f = 0.19;
+	double Θf = 63;
+	double ϕf = 4;
+	double κ = 1.0;
+	double χ = 1.0e6;
+	double dt = 1.0;
+
+	Θβ *= 2.0 * M_PI / 360.0;
+	ϕβ *= 2.0 * M_PI / 360.0;
+	Θf *= 2.0 * M_PI / 360.0;
+	ϕf *= 2.0 * M_PI / 360.0;
+
+	double βx = β * cos(ϕβ) * sin(Θβ);
+	double βy = β * sin(ϕβ) * sin(Θβ);
+	double βz = β * cos(Θβ);
+	double fx = f * cos(ϕf) * sin(Θf);
+	double fy = f * sin(ϕf) * sin(Θf);
+	double fz = f * cos(Θf);
+	std::array<double, 4> vg = { βx, βy, βz, T };
+	std::array<double, 4> vr = { fx, fy, fz, 0.5 * T };
+	ImplicitRadiation<double, 3> solver(ρ, μ, κ, χ);
+
+	solver(vg, vr, dt);
+}
+
+void radiation_test() {
+	testCaseA();
+}
 
 constexpr int NDIM = 3;
 
@@ -293,7 +805,6 @@ std::array<T, 3> crossProduct(std::array<T, 3> const &a, std::array<T, 3> const 
 	c[2] = a[0] * b[1] - a[1] * b[0];
 	return c;
 }
-
 
 template<typename T>
 SquareMatrix<T, 3> crossProductMatrix(std::array<T, 3> const &a) {

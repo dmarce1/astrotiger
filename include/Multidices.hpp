@@ -1,15 +1,16 @@
 /******************************************************************************
  Copyright (C) 2024  Dominic C. Marcello
-*******************************************************************************/
+ *******************************************************************************/
 
 #ifndef INCLUDE_MULTIDICES_HPP_
 #define INCLUDE_MULTIDICES_HPP_
 
-
 #include <cassert>
 #include "Util.hpp"
 
-template<int D>
+enum class IndexingType {Triangular, Square};
+
+template<int D, IndexingType indexing = IndexingType::Triangular >
 struct Multidices {
 	constexpr Multidices() {
 		indices_.fill(0);
@@ -20,7 +21,7 @@ struct Multidices {
 	constexpr int& operator[](int i) {
 		return indices_[i];
 	}
-	constexpr 	int operator[](int i) const {
+	constexpr int operator[](int i) const {
 		return indices_[i];
 	}
 	constexpr Multidices(Multidices const&) = default;
@@ -197,12 +198,12 @@ struct Multidices {
 		return flat;
 	}
 	template<typename T>
-	friend constexpr std::array<T, D> pow(std::array<T, D> const &x, Multidices const &n) {
+	friend constexpr T pow(std::array<T, D> const &x, Multidices const &n) {
 		std::array<T, D> result;
 		for (int d = 0; d < D; d++) {
 			result[d] = ipow(x[d], n[d]);
 		}
-		return result;
+		return std::accumulate(result.begin(), result.end(), T(1), std::multiplies<T>());
 	}
 	friend constexpr unsigned long long factorial(Multidices const &n) {
 		unsigned long long x = 1;
@@ -212,6 +213,16 @@ struct Multidices {
 			}
 		}
 		return x;
+	}
+	static Multidices one() {
+		Multidices o;
+		for (int d = 0; d < D; d++) {
+			o.indices_[d] = 1;
+		}
+		return o;
+	}
+	friend constexpr unsigned long long risingFactorial(Multidices const &n, Multidices const &k) {
+		return factorial(n + k - one()) / factorial(n - one());
 	}
 	friend constexpr unsigned long long binco(Multidices const &n, Multidices const &k) {
 		unsigned long long result = 1;
@@ -254,6 +265,5 @@ struct std::hash<Multidices<N>> {
 		return key;
 	}
 };
-
 
 #endif /* INCLUDE_MULTIDICES_HPP_ */

@@ -6,63 +6,118 @@
 
 // Α,α,Β,β,Γ,γ,Δ,δ,Ε,ε,Ζ,ζ,Η,η,Θ,θ,ϑ,Ι,ι,Κ,κ,ϰ,Λ,λ,Μ,μ,Ν,μ,Ξ,ξ,Ο,ο,Π,π,ϖ,Ρ,ρ,ϱ,Σ,σ,ς,Τ,τ,Υ,υ,Φ,φ,ϕ,Χ,χ,Ψ,ψ,Ω,ω
 
+//template<typename T, int N, int ...Ns>
+//struct PolyN {
+//	using value_type = typename std::conditional<(sizeof...(Ns) > 0), PolyN<T, Ns>, T>::type;
+//	using reference = typename std::conditional<(sizeof...(Ns) > 0), PolyN<T, Ns>&, T&>::type;
+//	using const_reference = typename std::conditional<(sizeof...(Ns) > 0), PolyN<T, Ns> const&, T const&>::type;
+//
+//	const_reference operator[](int i) const {
+//		return coefficients_[i];
+//	}
+//	reference operator[](int i) {
+//		return coefficients_[i];
+//	}
+//	PolyN operator+() const {
+//		return *this;
+//	}
+//	PolyN operator-() const {
+//		PolyN const &A = *this;
+//		PolyN B;
+//		for (int i = 0; i <= N; i++) {
+//			B[i] = -A[i];
+//		}
+//		return B;
+//	}
+//	PolyN operator+(PolyN const &A) const {
+//		PolyN C;
+//		PolyN const &B = *this;
+//		for (int i = 0; i <= N; i++) {
+//			C[i] = A[i] + B[i];
+//		}
+//		return C;
+//	}
+//	PolyN operator-(PolyN const &A) const {
+//		PolyN C;
+//		PolyN const &B = *this;
+//		for (int i = 0; i <= N; i++) {
+//			C[i] = A[i] - B[i];
+//		}
+//		return C;
+//	}
+//	template<typename S, int M, int ...Ms>
+//	auto operator*(PolyN<S, M, Ms...> const &A) const {
+//		using ReturnType = decltype(T{} * S{});
+//		PolyN<ReturnType, N + M, (Ns + Ms)...> C;
+//		PolyN const &B = *this;
+//		for (int n = 0; n <= N + M; n++) {
+//			C[n] = T(0);
+//			for (int k = 0; k <= M; k++) {
+//				C[n] += A[n - k] * B[k];
+//			}
+//		}
+//		return C;
+//	}
+//	template<typename S>
+//	auto operator*(const S &a) const {
+//		using ReturnType = decltype(T{} * S{});
+//		PolyN<ReturnType, N, Ns...> C = *this;
+//			return C;
+//	}
+//private:
+//	std::array<value_T, N + 1> coefficients_;
+//
+//};
+//
+inline int stirling2(int n, int k) {
+	static thread_local std::vector<std::vector<int>> S2;
+	while (int(S2.size()) > n) {
+		std::vector<int> s2(S2.size() + 2);
+		int const n1 = S2.size();
+		if (n1 == 0) {
+			s2[0] = 1;
+			s2[1] = 0;
+		} else {
+			for (int k1 = 0; k1 <= n1; k1++) {
+				s2[k1] = k1 * S2[n1 - 1][k1] + S2[n1 - 1][k1 - 1];
+			}
+			s2.back() = 0;
+		}
+		S2.push_back(std::move(s2));
+	}
+	return S2[n][k];
+}
+
 template<typename Type, int O, int D>
 struct AutoDiff {
 	static constexpr size_t size() {
 		return binco(O + D - 1, D);
 	}
 private:
-	struct ProductTerm {
-		int n;
-		int m;
-		int nm;
-	};
-	struct QuotientTerm {
-		int n;
-		int k;
-		int kmn;
-	};
-	static constexpr auto productTerms = []() {
-		constexpr int length = (size() * (size() + 1)) / 2;
-		std::array<ProductTerm, length> terms;
-		int index = 0;
-		ProductTerm term;
-		for (Multidices<D> nm = 0; abs(nm) < O; nm++) {
-			term.nm = int(nm);
-			for (Multidices<D> n = 0; n <= nm; n++) {
-				const auto m = nm - n;
-				term.n = int(n);
-				term.m = int(m);
-				terms[index] = term;
-				index++;
-			}
-		}
-		return terms;
-	}();
-	static constexpr auto quotientTerms = []() {
-		constexpr int length = (size() * (size() - 1)) / 2;
-		std::array<QuotientTerm, length> terms;
-		int index = 0;
-		QuotientTerm term;
-		for (Multidices<D> k = 1; abs(k) < O; k++) {
-			term.k = int(k);
-			for (Multidices<D> n = 0; n < k; n++) {
-				const auto kmn = k - n;
-				term.n = int(n);
-				term.kmn = int(kmn);
-				terms[index] = term;
-				index++;
-			}
-		}
-		return terms;
-	}();
 	std::array<Type, size()> C_;
 public:
+	explicit operator Type() const {
+		return C_[0];
+	}
 	Type operator[](Multidices<D> const &mI) const {
 		return C_[int(mI)];
 	}
 	Type& operator[](Multidices<D> const &mI) {
 		return C_[int(mI)];
+	}
+	template<typename Real = Type>
+	auto generateFunction() {
+		std::array<Real, size()> A;
+		std::copy(C_.begin(), C_.end(), A.begin());
+		return [A](auto ...xs) {
+			std::array<Real, D> X = { xs... };
+			std::reverse(X.begin(), X.end());
+			Real y = Real(0);
+			for (Multidices<D> N = 0; N < abs(O); N++) {
+				y += A[N] * pow(X, N);
+			}
+			return y;
+		};
 	}
 	friend AutoDiff operator+(AutoDiff const &A) {
 		return A;
@@ -84,9 +139,10 @@ public:
 	}
 	friend AutoDiff operator*(AutoDiff const &A, AutoDiff const &B) {
 		AutoDiff C;
-		C.C_.fill(Type(0));
-		for (auto term : productTerms) {
-			C.C_[term.nm] += A.C_[term.n] * B.C_[term.m];
+		for (Multidices<D> n = 0; abs(n) < O; n++) {
+			for (Multidices<D> k = 0; abs(n + k) < O; k++) {
+				C[n + k] += A[n] * B[k];
+			}
 		}
 		return C;
 	}
@@ -98,31 +154,6 @@ public:
 	}
 	friend AutoDiff operator*(Type const &a, AutoDiff const &B) {
 		return B * a;
-	}
-	friend AutoDiff operator/(AutoDiff const &R, AutoDiff const &A) {
-		AutoDiff Q;
-		Q.C_.fill(Type(0));
-		Type const iA = Type(1) / A.C_[0];
-		for (int k = 0; k < O; k++) {
-			Q.C_[k] = R.C_[k] * iA;
-		}
-		for (auto term : quotientTerms) {
-			Q.C_[term.k] -= Q.C_[term.n] * A.C_[term.kmn] * iA;
-		}
-		return Q;
-	}
-	friend AutoDiff operator/(AutoDiff const &R, Type const &A) {
-		return R * (Type(1) / A);
-	}
-	friend AutoDiff operator/(Type const &R, AutoDiff const &A) {
-		AutoDiff Q;
-		Q.C_.fill(Type(0));
-		Type const iA = Type(1) / A.C_[0];
-		Q.C_[0] = R * iA;
-		for (auto term : quotientTerms) {
-			Q.C_[term.k] -= Q.C_[term.n] * A.C_[term.kmn] * iA;
-		}
-		return Q;
 	}
 	AutoDiff& operator*=(AutoDiff const &A) {
 		*this = *this * A;
@@ -152,14 +183,18 @@ public:
 		std::function<std::ostream& (std::ostream&, Type const*, int, int)> print;
 		print = [&print](std::ostream &os, Type const *ptr, int n, int dim) -> std::ostream& {
 			if (dim == 0) {
+				os << print2string("{");
 				for (int i = 0; i < n; i++) {
-					os << print2string("%10.2e ", ptr[i]);
+					os << print2string("%11.3e ", double(ptr[i]));
+					if (i + 1 < n) {
+						os << print2string(", ");
+					}
 				}
+				os << print2string("}");
 			} else {
-				int size = binco(n + dim, 1 + dim);
 				for (int i = 0; i < n; i++) {
-					os << print2string("%c = %i\n ", 'j' + dim, n);
-					print(os, ptr + n * size, i + 1, dim - 1);
+					os << print2string("%c = %2i : ", 'j' + dim, i);
+					print(os, ptr + binco(i + dim, 1 + dim), i + 1, dim - 1);
 				}
 			}
 			os << print2string("\n");
@@ -167,11 +202,6 @@ public:
 		};
 		print(os, jet.C_.data(), O, D - 1);
 		return os;
-	}
-	AutoDiff() = default;
-	AutoDiff(Type const &value) {
-		C_.fill(0);
-		C_[0] = value;
 	}
 	friend AutoDiff compose(std::function<Type(Type, int)> const &f, AutoDiff const &gj) {
 		AutoDiff H;
@@ -191,7 +221,7 @@ public:
 					for (auto const &factor : term) {
 						auto const J = factor.first;
 						auto const Kj = factor.second;
-						product *= ipow(gj[J], Kj[0]) / factorial(Kj[0]);
+						product *= ipow(gj[J], Kj[0]) / Type(factorial(Kj[0]));
 					}
 					Bg += product;
 				}
@@ -201,18 +231,87 @@ public:
 		}
 		return H;
 	}
+	//y^-1(y(x)) = x
+//	AutoDiff invert() {
+//		AutoDiff const& F = *this;
+//		AutoDiff H;
+//		H[0] = Type(0);
+//		for (Multidices<D> N = 1; abs(N) <= 1; N++) {
+//			H[N] = Type(1) / F[N];
+//		}
+//		for (Multidices<D> N = 2; abs(N) < O; N++) {
+//			Type h = Type(0);
+//			for (Multidices<1> k = 1; k <= abs(N); k++) {
+//				auto const Bnk = multivariateBellPolynomial<D, 1>(N, k);
+//				Type Bg = Type(0);
+//				for (auto const &term : Bnk) {
+//					Type product = Type(1);
+//					for (auto const &factor : term) {
+//						auto const J = factor.first;
+//						auto const Kj = factor.second;
+//						product *= ipow(F[J], Kj[0]) / factorial(Kj[0]);
+//					}
+//					Bg += product;
+//				}
+//				h += dfdg[k] * Bg;
+//			}
+//			H[N] = h;
+//		}
+//		return H;
+//	}
+	friend AutoDiff operator/(AutoDiff const &R, Type const &A) {
+		return R * (Type(1) / A);
+	}
+	friend AutoDiff operator/(Type const &y, AutoDiff const &x) {
+		return y * compose([](Type const &x, int n) {
+			return factorialPower(-1, n) * pow(x, Type(-(n + 1)));
+		}, x);
+	}
+	friend AutoDiff operator/(AutoDiff const &y, AutoDiff const &x) {
+		return y * (Type(1) / x);
+	}
+	friend AutoDiff pow(AutoDiff const &x, Type const &k) {
+		return compose([k](Type const &x, int n) {
+			return factorialPower(k, n) * pow(x, k - n);
+		}, x);
+	}
+	friend AutoDiff sqr(AutoDiff const &x) {
+		return x * x;
+	}
+	friend AutoDiff sqrt(AutoDiff const &x) {
+		return compose([](Type const &x, int n) {
+			return factorialPower(0.5, n) * std::sqrt(x) / ipow(x, n);
+		},x);
+	}
 	friend AutoDiff exp(AutoDiff const &x) {
-		return compose([](Type x, int) {
+		return compose([](Type const &x, int) {
 			return std::exp(x);
 		}, x);
 	}
-	static AutoDiff generateVariable(Type const &value, int dim = 0) {
-		AutoDiff v;
-		v.C_.fill(0);
-		v.C_[0] = value;
-		printf(" = %i\n", binco(O, 1 + dim));
-		v.C_[binco(O - 1, dim)] = Type(1);
-		return v;
+	friend AutoDiff log(AutoDiff const &x) {
+		return compose([](Type const &x, int) {
+			return std::log(x);
+		}, x);
+	}
+	friend AutoDiff tanh(AutoDiff const &x) {
+		return compose([](Type const &x, int) {
+			return std::tanh(x);
+		}, x);
+	}
+	friend AutoDiff atanh(AutoDiff const &x) {
+		return compose([](Type const &x, int) {
+			return std::atanh(x);
+		}, x);
+	}
+	AutoDiff(Type value = Type(0)) {
+		C_.fill(0);
+		C_[0] = value;
+	}
+	AutoDiff(Type const &value, int dim) {
+		C_.fill(0);
+		C_[0] = value;
+		int const i = binco(1 + dim, dim);
+		C_[i] = Type(1);
 	}
 };
 

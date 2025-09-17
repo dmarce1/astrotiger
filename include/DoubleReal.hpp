@@ -7,15 +7,18 @@
 
 #include <cmath>
 
-template<typename T>
+template<typename T = double>
 struct DoubleReal {
 	T h_;
 	T l_;
+	DoubleReal(T h, T l) :
+			h_(h), l_(l) {
+	}
 	static inline auto fast2Sum(T a, T b) {
 		auto volatile const s = a + b;
 		auto volatile const z = s - a;
-		auto volatile const t = s - a;
-		return DoubleReal(s, t);;
+		auto volatile const t = b - z;
+		return DoubleReal(s, t);
 	}
 	static inline auto _2Sum(T a, T b) {
 		auto volatile const s = a + b;
@@ -36,6 +39,22 @@ struct DoubleReal {
 		return y * (T(1) - y * x);
 	}
 public:
+	DoubleReal() = default;
+	DoubleReal(DoubleReal const &other) {
+		h_ = other.h_;
+		l_ = other.l_;
+	}
+	DoubleReal(T other) {
+		h_ = other;
+		l_ = T(0);
+	}
+	DoubleReal(int other) {
+		h_ = T(other);
+		l_ = T(0);
+	}
+	operator T() const {
+		return h_;
+	}
 	auto& operator=(DoubleReal const &other) {
 		h_ = other.h_;
 		l_ = other.l_;
@@ -43,6 +62,11 @@ public:
 	}
 	auto& operator=(T other) {
 		h_ = other;
+		l_ = T(0);
+		return *this;
+	}
+	auto& operator=(int other) {
+		h_ = T(other);
 		l_ = T(0);
 		return *this;
 	}
@@ -62,6 +86,12 @@ public:
 	}
 	friend auto operator-(DoubleReal const &x, DoubleReal const &y) {
 		return x + -y;
+	}
+	friend auto operator-(auto const &x, DoubleReal const &y) {
+		return DoubleReal(x) + -y;
+	}
+	friend auto operator-(DoubleReal const &x, auto const &y) {
+		return x + DoubleReal(-y);
 	}
 	friend auto operator*(DoubleReal const &x, DoubleReal const &y) {
 		auto const c = _2Prod(x.h_, y.h_);
@@ -96,14 +126,30 @@ public:
 	friend auto operator/(DoubleReal const &x, T y) {
 		return x * (T(1) / y);
 	}
-	friend auto operator+(T x, DoubleReal const &y) {
-		return y + x;
+	friend auto operator+(auto x, DoubleReal const &y) {
+		return DoubleReal(x) + y;
 	}
 	friend auto operator-(T x, DoubleReal const &y) {
 		return -y + x;
 	}
 	friend auto operator*(T x, DoubleReal const &y) {
 		return y * x;
+	}
+	DoubleReal& operator*=(DoubleReal const &y) {
+		*this = *this * y;
+		return *this;
+	}
+	DoubleReal& operator-=(DoubleReal const &y) {
+		*this = *this - y;
+		return *this;
+	}
+	DoubleReal& operator+=(DoubleReal const &y) {
+		*this = *this + y;
+		return *this;
+	}
+	DoubleReal& operator/=(DoubleReal const &y) {
+		*this = *this / y;
+		return *this;
 	}
 	friend auto operator/(T x, DoubleReal const &y) {
 		return x * _2Inv(y);
@@ -122,6 +168,41 @@ public:
 		auto const s = std::pow(y.h_, n);
 		auto const t = n * s * y.l_ / y.h_;
 		return _2Sum(s, t);
+	}
+	friend auto abs(DoubleReal const &y) {
+		if (y.h_ < 0) {
+			return -y;
+		} else {
+			return y;
+		}
+	}
+	friend bool operator<(DoubleReal const &a, DoubleReal const &b) {
+		if (a.h_ == b.h_) {
+			return a.l_ < b.l_;
+		}
+		return a.h_ < b.h_;
+	}
+	friend bool operator==(DoubleReal const &a, DoubleReal const &b) {
+		if (a.h_ == b.h_) {
+			return a.l_ == b.l_;
+		}
+		return false;
+
+	}
+	friend bool operator!=(DoubleReal const &a, DoubleReal const &b) {
+		if (a.h_ == b.h_) {
+			return a.l_ != b.l_;
+		}
+		return true;
+	}
+	friend bool operator>(DoubleReal const &a, DoubleReal const &b) {
+		return b < a;
+	}
+	friend bool operator<=(DoubleReal const &a, DoubleReal const &b) {
+		return !(b < a);
+	}
+	friend bool operator>=(DoubleReal const &a, DoubleReal const &b) {
+		return !(b > a);
 	}
 };
 

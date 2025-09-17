@@ -8,56 +8,192 @@
 #include "MultiPrecision.hpp"
 
 struct Rational {
-	void normalize() {
-		auto const d = std::copysign(std::gcd(n_, d_), d_);
-		n_ /= d;
-		d_ /= d;
-	}
-	Rational(intmax_t n, intmax_t d = 1) :
+	using Type = intmax_t;
+	constexpr explicit Rational(Type n = 0, Type d = 1) :
 			n_(n), d_(d) {
 	}
-	Rational& operator=(intmax_t integer) {
-		n_ = integer;
+	constexpr Rational& operator=(Rational i) {
+		n_ = i.n_;
+		d_ = i.d_;
+		return *this;
+	}
+	constexpr Rational& operator+=(Rational i) {
+		*this = *this + i;
+		return *this;
+	}
+	constexpr Rational& operator-=(Rational i) {
+		*this = *this - i;
+		return *this;
+	}
+	constexpr Rational& operator*=(Rational i) {
+		*this = *this * i;
+		return *this;
+	}
+	constexpr Rational& operator/=(Rational i) {
+		*this = *this / i;
+		return *this;
+	}
+	constexpr Rational& operator=(Type i) {
+		n_ = i;
 		d_ = 1;
 		return *this;
 	}
-	friend Rational operator-(Rational const &b) {
-		Rational a;
-		a.n_ = -b.n_;
-		a.d_ = b.d_;
+	constexpr Rational& operator+=(Type i) {
+		*this = *this + i;
+		return *this;
+	}
+	constexpr Rational& operator-=(Type i) {
+		*this = *this - i;
+		return *this;
+	}
+	constexpr Rational& operator*=(Type i) {
+		*this = *this * i;
+		return *this;
+	}
+	constexpr Rational& operator/=(Type i) {
+		*this = *this / i;
+		return *this;
+	}
+	friend constexpr Rational operator+(Rational b) {
+		return b;
+	}
+	friend constexpr Rational operator-(Rational a) {
+		a.n_ = -a.n_;
 		return a;
 	}
-	friend Rational operator+(Rational const &b, Rational const &c) {
+	friend constexpr Rational operator+(Rational b, Rational c) {
 		Rational a;
 		a.n_ = b.d_ * c.n_ + b.n_ * c.d_;
 		a.d_ = b.d_ * c.d_;
 		a.normalize();
 		return a;
 	}
-	friend Rational operator-(Rational const &a, Rational const &b) {
+	friend Rational operator+(Rational a, Type b) {
+		a.n_ += a.d_ * b;
+		a.normalize();
+		return a;
+	}
+	friend constexpr Rational operator+(Type a, Rational b) {
+		b.n_ += b.d_ * a;
+		b.normalize();
+		return b;
+	}
+	friend constexpr Rational operator-(Rational a, Rational b) {
 		return a + -b;
 	}
-	friend Rational operator*(Rational const &b, Rational const &c) {
-		Rational a;
-		a.n_ = b.n_ * c.n_;
-		a.d_ = b.d_ * c.d_;
+	friend constexpr Rational operator-(Rational a, Type b) {
+		return a + -b;
+	}
+	friend constexpr Rational operator-(Type a, Rational b) {
+		return a + -b;
+	}
+	friend constexpr Rational operator*(Rational a, Rational b) {
+		a.n_ *= b.n_;
+		a.d_ *= b.d_;
 		a.normalize();
 		return a;
 	}
-	friend Rational operator/(Rational const &b, Rational const &c) {
-		Rational a;
-		a.n_ = b.n_ * c.d_;
-		a.d_ = b.d_ * c.n_;
+	friend constexpr Rational operator*(Rational a, Type b) {
+		a.n_ *= b;
 		a.normalize();
 		return a;
+	}
+	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
+	friend constexpr Real operator+(Rational a, Real b) {
+		return (a.n_ + a.d_ * b) / a.d_;
+	}
+	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
+	friend constexpr Real operator+(Real a, Rational b) {
+		return b + a;
+	}
+	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
+	friend constexpr Real operator-(Rational a, Real b) {
+		return a + (-b);
+	}
+	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
+	friend constexpr Real operator-(Real a, Rational b) {
+		return a + (-b);
+	}
+	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
+	friend constexpr Real operator*(Rational a, Real b) {
+		b *= a.n_;
+		b /= a.d_;
+		return b;
+	}
+	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
+	friend constexpr Real operator*(Real a, Rational b) {
+		return b * a;
+	}
+	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
+	friend constexpr Real operator/(Rational a, Real b) {
+		return a.n_ / (b * a.d_);
+	}
+	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
+	friend constexpr Real operator/(Real a, Rational b) {
+		a *= b.d_;
+		a /= b.n_;
+		return a;
+	}
+	friend constexpr Rational operator*(Type a, Rational b) {
+		return b * a;
+	}
+	friend constexpr Rational operator/(Rational a, Rational b) {
+		a.n_ *= b.d_;
+		a.d_ *= b.n_;
+		a.normalize();
+		return a;
+	}
+	friend constexpr Rational operator/(Type b, Rational a) {
+		std::swap(a.n_, a.d_);
+		a.n_ *= b;
+		return a;
+	}
+	friend constexpr Rational operator/(Rational a, Type b) {
+		a.d_ *= b;
+		a.normalize();
+		return a;
+	}
+	friend constexpr bool operator==(Rational a, Rational b) {
+		return (a.n_ * b.d_) == (a.d_ * b.n_);
+	}
+	friend constexpr bool operator!=(Rational a, Rational b) {
+		return (a.n_ * b.d_) != (a.d_ * b.n_);
+	}
+	friend constexpr bool operator<(Rational a, Rational b) {
+		return (a.n_ * b.d_) < (a.d_ * b.n_);
+	}
+	friend constexpr bool operator>(Rational a, Rational b) {
+		return (a.n_ * b.d_) > (a.d_ * b.n_);
+	}
+	friend constexpr bool operator<=(Rational a, Rational b) {
+		return (a.n_ * b.d_) <= (a.d_ * b.n_);
+	}
+	friend constexpr bool operator>=(Rational a, Rational b) {
+		return (a.n_ * b.d_) >= (a.d_ * b.n_);
 	}
 	template<typename T>
-	operator T() const {
+	constexpr operator T() const {
 		return T(n_) / T(d_);
 	}
+	friend std::ostream& operator<<(std::ostream &os, Rational f) {
+		os << f.n_;
+		if (f.d_ != 1) {
+			os << "/" << f.d_;
+		}
+		return os;
+	}
 private:
-	intmax_t n_ = 0;
-	intmax_t d_ = 1;
+	constexpr void normalize() {
+		if (n_ == 0) {
+			d_ = 1;
+		} else {
+			auto const d = std::copysign(std::gcd(n_, d_), d_);
+			n_ /= d;
+			d_ /= d;
+		}
+	}
+	Type n_ = 0;
+	Type d_ = 1;
 };
 
 #endif /* INCLUDE_RATIONAL_HPP_ */

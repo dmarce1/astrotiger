@@ -19,42 +19,43 @@ struct QuadraturePoint {
 };
 
 template<typename T>
-std::vector<QuadraturePoint<T>> const& gaussLegendreQuadraturePoints(int l) {
+std::vector<QuadraturePoint<T>> const gaussLegendreQuadraturePoints(int l) {
 	using namespace std;
 	static const T π = T(4) * atan(T(1));
 	static const T zero = 0;
 	static const T one = 1;
 	static const T two = 2;
 	static const T half = one / two;
-	static unordered_map<int, std::shared_ptr<vector<QuadraturePoint<T>>>> memory;
-	if (memory.find(l) == memory.end()) {
-		vector<QuadraturePoint<T>> results;
-		results.reserve(l);
-		for (int pointIndex = 0; pointIndex < l; ++pointIndex) {
-			if ((l % 2 == 0) && (2 * pointIndex + 1 == l)) {
-				T const w = two / sqr(assoc_legendre(l, 1, one));
-				results.push_back(QuadraturePoint<T>( { zero, T(w) }));
-				continue;
-			}
-			T θ = π * (T(pointIndex) + half) / T(l);
-			T θ0;
-			int cnt = 0;
-			do {
-				θ0 = θ;
-				θ += legendre(l, cos(θ)) / assoc_legendre(l, 1, cos(θ));
-				cnt++;
-				if (cnt > 32) {
-					printf("Failed to converge - %lli\n", ulpDistance(cos(θ0), cos(θ)));
-					abort();
-				}
-			} while (abs(ulpDistance(cos(θ0), cos(θ))) > 64);
-			T const x = cos(θ);
-			T const w = two / sqr(assoc_legendre(l, 1, cos(θ)));
-			results.push_back(QuadraturePoint<T>( { T(x), T(w) }));
+//	static unordered_map<int, std::shared_ptr<vector<QuadraturePoint<T>>>> memory;
+//	if (memory.find(l) == memory.end()) {
+	vector<QuadraturePoint<T>> results;
+	results.reserve(l);
+	for (int pointIndex = 0; pointIndex < l; ++pointIndex) {
+		if ((l % 2 == 0) && (2 * pointIndex + 1 == l)) {
+			T const w = two / sqr(assoc_legendre(l, 1, one));
+			results.push_back(QuadraturePoint<T>( { zero, T(w) }));
+			continue;
 		}
-		memory[l] = std::make_shared<std::vector<QuadraturePoint<T>>>(std::move(results));
+		T θ = π * (T(pointIndex) + half) / T(l);
+		T θ0;
+		int cnt = 0;
+		do {
+			θ0 = θ;
+			θ += legendre(l, cos(θ)) / assoc_legendre(l, 1, cos(θ));
+			cnt++;
+			if (cnt > 320) {
+				printf("Failed to converge\n");
+				abort();
+			}
+		} while (abs(cos(θ0) - cos(θ)) > T(64) * std::numeric_limits<T>::epsilon());
+		T const x = cos(θ);
+		T const w = two / sqr(assoc_legendre(l, 1, cos(θ)));
+		results.push_back(QuadraturePoint<T>( { T(x), T(w) }));
 	}
-	return *(memory[l]);
+	return results;
+//		memory[l] = std::make_shared<std::vector<QuadraturePoint<T>>>(std::move(results));
+//	}
+//	return *(memory[l]);
 }
 
 template<typename T>
@@ -74,13 +75,13 @@ std::vector<QuadraturePoint<T>> const& gaussLaguerreQuadraturePoints(int n) {
 		for (int m = 2;; m *= 2) {
 			xbnd.resize(1);
 			xbnd[0] = zero;
-			double dx = (four * n + two) / (n * m);
-			double x = zero;
-			double Ln = laguerre(n, zero);
+			T dx = (four * T(n) + two) / T(n * m);
+			T x = zero;
+			T Ln = laguerre(n, zero);
 			int count = 0;
 			for (int k = 0; k < m * n; k++) {
 				x += dx;
-				double Lnp1 = laguerre(n, x);
+				T Lnp1 = laguerre(n, x);
 				if (copysign(one, Lnp1) * copysign(one, Ln) <= zero) {
 					count++;
 					xbnd.push_back(x);
@@ -102,8 +103,8 @@ std::vector<QuadraturePoint<T>> const& gaussLaguerreQuadraturePoints(int n) {
 				} else {
 					xmin = x;
 				}
-			} while (xmax > nextafter(xmin, xmax));
-			w = x / (sqr((n + 1) * laguerre(n + 1, x)));
+			} while (xmax > nexttoward(xmin, xmax));
+			w = x / (sqr(T(n + 1) * laguerre(n + 1, x)));
 //			if(n==4) printf( "%e %e\n", x,w);
 			results.push_back( { x, w });
 		}

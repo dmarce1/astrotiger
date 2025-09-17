@@ -189,9 +189,10 @@ struct FDTest {
 
 
 void polytest();
+void radiation_test();
 
 int hpx_main(int argc, char *argv[]) {
-	polytest();
+	radiation_test();
 //	for (Real ρ = 1e10; ρ < Real(1e20); ρ *= Real(10)) {
 //		printf( " ρ          T          n          ε          p\n");
 //		for (Real T = 10; T < Real(1e13); T *= Real(10)) {

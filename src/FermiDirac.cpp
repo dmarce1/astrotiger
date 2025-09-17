@@ -1,3 +1,5 @@
+#include "MultiPrecision.hpp"
+#include "MultiIndex.hpp"
 #include "DifferentialPolynomial.hpp"
 #include "AutoDiff.hpp"
 #include "PadeApproximant.hpp"
@@ -28,17 +30,6 @@ constexpr int stirling1(int n, int k) {
 		return n == 0;
 	}
 	int const sum = k * stirling1(n - 1, k) + stirling1(n - 1, k - 1);
-	return sum;
-}
-
-constexpr int stirling2(int n, int k) {
-	if ((n == 0) || (k == 0) || (k > n)) {
-		return 0;
-	}
-	if (n == k) {
-		return 1;
-	}
-	int const sum = k * stirling2(n - 1, k) + stirling2(n - 1, k - 1);
 	return sum;
 }
 
@@ -501,75 +492,6 @@ std::complex<double> iBeta(double x, HalfInteger<int> a, HalfInteger<int> b) {
 //	return (Ia + Ib + Ic + Id);
 //}
 
-template<int O>
-auto FD(HalfInteger<int> const &k, double η, double β, double α) {
-//	Jet<double, O, 1, 2> η = Jet<double, O, 1, 2>::generate(0) * η_;
-//	Jet<double, O,1,  2> β = Jet<double, O, 1, 2>::generate(1) * β_;
-	using std::pow;
-	using std::sqrt;
-	constexpr int qOrder = 24;
-	static auto const gaussLaguerre = gaussLaguerreQuadraturePoints<double>(qOrder);
-	static auto const gaussLegendre = gaussLegendreQuadraturePoints<double>(qOrder);
-	constexpr double D = 3.3609;
-	constexpr double σ = 9.1186e-2;
-	constexpr double a1 = 6.7774;
-	constexpr double b1 = 1.1418;
-	constexpr double c1 = 2.9826;
-	constexpr double a2 = 3.7601;
-	constexpr double b2 = 9.3719e-2;
-	constexpr double c2 = 2.1063e-2;
-	constexpr double d2 = 3.1084e1;
-	constexpr double e2 = 1.0056;
-	constexpr double a3 = 7.5669;
-	constexpr double b3 = 1.1695;
-	constexpr double c3 = 7.5416e-1;
-	constexpr double d3 = 6.6558;
-	constexpr double e3 = -1.2819e-1;
-//	auto const Exp = [](double x) {
-//		constexpr double zero = 0.0;
-//		constexpr double χmax = std::log(std::numeric_limits<double>::max());
-//		if (x > χmax) {
-//			return zero;
-//		} else if (x < -χmax) {
-//			return zero;
-//		} else {
-//			return std::exp(x);
-//		}
-//	};
-//	double const ξ = log1p(exp(σ * (η_ - D))) / σ;
-//	double const Xa = ((a1 + b1 * ξ + c1 * ξ * ξ) / (1.0 + c1 * ξ));
-//	double const Xb = ((a2 + b2 * ξ + c2 * d2 * ξ * ξ) / (1.0 + e2 * ξ + c2 * ξ * ξ));
-//	double const Xc = ((a3 + b3 * ξ + c3 * d3 * ξ * ξ) / (1.0 + e3 * ξ + c3 * ξ * ξ));
-//	double const S1 = Xa - Xb;
-//	double const S2 = Xa;
-//	double const S3 = Xa + Xc;
-//	double const ha = sqrt(S1);
-//	double const hb = (S2 - S1);
-//	double const hc = (S3 - S2);
-//	Jet<double, O, 1,2> Ia, Ib, Ic, Id;
-//	Ia = 0.0;
-//	Ib = 0.0;
-//	Ic = 0.0;
-//	Id = 0.0;
-	for (int q = 0; q < qOrder; q++) {
-//		double const x = gaussLegendre[q].position;
-//		double const wp = 0.5 * gaussLegendre[q].weight;
-//		double const xd = (S3 + gaussLaguerre[q].position);
-//		double const wl = gaussLaguerre[q].weight;
-//		double const τ = 0.5 * (x + 1.0);
-//		double const xa = τ * ha;
-//		double const xb = (S1 + τ * hb);
-//		double const xc = (S2 + τ * hc);
-//		double const x2 = xa * xa;
-//		Ia += wp * pow(x2, k) * (1 + α * β * x2) * sqrt(1 + 0.5 * β * x2) / (1 + exp(x2 - η)) * ha * 2.0 * xa;
-//		Ib += wp * pow(xb, k) * (1 + α * β * xb) * sqrt(1 + 0.5 * β * xb) / (1 + exp(xb - η)) * hb;
-//		Ic += wp * pow(xc, k) * (1 + α * β * xc) * sqrt(1 + 0.5 * β * xc) / (1 + exp(xc - η)) * hc;
-//		Id += wl * pow(xd, k) * (1 + α * β * xd) * sqrt(1 + 0.5 * β * xd) / (1 + exp(xd - η)) * exp(xd - S3);
-	}
-//	printf("%e %e %e %e\n", double(Ia), double(Ib), double(Ic), double(Id));
-//	return (Ia + Ib + Ic + Id);
-}
-
 #include <vector>
 #include <cmath>
 #include <stdexcept>
@@ -828,16 +750,211 @@ struct BellPolynomial {
 	std::vector<Multidices<D1>> J;
 };
 
+template<typename Type, int O>
+auto FD(HalfInteger<int> const &k, Type η_, Type β_) {
+	using AutoType = AutoDiff<Type, O, 2>;
+	AutoType η(η_, 0);
+	AutoType β(β_, 1);
+	constexpr int qOrder = 24;
+	static auto const gaussLaguerre = gaussLaguerreQuadraturePoints<Type>(qOrder);
+	static auto const gaussLegendre = gaussLegendreQuadraturePoints<Type>(qOrder);
+	Type const one(1);
+	Type const two(2);
+	Type const half = one / two;
+	Type const D = 3.3609;
+	Type const σ = 9.1186e-2;
+	Type const a1 = 6.7774;
+	Type const b1 = 1.1418;
+	Type const c1 = 2.9826;
+	Type const a2 = 3.7601;
+	Type const b2 = 9.3719e-2;
+	Type const c2 = 2.1063e-2;
+	Type const d2 = 3.1084e1;
+	Type const e2 = 1.0056;
+	Type const a3 = 7.5669;
+	Type const b3 = 1.1695;
+	Type const c3 = 7.5416e-1;
+	Type const d3 = 6.6558;
+	Type const e3 = -1.2819e-1;
+	auto const Exp = [](AutoType x) {
+		Type const χmax = std::log(std::numeric_limits<Type>::max());
+		Type const x0 = x[0];
+		if (x0 > χmax) {
+			return AutoType { };
+		} else if (x0 < -χmax) {
+			return AutoType { };
+		} else {
+			return exp(x);
+		}
+	};
+	Type const ξ = log1p(exp(σ * (Type(η) - D))) / σ;
+	Type const Xa = ((a1 + b1 * ξ + c1 * ξ * ξ) / (one + c1 * ξ));
+	Type const Xb = ((a2 + b2 * ξ + c2 * d2 * ξ * ξ) / (one + e2 * ξ + c2 * ξ * ξ));
+	Type const Xc = ((a3 + b3 * ξ + c3 * d3 * ξ * ξ) / (one + e3 * ξ + c3 * ξ * ξ));
+	Type const S1 = Xa - Xb;
+	Type const S2 = Xa;
+	Type const S3 = Xa + Xc;
+	Type const ha = sqrt(S1);
+	Type const hb = (S2 - S1);
+	Type const hc = (S3 - S2);
+	AutoType Ia, Ib, Ic, Id;
+	for (int q = 0; q < qOrder; q++) {
+		Type const x = gaussLegendre[q].position;
+		Type const wp = 0.5 * gaussLegendre[q].weight;
+		Type const xd = (S3 + gaussLaguerre[q].position);
+		Type const wl = gaussLaguerre[q].weight;
+		Type const τ = half * (x + one);
+		Type const xa = τ * ha;
+		Type const xb = (S1 + τ * hb);
+		Type const xc = (S2 + τ * hc);
+		Type const x2 = xa * xa;
+		Ia += wp * pow(x2, k) * sqrt(one + half * β * x2) / (one + Exp(x2 - η)) * ha * two * xa;
+		Ib += wp * pow(xb, k) * sqrt(one + half * β * xb) / (one + Exp(xb - η)) * hb;
+		Ic += wp * pow(xc, k) * sqrt(one + half * β * xc) / (one + Exp(xc - η)) * hc;
+		Id += wl * pow(xd, k) * sqrt(one + half * β * xd) / (one + Exp(xd - η)) * Exp(xd - S3);
+	}
+	return /*pow(β, k + 1) * */Ia + Ib + Ic + Id;
+}
+
+#include "Rational.hpp"
+
+
+template<typename Type, int order, int dimCount>
+struct Interpolator {
+	Interpolator() {
+		constexpr int N = ipow(2 * order, dimCount);
+		constexpr int M = ipow(2, dimCount);
+		typedef MultiIndex<M, dimCount> Index2;
+		typedef MultiIndex<order, dimCount> IndexO;
+		typedef MultiIndex<2 * order, dimCount> Index2O;
+		auto const F = [](Index2 x, IndexO n, Index2O k) {
+			int xProduct = 1;
+			int num = 1;
+			int den = 1;
+			for(int d = 0; d < dimCount; d++) {
+				xProduct *= (x[d] || (n[d] == k[d]));
+				if(n[d] < k[d]) {
+					num = 0;
+					den = 1;
+					break;
+				}
+				num *= factorial(n[d]);
+				den *= factorial(n[d] - k[d]);
+			}
+			return xProduct * num / den;
+		};
+		constexpr int size = ipow(2, order * dimCount);
+		SquareMatrix<Rational, N> A;
+		for(auto x = Index2::begin(); x != Index2::end(); x++) {
+			for(auto n = IndexO::begin(); n != IndexO::end(); n++) {
+				for(auto m = Index2O::begin(); m != Index2O::end(); m++) {
+					A(M * int(n) + int(x), int(m)) = F(x, n, m);
+				}
+			}
+		}
+		matrixInverseAndDeterminant(A);
+		for(int i = 0; i < size; i++) {
+			for(int j = 0; j < size; j++) {
+				transform_(i, j) = Type(A(i, j));
+			}
+		}
+	}
+private:
+	static constexpr int size = ipow(2, order * dimCount);
+	static SquareMatrix<Type, size> transform_;
+	std::array<Type, size> coefficients_;
+};
+
 void polytest() {
-	constexpr int N = 6;
-	constexpr int D = 1;
-	AutoDiff<double, N, D> x, y, z;
-	x = AutoDiff<double, N, D>::generateVariable(0.5);
-	y = exp(x * x);
-	z = exp(x);
-	std::cout << x;
-	std::cout << y;
-	std::cout << z;
+	auto const F = [](int x, int y, int n, int m, int k, int l) {
+		x = (x || (n == k));
+		y = (y || (m == l));
+		if ((m >= l) && (n >= k)) {
+			return x * y * Rational(factorial(n) * factorial(m), factorial(n - k) * factorial(m - l));
+		} else {
+			return Rational(0, 1);
+		}
+	};
+	constexpr int O = 3;
+	constexpr int D = 2;
+	constexpr int N = ipow(2 * O, D);
+	SquareMatrix<Rational, N> A;
+	for (int x = 0; x <= 1; x++) {
+		for (int y = 0; y <= 1; y++) {
+			for (int k = 0; k < O; k++) {
+				for (int l = 0; l < O; l++) {
+					int const i = 4 * (O * k + l) + 2 * y + x;
+					for (int n = 0; n < 2 * O; n++) {
+						for (int m = 0; m < 2 * O; m++) {
+							int const j = 2 * O * n + m;
+							A(i, j) = F(x, y, n, m, k, l);
+						}
+					}
+				}
+			}
+		}
+	}
+	matrixInverseAndDeterminant(A);
+	constexpr int Nβ = 4;
+	constexpr int Nη = 4;
+	std::array<std::array<std::array<double, N>, Nη>, Nβ> coefficients;
+	double β_min = 0.0;
+	double β_max = +1.0;
+	double η_min = -1.0;
+	double η_max = +1.0;
+	double dβ = (β_max - β_min) / (Nβ - 1);
+	double dη = (η_max - η_min) / (Nη - 1);
+	for (int k = 0; k < Nβ; k++) {
+		double β0 = β_min + (k + 0) * dβ;
+		double β1 = β_min + (k + 1) * dβ;
+		for (int n = 0; n < Nη; n++) {
+			double η0 = η_min + (n + 0) * dη;
+			double η1 = η_min + (n + 1) * dη;
+			auto fη0β0 = FD<double, 2 * O>(3 * half, η0, β0);
+			auto fη0β1 = FD<double, 2 * O>(3 * half, η0, β1);
+			auto fη1β0 = FD<double, 2 * O>(3 * half, η1, β0);
+			auto fη1β1 = FD<double, 2 * O>(3 * half, η1, β1);
+			Multidices<2> I;
+			std::array<double, N> B;
+			for (I[0] = 0; I[0] != O; I[0]++) {
+				for (I[1] = 0; I[1] != O; I[1]++) {
+					int j = 4 * (O * I[0] + I[1]);
+					B[j + 0] = fη0β0[I] / factorial(I);
+					B[j + 1] = fη1β0[I] / factorial(I);
+					B[j + 2] = fη0β1[I] / factorial(I);
+					B[j + 3] = fη1β1[I] / factorial(I);
+				}
+			}
+			coefficients[n][k] = A * B;
+		}
+	}
+	auto fdFunction = [O, coefficients, β_min, β_max, η_min, η_max](double β, double η) {
+		constexpr int Nβ = coefficients.size();
+		constexpr int Nη = coefficients[0].size();
+		double sum = 0.0;
+		int const k = (β - β_min) * Nβ / (β_max - β_min);
+		int const l = (η - η_min) * Nη / (η_max - η_min);
+		for (int n = 0; n < 2 * O; n++) {
+			for (int m = 0; m < 2 * O; m++) {
+				int j = 2 * O * n + m;
+				auto const co = coefficients[k][l][j];
+				sum += co * ipow(η, n) * ipow(β, m);
+			}
+		}
+		return sum;
+	};
+
+//	using Real = MultiPrecision<256>;
+//	AutoDiff<double, 6, 2> x1(1.0, 0);
+//	AutoDiff<double, 6, 2> x2(1.0, 1);
+//	auto y = exp(x1 * x2 *sqrt(x2));
+//	auto z = y.generateFunction();
+//	for (double y1 = 0.5; y1 < 1.5; y1 *= 1.1) {
+//		for (double y2 = 0.5; y2 < 1.5; y2 *= 1.1) {
+//			printf( "%e %e %e %e %e\n", y1, y2, z(y2-1,y1-1), exp(y1*y2 *sqrt(y2) ), z(y2-1,y1-1)-exp(y1*y2 *sqrt(y2)));
+//		}
+//	}
+//	std::cout << fd;
 //	DerivativeIndex<N> a;
 //	DifferentialPolynomial<double, N, D> test;
 //	test.show();
