@@ -11,8 +11,14 @@
 #include <type_traits>
 #include "ContainerArithmetic.hpp"
 
-template<typename Type, int RowCount, int ColumnCount>
+template<typename Type, int R1, int C1>
 struct Matrix;
+
+template<typename, int>
+struct ColumnVector;
+
+template<typename, int>
+struct RowVector;
 
 template<typename Type, int Ndim>
 using SquareMatrix = Matrix<Type, Ndim, Ndim>;
@@ -27,6 +33,16 @@ struct IsMatrix {
 
 template<typename T, int Nr, int Nc>
 struct IsMatrix<Matrix<T, Nr, Nc>> {
+	static constexpr bool value = true;
+};
+
+template<typename T, int N>
+struct IsMatrix<ColumnVector<T, N>> {
+	static constexpr bool value = true;
+};
+
+template<typename T, int N>
+struct IsMatrix<RowVector<T, N>> {
 	static constexpr bool value = true;
 };
 
@@ -50,38 +66,38 @@ struct IsSquareMatrix<SquareMatrix<T, N>> {
 	static constexpr bool value = true;
 };
 
-template<typename Type, int RowCount, int ColumnCount>
+template<typename T1, int R1, int C1>
 struct Matrix {
 	static constexpr std::size_t size() {
-		return ColumnCount * RowCount;
+		return C1 * R1;
 	}
 	static constexpr std::size_t rowCount() {
-		return RowCount;
+		return R1;
 	}
 	static constexpr std::size_t columnCount() {
-		return ColumnCount;
+		return C1;
 	}
 
 	constexpr Matrix() {
 	}
 
-	constexpr Matrix(std::array<std::array<Type, ColumnCount>, RowCount> const &initList) :
+	constexpr Matrix(std::array<std::array<T1, C1>, R1> const &initList) :
 			values { } {
-		for (int n = 0; n < RowCount; n++) {
-			for (int m = 0; m < ColumnCount; m++) {
+		for (int n = 0; n < R1; n++) {
+			for (int m = 0; m < C1; m++) {
 				(*this)(n, m) = initList[n][m];
 			}
 		}
 	}
 
-	constexpr Matrix(std::initializer_list<Type> initList) {
+	constexpr Matrix(std::initializer_list<T1> initList) {
 		int i = 0;
 		for (auto const &v : initList) {
 			values[i++] = v;
 		}
 	}
 
-	constexpr Matrix(std::initializer_list<std::initializer_list<Type>> init) {
+	constexpr Matrix(std::initializer_list<std::initializer_list<T1>> init) {
 		int i = 0;
 		for (auto const &row : init) {
 			for (auto const &val : row) {
@@ -90,7 +106,7 @@ struct Matrix {
 		}
 	}
 
-	constexpr Matrix(Type const &init) :
+	constexpr Matrix(T1 const &init) :
 			values { } {
 		for (std::size_t i = 0; i < size(); i++) {
 			values[i] = init;
@@ -113,11 +129,11 @@ struct Matrix {
 		return *this;
 	}
 
-	constexpr Type& operator()(int n, int m) {
-		return values[n * ColumnCount + m];
+	constexpr T1& operator()(int n, int m) {
+		return values[n * C1 + m];
 	}
-	constexpr Type const& operator()(int n, int m) const {
-		return values[n * ColumnCount + m];
+	constexpr T1 const& operator()(int n, int m) const {
+		return values[n * C1 + m];
 	}
 
 	constexpr Matrix& operator+=(Matrix const &A) {
@@ -128,25 +144,27 @@ struct Matrix {
 		*this = *this - A;
 		return *this;
 	}
-	constexpr Matrix& operator*=(Type const &a) {
+	template<typename T2, std::enable_if<std::is_same<T1, decltype(T1() * T2())>::value, int> = 0>
+	constexpr Matrix& operator*=(T2 const &a) {
 		*this = *this * a;
 		return *this;
 	}
-	constexpr Matrix& operator/=(Type const &a) {
+	template<typename T2, std::enable_if<std::is_same<T1, decltype(T1() / T2())>::value, int> = 0>
+	constexpr Matrix& operator/=(T2 const &a) {
 		*this = *this / a;
 		return *this;
 	}
-
-	constexpr Matrix operator*(Type const &a) const {
-		Matrix B;
+	template<typename T2, typename T3 = decltype(T1() * T2()), std::enable_if_t<!IsMatrix<T2>::value, int> = 0>
+	constexpr Matrix<T3, R1, C1> operator*(T2 const &a) const {
+		Matrix<T3, R1, C1> B;
 		for (std::size_t k = 0; k < size(); k++) {
 			B.values[k] = a * values[k];
 		}
 		return B;
 	}
-
-	constexpr Matrix operator/(Type const &a) const {
-		Matrix B;
+	template<typename T2, typename T3 = decltype(T1() / T2())>
+	constexpr Matrix<T3, R1, C1> operator/(T2 const &a) const {
+		Matrix<T3, R1, C1> B;
 		for (std::size_t k = 0; k < size(); k++) {
 			B.values[k] = values[k] / a;
 		}
@@ -164,16 +182,18 @@ struct Matrix {
 		return B;
 	}
 
-	constexpr Matrix operator+(Matrix const &A) const {
-		Matrix B;
+	template<typename T2, typename T3 = decltype(T1() + T2())>
+	constexpr auto operator+(Matrix<T2, R1, C1> const &A) const {
+		Matrix<T3, R1, C1> B;
 		for (std::size_t k = 0; k < size(); k++) {
 			B.values[k] = values[k] + A.values[k];
 		}
 		return B;
 	}
 
-	constexpr Matrix operator-(Matrix const &A) const {
-		Matrix B;
+	template<typename T2, typename T3 = decltype(T1() + T2())>
+	constexpr auto operator-(Matrix<T2, R1, C1> const &A) const {
+		Matrix<T3, R1, C1> B;
 		for (std::size_t k = 0; k < size(); k++) {
 			B.values[k] = values[k] - A.values[k];
 		}
@@ -187,11 +207,12 @@ struct Matrix {
 		return !(*this == A);
 	}
 
-	static constexpr std::enable_if_t<RowCount == ColumnCount, Matrix> identity() {
+	static constexpr Matrix identity() {
+		static_assert(R1 == C1, "Identity called for non-square matrix");
 		Matrix I;
-		for (int n = 0; n < RowCount; n++) {
-			for (int m = 0; m < ColumnCount; m++) {
-				I(n, m) = Type(n == m);
+		for (int n = 0; n < R1; n++) {
+			for (int m = 0; m < C1; m++) {
+				I(n, m) = T1(n == m);
 			}
 		}
 		return I;
@@ -199,14 +220,14 @@ struct Matrix {
 
 	static constexpr Matrix zero() {
 		Matrix Z;
-		std::fill(Z.begin(), Z.end(), Type(0));
+		std::fill(Z.begin(), Z.end(), T1(0));
 		return Z;
 	}
 
-	friend Matrix operator*(Type const &a, Matrix const &B) {
+	template<typename T2, typename T3 = decltype(T1() * T2()), std::enable_if_t<!IsMatrix<T2>::value, int> = 0>
+	friend Matrix<T3, R1, C1> operator*(T2 const &a, Matrix const &B) {
 		return B * a;
 	}
-
 	constexpr auto begin() {
 		return values.begin();
 	}
@@ -219,278 +240,98 @@ struct Matrix {
 	constexpr auto end() const {
 		return values.end();
 	}
-
+	template<typename T2>
+	operator Matrix<T2, R1, C1>() const {
+		Matrix<T1, R1, C1> const &A = *this;
+		Matrix<T2, R1, C1> B;
+		for (int n = 0; n < R1; n++) {
+			for (int m = 0; m < C1; m++) {
+				B(n, m) = T2(A(n, m));
+			}
+		}
+		return B;
+	}
+	template<typename, int, int>
+	friend class Matrix;
 private:
-	std::array<Type, size()> values;
+	std::array<T1, size()> values;
 };
 
-template<typename Type, int RowCount>
-struct Matrix<Type, RowCount, 1> {
-	static constexpr std::size_t size() {
-		return RowCount;
+template<typename T1, int N>
+struct ColumnVector: public Matrix<T1, N, 1> {
+	using base_type = Matrix<T1, N, 1>;
+	ColumnVector() = default;
+	ColumnVector(ColumnVector const &other) = default;
+	ColumnVector(ColumnVector &&other) = default;
+	ColumnVector(T1 const &other) :
+			base_type(other) {
 	}
-	static constexpr std::size_t rowCount() {
-		return RowCount;
+	ColumnVector(std::initializer_list<T1> const &list) :
+			base_type(list) {
 	}
-	static constexpr std::size_t columnCount() {
-		return 1;
+	template<typename T2>
+	ColumnVector(Matrix<T2, N, 1> const &other) :
+			base_type(other) {
 	}
-
-	constexpr Matrix() :
-			values { } {
+	template<typename T2>
+	ColumnVector(Matrix<T2, N, 1> &&other) :
+			base_type(base_type(other)) {
 	}
-	constexpr Matrix(Type const &init) :
-			values { } {
-		std::fill(begin(), end(), init);
-	}
-	constexpr Matrix(std::initializer_list<Type> initList) :
-			values { } {
-		std::copy(initList.begin(), initList.end(), begin());
-	}
-	constexpr Matrix(Matrix const &other) :
-			values(other.values) {
-	}
-	constexpr Matrix(Matrix &&other) :
-			values(std::move(other.values)) {
-	}
-
-	constexpr Matrix& operator=(Matrix const &other) {
-		values = other.values;
+	ColumnVector& operator=(ColumnVector const &other) = default;
+	ColumnVector& operator=(ColumnVector &&other) = default;
+	ColumnVector& operator=(base_type const &other) {
+		base_type::operator=(other);
 		return *this;
 	}
-	constexpr Matrix& operator=(Matrix &&other) {
-		values = std::move(other.values);
+	ColumnVector& operator=(base_type &&other) {
+		base_type::operator=(std::move(other));
 		return *this;
 	}
-
-	constexpr Type& operator()(int n, int m) {
-		assert(m == 0);
-		return (*this)(n);
-	}
-	constexpr Type const& operator()(int n, int m) const {
-		assert(m == 0);
-		return (*this)(n);
-	}
-
-	constexpr Type& operator()(int n) {
-		return values[n];
-	}
-	constexpr Type const& operator()(int n) const {
-		return values[n];
-	}
-
-	constexpr Matrix& operator+=(Matrix const &A) {
-		return *this = *this + A;
-	}
-	constexpr Matrix& operator-=(Matrix const &A) {
-		return *this = *this - A;
-	}
-	constexpr Matrix& operator*=(Type const &a) {
-		return *this = *this * a;
-	}
-	constexpr Matrix& operator/=(Type const &a) {
-		return *this = *this / a;
-	}
-
-	constexpr Matrix operator*(Type const &a) const {
-		Matrix B;
-		for (std::size_t k = 0; k < size(); k++)
-			B.values[k] = a * values[k];
-		return B;
-	}
-	constexpr Matrix operator/(Type const &a) const {
-		Matrix B;
-		typename ElementType<Type>::type const one(1);
-		Type const aInv = one / a;
-		for (std::size_t k = 0; k < size(); k++)
-			B.values[k] = aInv * values[k];
-		return B;
-	}
-
-	constexpr Matrix operator+() const {
+	ColumnVector& operator=(std::initializer_list<T1> const &list) {
+		*this = ColumnVector(list);
 		return *this;
 	}
-	constexpr Matrix operator-() const {
-		Matrix B;
-		for (std::size_t k = 0; k < size(); k++)
-			B.values[k] = -values[k];
+	T1 operator[](int i) const {
+		return base_type::operator()(i, 0);
+	}
+	T1& operator[](int i) {
+		return base_type::operator()(i, 0);
+	}
+	template<typename T2>
+	operator ColumnVector<T2, N>() const {
+		ColumnVector<T1, N> const &A = *this;
+		ColumnVector<T2, N> B;
+		for (int n = 0; n < N; n++) {
+			B[n] = A[n];
+		}
 		return B;
 	}
-	constexpr Matrix operator+(Matrix const &A) const {
-		Matrix B;
-		for (std::size_t k = 0; k < size(); k++)
-			B.values[k] = values[k] + A.values[k];
-		return B;
-	}
-	constexpr Matrix operator-(Matrix const &A) const {
-		Matrix B;
-		for (std::size_t k = 0; k < size(); k++)
-			B.values[k] = values[k] - A.values[k];
-		return B;
-	}
-
-	constexpr bool operator==(Matrix const &A) const {
-		return values == A.values;
-	}
-	constexpr bool operator!=(Matrix const &A) const {
-		return !(*this == A);
-	}
-
-	static constexpr Matrix zero() {
-		Matrix Z;
-		std::fill(Z.begin(), Z.end(), Type(0));
-		return Z;
-	}
-
-	friend constexpr Matrix operator*(Type const &a, Matrix const &B) {
-		return B * a;
-	}
-
-	constexpr auto begin() {
-		return values.begin();
-	}
-	constexpr auto end() {
-		return values.end();
-	}
-	constexpr auto begin() const {
-		return values.begin();
-	}
-	constexpr auto end() const {
-		return values.end();
-	}
-
-	constexpr auto* data() {
-		return values.data();
-	}
-	constexpr auto const* data() const {
-		return values.data();
-	}
-
-private:
-	std::array<Type, size()> values;
 };
 
-template<typename Type>
-struct Matrix<Type, 1, 1> {
-	static constexpr std::size_t rowCount() {
-		return 1;
+template<typename T1, int N>
+struct RowVector: public Matrix<T1, N, 1> {
+	using base_type = Matrix<T1, 1, N>;
+	RowVector() = default;
+	RowVector(RowVector const &other) = default;
+	RowVector(base_type const &other) :
+			base_type(other) {
 	}
-	static constexpr std::size_t columnCount() {
-		return 1;
-	}
-
-	constexpr Matrix() = default;
-	constexpr Matrix(std::initializer_list<Type> const &init) :
-			value(*init.begin()) {
-	}
-	constexpr Matrix(Type const &v) :
-			value(v) {
-	}
-	constexpr Matrix(Matrix const &o) :
-			value(o.value) {
-	}
-	constexpr Matrix(Matrix &&o) :
-			value(std::move(o.value)) {
-	}
-
-	constexpr Matrix& operator=(Matrix const &o) {
-		value = o.value;
+	RowVector& operator=(RowVector const &other) = default;
+	RowVector& operator=(base_type const &other) {
+		base_type::operator=(other);
 		return *this;
 	}
-	constexpr Matrix& operator=(Matrix &&o) {
-		value = std::move(o.value);
-		return *this;
+	T1 operator[](int i) const {
+		return base_type::operator()(0, i);
 	}
-
-	static constexpr std::size_t size() {
-		return 1;
+	T1& operator[](int i) {
+		return base_type::operator()(0, i);
 	}
-
-	constexpr Type& operator()(int, int) {
-		return value;
-	}
-	constexpr Type const& operator()(int, int) const {
-		return value;
-	}
-
-	constexpr Type& operator()(int) {
-		return value;
-	}
-	constexpr Type const& operator()(int) const {
-		return value;
-	}
-
-	constexpr operator Type() const {
-		return value;
-	}
-	constexpr operator Type&() {
-		return value;
-	}
-
-	constexpr Matrix& operator+=(Matrix const &A) {
-		return *this = *this + A;
-	}
-	constexpr Matrix& operator-=(Matrix const &A) {
-		return *this = *this - A;
-	}
-	constexpr Matrix& operator*=(Type const &a) {
-		return *this = *this * a;
-	}
-	constexpr Matrix& operator/=(Type const &a) {
-		return *this = *this / a;
-	}
-
-	constexpr Matrix operator*(Type const &a) const {
-		Matrix B;
-		B.value = a * value;
-		return B;
-	}
-	constexpr Matrix operator/(Type const &a) const {
-		typename ElementType<Type>::type const one(1);
-		Matrix B;
-		B.value = (one / a) * value;
-		return B;
-	}
-
-	constexpr Matrix operator+() const {
-		return *this;
-	}
-	constexpr Matrix operator-() const {
-		return Matrix(-value);
-	}
-
-	constexpr Matrix operator+(Matrix const &A) const {
-		return Matrix(value + A.value);
-	}
-	constexpr Matrix operator-(Matrix const &A) const {
-		return Matrix(value - A.value);
-	}
-
-	constexpr bool operator==(Matrix const &A) const {
-		return value == A.value;
-	}
-	constexpr bool operator!=(Matrix const &A) const {
-		return !(*this == A);
-	}
-
-	friend constexpr Matrix operator*(Type const &a, Matrix const &B) {
-		return B * a;
-	}
-
-	static constexpr Matrix identity() {
-		return Matrix(Type(1));
-	}
-	static constexpr Matrix zero() {
-		return Matrix(Type(0));
-	}
-
-private:
-	Type value;
 };
 
-template<typename T, int N, int M, int L>
-Matrix<T, N, L> operator*(Matrix<T, N, M> const &A, Matrix<T, M, L> const &B) {
-	Matrix<T, N, L> C;
+template<typename T1, typename T2, int N, int M, int L, typename T3 = decltype(T1() * T2())>
+Matrix<T3, N, L> operator*(Matrix<T1, N, M> const &A, Matrix<T2, M, L> const &B) {
+	Matrix<T3, N, L> C;
 	for (int n = 0; n < N; n++) {
 		for (int l = 0; l < L; l++) {
 			C(n, l) = A(n, 0) * B(0, l);
@@ -502,32 +343,18 @@ Matrix<T, N, L> operator*(Matrix<T, N, M> const &A, Matrix<T, M, L> const &B) {
 	return C;
 }
 
-template<typename Type, int Ndim>
-SquareMatrix<Type, Ndim> operator*=(SquareMatrix<Type, Ndim> &A, SquareMatrix<Type, Ndim> const &C) {
-	SquareMatrix<Type, Ndim> B = A;
-	for (int i = 0; i < Ndim; i++) {
-		for (int j = 0; j < Ndim; j++) {
-			A(i, j) = B(i, 0) * C(0, j);
-			for (int k = 1; k < Ndim; k++) {
-				A(i, j) += B(i, k) * C(k, j);
-			}
-		}
-	}
-	return A;
-}
-
 template<typename Type, int N>
 Type matrixDiagonalDominance(SquareMatrix<Type, N> const &A) {
 	Type pSum = Type(0);
 	Type nSum = Type(0);
-	for(int n = 0; n < N; n++) {
+	for (int n = 0; n < N; n++) {
 		pSum += std::abs(A(n, n));
-		for(int m = 0; m < N; m++) {
+		for (int m = 0; m < N; m++) {
 			nSum += std::abs(A(n, m));
 		}
 	}
 	nSum -= pSum;
-	return (pSum - nSum)/(pSum + nSum);
+	return (pSum - nSum) / (pSum + nSum);
 }
 
 template<typename Type, int R, int C>
@@ -547,31 +374,6 @@ Matrix<Type, R, 1> matrixColumn(Matrix<Type, R, C> const &A, int c) {
 	}
 	return col;
 }
-
-template<typename Type, int R>
-struct ColumnVector : public Matrix<Type, R, 1> {
-	ColumnVector& operator=(ColumnVector const&) = default;
-	ColumnVector& operator=(Matrix<Type, R, 1> const& other) {
-		static_cast<Matrix<Type, R, 1>&>(*this) = other;
-		return *this;
-	}
-	Type operator[](int i) const {
-		return static_cast<Matrix<Type, R, 1> const&>(*this)(i, 0);
-	}
-	Type& operator[](int i) {
-		return static_cast<Matrix<Type, R, 1>&>(*this)(i, 0);
-	}
-};
-
-template<typename Type, int C>
-struct RowVector : public Matrix<Type, 1, C> {
-	Type operator[](int i) const {
-		return static_cast<Matrix<Type, 1, C> const&>(*this)(0, i);
-	}
-	Type& operator[](int i) {
-		return static_cast<Matrix<Type, 1, C>&>(*this)(0, i);
-	}
-};
 
 template<typename T, int N>
 T matrixInverseAndDeterminant(SquareMatrix<T, N> &A) {
@@ -930,25 +732,40 @@ std::string toMathematica(Matrix<Type, R, C> const &M) {
 	return out;
 }
 
-template<typename T, auto N, int M, typename Container>
-inline constexpr auto operator*(Matrix<T, N, M> const &A, Container const &B) {
-	Container C;
-	for (int n = 0; n < N; n++) {
-		C[n] = A(n, 0) * B[0];
-		for (int m = 1; m < M; m++) {
-			C[n] += A(n, m) * B[m];
-		}
-	}
-	return C;
+template<typename T1, typename T2, int N>
+auto vectorDotProduct(Matrix<T1, N, 1> const &v1, Matrix<T2, N, 1> const &v2) {
+	return (matrixTranspose(v1) * v2)(0, 0);
 }
 
-template<typename T, auto N, typename Container>
-inline constexpr auto operator*(DiagonalMatrix<T, N> const &A, Container const &B) {
-	Container C;
-	for (int row = 0; row < N; row++) {
-		int const &col = row;
-		C[row] = A(row, col) * B[col];
-	}
-	return C;
+template<typename T1, typename T2, int N, typename T3 = decltype(T1() * T2())>
+auto vectorDyadicProduct(Matrix<T1, N, 1> const &v1, Matrix<T2, N, 1> const &v2) {
+	return v1 * matrixTranspose(v2);
 }
+
+template<typename T1, int N>
+auto vectorMagnitude(Matrix<T1, N, 1> const &v) {
+	return sqrt(vectorDotProduct(v, v));
+}
+
+//template<typename T, auto N, int M, typename Container>
+//inline constexpr auto operator*(Matrix<T, N, M> const &A, Container const &B) {
+//	Container C;
+//	for (int n = 0; n < N; n++) {
+//		C[n] = A(n, 0) * B[0];
+//		for (int m = 1; m < M; m++) {
+//			C[n] += A(n, m) * B[m];
+//		}
+//	}
+//	return C;
+//}
+//
+//template<typename T, auto N, typename Container>
+//inline constexpr auto operator*(DiagonalMatrix<T, N> const &A, Container const &B) {
+//	Container C;
+//	for (int row = 0; row < N; row++) {
+//		int const &col = row;
+//		C[row] = A(row, col) * B[col];
+//	}
+//	return C;
+//}
 

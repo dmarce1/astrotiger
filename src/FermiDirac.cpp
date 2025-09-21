@@ -897,7 +897,7 @@ void polytest() {
 	matrixInverseAndDeterminant(A);
 	constexpr int Nβ = 4;
 	constexpr int Nη = 4;
-	std::array<std::array<std::array<double, N>, Nη>, Nβ> coefficients;
+	std::array<std::array<ColumnVector<double, N>, Nη>, Nβ> coefficients;
 	double β_min = 0.0;
 	double β_max = +1.0;
 	double η_min = -1.0;
@@ -915,7 +915,7 @@ void polytest() {
 			auto fη1β0 = FD<double, 2 * O>(3 * half, η1, β0);
 			auto fη1β1 = FD<double, 2 * O>(3 * half, η1, β1);
 			Multidices<2> I;
-			std::array<double, N> B;
+			ColumnVector<double, N> B;
 			for (I[0] = 0; I[0] != O; I[0]++) {
 				for (I[1] = 0; I[1] != O; I[1]++) {
 					int j = 4 * (O * I[0] + I[1]);

@@ -15,19 +15,6 @@ set(CUDA_FLAGS ${ALL_FLAGS} -Xcompiler -march=native)
 find_package(HDF5 REQUIRED COMPONENTS C CXX)
 find_package(HPX  REQUIRED)
 
-# ------------------------------------------------------------------------------
-# GOOGLE TEST SETUP
-# ------------------------------------------------------------------------------
-#include(FetchContent)
-#FetchContent_Declare(
-#  googletest
-#  URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
-#)
-#set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-#FetchContent_MakeAvailable(googletest)
-
-#enable_testing()
-#include(GoogleTest)
 
 # ------------------------------------------------------------------------------
 # SOURCES
@@ -44,29 +31,42 @@ set(astrotiger_src
 )
 
 set(astrotiger_header
-   include/AutoDifferentiation.hpp
-   include/BiconjugateGradient.hpp
-   include/Constants.hpp
-   include/ContainerArithmetic.hpp
-   include/Definitions.hpp
-   include/DoubleReal.hpp
-   include/EulerState.hpp
-   include/Face.hpp
-   include/Hdf5.hpp
-   include/HyperSubgrid.hpp
-   include/Indent.hpp
-   include/Integrate.hpp
-   include/Matrix.hpp
-   include/MultiIndex.hpp
-   include/Octogrid.hpp
-   include/Options.hpp
-   include/Polynomial.hpp
-   include/RadiationState.hpp
-   include/Range.hpp
-   include/Real.hpp
-   include/RungeKutta.hpp
-   include/Symbolic.hpp
+   include/AutoDiff.hpp		 
+   include/Constants.hpp		  
+   include/DifferentialPolynomial.hpp  
+   include/Face.hpp	       
+   include/Hdf5.hpp		 
+   include/Indent.hpp	 
+   include/Multidices.hpp    
+   include/Octogrid.hpp	   
+   include/Polynomial.hpp      
+   include/Range.hpp     
+   include/RungeKutta.hpp   
    include/TriIndex.hpp
+   include/BellPolynomial.hpp	
+   include/ContainerArithmetic.hpp  
+   include/DoubleReal.hpp	     
+   include/FermiDirac.hpp   
+   include/Hypergeometric.hpp 
+   include/Integrate.hpp  
+   include/MultiIndex.hpp    
+   include/Options.hpp	 
+   include/Quadrature.hpp    
+   include/Rational.hpp 
+   include/stateCodegen.hpp 
+   include/Units.hpp
+   include/BiconjugateGradient.hpp  
+   include/Definitions.hpp	  
+   include/EulerState.hpp	    
+   include/HalfInteger.hpp 
+   include/HyperSubgrid.hpp  
+   include/Matrix.hpp	 
+   include/MultiPrecision.hpp
+   include/PadeApproximant.hpp 
+   include/RadiationState.hpp 
+   include/Radiation.hpp 
+   include/Real.hpp    
+   include/Symbolic.hpp   
    include/Util.hpp
 )
 
@@ -179,4 +179,45 @@ target_compile_options(astrotiger PUBLIC
 target_link_options(astrotiger PUBLIC
   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -rdynamic>>
 )
+
+# ------------------------------------------------------------------------------
+# TESTS
+# ------------------------------------------------------------------------------
+# Add Catch2
+add_subdirectory(extern/Catch2)
+
+# Define test sources
+set(test_sources
+  include/Matrix.hpp 
+  include/Radiation.hpp 
+  include/Units.hpp 
+  tests/test_con2prim.cpp
+)
+
+add_executable(unit_tests ${test_sources})
+
+target_link_libraries(unit_tests
+  PRIVATE
+    Catch2::Catch2WithMain
+    HDF5::HDF5
+    stdc++_libbacktrace
+    quadmath
+    mpfr
+    gmp
+)
+
+target_include_directories(unit_tests
+  PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${GENERATED_SOURCE_DIR}
+)
+
+target_compile_options(unit_tests PUBLIC
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g>>
+  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3>>
+)
+
+include(CTest)
+include(Catch)
+catch_discover_tests(unit_tests)
 

@@ -1,3 +1,4 @@
+#include "Units.hpp"
 #include "BellPolynomial.hpp"
 #include "MultiPrecision.hpp"
 #include "DoubleReal.hpp"

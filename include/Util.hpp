@@ -256,9 +256,9 @@ inline constexpr int nonepow(int k) {
 	return 1 - 2 * (k & 1);
 }
 
-template<int D>
-inline constexpr std::array<int, D> zeroArray() {
-	std::array<int, D> u;
+template<int D, typename T = int>
+inline constexpr std::array<T, D> zeroArray() {
+	std::array<T, D> u;
 	u.fill(0);
 	return u;
 }
