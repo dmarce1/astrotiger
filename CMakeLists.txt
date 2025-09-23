@@ -35,6 +35,7 @@ set(astrotiger_header
    include/Constants.hpp		  
    include/DifferentialPolynomial.hpp  
    include/Face.hpp	       
+   include/FwdAutoDiff.hpp 
    include/Hdf5.hpp		 
    include/Indent.hpp	 
    include/Multidices.hpp    
@@ -188,13 +189,17 @@ add_subdirectory(extern/Catch2)
 
 # Define test sources
 set(test_sources
+  include/FwdAutoDiff.hpp 
   include/Matrix.hpp 
   include/Radiation.hpp 
   include/Units.hpp 
   tests/test_con2prim.cpp
+  tests/test_implicit_radiation.cpp
+  src/Radiation.cpp
+  src/Util.cpp
 )
 
-add_executable(unit_tests ${test_sources})
+add_executable(unit_tests ${test_sources} )
 
 target_link_libraries(unit_tests
   PRIVATE

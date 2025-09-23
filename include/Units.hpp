@@ -52,18 +52,6 @@ struct UnitQuotient {
 	using type = typename UnitProduct<UnitA, typename UnitInverse<UnitB>::type>::type;
 };
 
-
-struct ZeroQuantity {
-	constexpr ZeroQuantity() = default;
-	constexpr ZeroQuantity(double z) {};
-};
-static constexpr ZeroQuantity zeroQ{};
-
-struct OneQuantity {
-};
-static constexpr OneQuantity oneQ{};
-
-
 template<typename Units = Unit<0, 0, 0, 0>, typename Type = double, Type scale = 1.0>
 struct Quantity {
 	static constexpr Type a_ = scale;
@@ -72,12 +60,8 @@ struct Quantity {
 	template<Type otherScale>
 	using ScaledOther = Quantity<Units, Type, otherScale>;
 
-
-	constexpr Quantity(OneQuantity = oneQ) :
-			value_(Type(1)) {
-	}
-	constexpr Quantity(ZeroQuantity) :
-			value_(Type(0)) {
+	explicit constexpr Quantity(Type v = Type(0)) :
+			value_(v) {
 	}
 	template<Type otherScale>
 	constexpr Quantity(ScaledOther<otherScale> const &other) {
@@ -143,12 +127,12 @@ struct Quantity {
 	template<typename OtherUnits, Type otherScale>
 	constexpr auto operator/(Quantity<OtherUnits, Type, otherScale> const &other) const {
 		Quantity<typename UnitQuotient<Units, OtherUnits>::type, Type, ia_> quotient;
-		quotient.value_ = value_ * a_ *  other.ia_ / other.value_;
+		quotient.value_ = value_ * a_ * other.ia_ / other.value_;
 		return quotient;
 	}
 	constexpr auto operator/(Type const &other) const {
 		Quantity quotient;
-		quotient.value_ = value_  * a_ / other;
+		quotient.value_ = value_ * a_ / other;
 		return quotient;
 	}
 	template<Type otherScale>
@@ -180,7 +164,7 @@ struct Quantity {
 		return *this;
 	}
 	constexpr Quantity& operator=(Type value) {
-		static_assert(std::is_same<Unit<0,0,0,0>, Units>::value, "Units mismatch");
+		static_assert(std::is_same<Unit<0, 0, 0, 0>, Units>::value, "Units mismatch");
 		value_ = value;
 		return *this;
 	}
@@ -214,7 +198,7 @@ struct Quantity {
 	}
 	friend constexpr auto operator*(Type const &value, Quantity const &other) {
 		Quantity product;
-		product.value_ = value * other.value_ * other.a_ ;
+		product.value_ = value * other.value_ * other.a_;
 		return product;
 	}
 	constexpr Type value() const noexcept {
@@ -245,15 +229,38 @@ struct UnitSqrt;
 
 template<int L, int M, int T, int K>
 struct UnitSqrt<Unit<L, M, T, K>> {
-    using type = Unit<L / 2, M / 2, T / 2, K / 2>;
+	using type = Unit<L / 2, M / 2, T / 2, K / 2>;
+};
+
+template<typename U>
+struct UnitCbrt;
+
+template<int L, int M, int T, int K>
+struct UnitCbrt<Unit<L, M, T, K>> {
+	using type = Unit<L / 3, M / 3, T / 3, K / 3>;
 };
 
 template<typename Units, typename Type, Type Scale>
 constexpr auto sqrt(Quantity<Units, Type, Scale> const &q) {
-	Quantity<typename UnitSqrt<Units>::type, Type, sqrt(Scale)> units;
-	return Quantity<typename UnitSqrt<Units>::type, Type, sqrt(Scale)>(std::sqrt(q.value()) * units);
+	using std::sqrt;
+	constexpr auto returnScale = sqrt(Scale);
+	using QuantityType = Quantity<typename UnitSqrt<Units>::type, Type, returnScale>;
+	QuantityType units(1.0);
+	auto const sroot = sqrt(q.value());
+	QuantityType const rc = sroot * units;
+	return rc;
 }
 
+template<typename Units, typename Type, Type Scale>
+constexpr auto cbrt(Quantity<Units, Type, Scale> const &q) {
+	using std::cbrt;
+	constexpr auto returnScale = cbrt(Scale);
+	using QuantityType = Quantity<typename UnitCbrt<Units>::type, Type, returnScale>;
+	QuantityType units(1.0);
+	auto const sroot = cbrt(q.value());
+	QuantityType const rc = sroot * units;
+	return rc;
+}
 
 namespace cgs {
 using One = Quantity<Unit<0, 0, 0, 0>>;
@@ -263,11 +270,11 @@ using Seconds = Quantity<Unit<0, 0, 1, 0>>;
 using Kelvin = Quantity<Unit<0, 0, 0, 1>>;
 using Ergs = Quantity<Unit<2, 1, -2, 0>>;
 using ErgsPerCm3 = Quantity<Unit<-1, 1, -2, 0>>;
-static constexpr One one;
-static constexpr Centimeters cm;
-static constexpr Grams g;
-static constexpr Seconds s;
-static constexpr Kelvin K;
+static constexpr One one(1.0);
+static constexpr Centimeters cm(1.0);
+static constexpr Grams g(1.0);
+static constexpr Seconds s(1.0);
+static constexpr Kelvin K(1.0);
 static constexpr auto s2 = s * s;
 static constexpr auto s3 = s2 * s;
 static constexpr auto cm2 = cm * cm;

@@ -106,8 +106,7 @@ struct Matrix {
 		}
 	}
 
-	constexpr Matrix(T1 const &init) :
-			values { } {
+	constexpr Matrix(T1 const &init) {
 		for (std::size_t i = 0; i < size(); i++) {
 			values[i] = init;
 		}

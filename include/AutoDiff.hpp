@@ -225,9 +225,9 @@ public:
 	friend AutoDiff operator/(AutoDiff const &R, T1 const &A) {
 		return R * (T1(1) / A);
 	}
-	friend AutoDiff operator/(AutoDiff const &y, AutoDiff const &x) {
-		return y * (T1(1) / x);
-	}
+//	friend AutoDiff operator/(AutoDiff const &y, AutoDiff const &x) {
+//		return y * (T1(1) / x);
+//	}
 	friend AutoDiff pow(AutoDiff const &x, T1 const &k) {
 		return compose([k](T1 const &x, int n) {
 			return factorialPower(k, n) * pow(x, k - n);
