@@ -62,9 +62,7 @@ inline auto radiationTensor(RadConserved const &rad) {
 
 GasPrimitive GasConserved::toPrimitive(EquationOfState const &eos) const {
 	constexpr double toler = 2 * eps;
-	constexpr auto Θ_dust = DimensionlessType(1e-3);
-	constexpr auto Θ_sep = DimensionlessType(3e-3);
-	constexpr auto v_hot = VelocityType(1e-2);
+	constexpr auto ξo = EnergyDensityType(1e-3);
 	static int k = 0;
 	using std::abs;
 	using std::copysign;
@@ -79,15 +77,10 @@ GasPrimitive GasConserved::toPrimitive(EquationOfState const &eos) const {
 	GAS_PRIMITIVE_PROPERTIES(gasPrim);
 #pragma GCC diagnostic pop
 	auto const S2 = vectorDotProduct(S, S);
-
 	auto const S1 = sqrt(S2);
-	auto const γo = sqrt(1 + S2 / sqr(c * D));
-	auto const τo = D * c2 * (γo - 1);
-	auto const Δ = max(EnergyDensityType(0.0), τ - τo);
-	auto const Θ = Δ / (γo * c2 * D);
-	auto const v_max = c2 * S1 / (τ + c2 * D);
+	auto const ξi = τ - S2 / (2 * D);
 	auto const D2 = sqr(D);
-	if (Θ < Θ_dust) {
+	if (ξi < ξo) {
 		auto const β2 = S2 / (S2 + c2 * D2);
 		auto const iγ2 = 1.0 - β2;
 		auto const iγ = sqrt(iγ2);
@@ -96,7 +89,7 @@ GasPrimitive GasConserved::toPrimitive(EquationOfState const &eos) const {
 		v = S * iγ * iD;
 		ϰ = K * iD;
 		ε = eos.entropy2energy(ρ, ϰ);
-	} else if ((Θ > Θ_dust) && (v_max < v_hot)) {
+	} else if (abs(S1.value()) < tiny) {
 		auto const iρ = 1 / D;
 		ρ = D;
 		ε = τ * iρ;
