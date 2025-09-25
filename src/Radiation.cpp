@@ -40,7 +40,7 @@ inline auto velocity(GasPrimitive const &gasPrim) {
 	return γ * space2SpaceTime<VelocityType>(c, v);
 }
 
-inline TensorType<double> boostTensor(GasPrimitive const &gasPrim) {
+inline TensorType<double> boostTensor(GasPrimitive const &gasPrim, int sign = +1) {
 	TensorType<double> Λ;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
@@ -49,7 +49,7 @@ inline TensorType<double> boostTensor(GasPrimitive const &gasPrim) {
 	auto const β = ColumnVector<double, ndim>(v * ic);
 	double const γ = lorentzFactor(gasPrim);
 	auto const Λij = SquareMatrix<double, ndim>(δ + (sqr(γ) / (γ + 1)) * vectorDyadicProduct(β, β));
-	auto const Λoi = γ * β;
+	auto const Λoi = double(sign) * γ * β;
 	double const Λoo = γ;
 	return space2SpaceTime<double>(Λoo, Λoi, Λij);
 }
@@ -60,8 +60,11 @@ inline auto radiationTensor(RadConserved const &rad) {
 	return space2SpaceTime<typename std::remove_cvref<decltype(Er)>::type>(Er, F, P);
 }
 
-GasPrimitive gasCon2Prim(GasConserved const &con, Material const &mat) {
-	constexpr double toler = eps;
+GasPrimitive GasConserved::toPrimitive(EquationOfState const &eos) const {
+	constexpr double toler = 2 * eps;
+	constexpr auto Θ_dust = DimensionlessType(1e-3);
+	constexpr auto Θ_sep = DimensionlessType(3e-3);
+	constexpr auto v_hot = VelocityType(1e-2);
 	static int k = 0;
 	using std::abs;
 	using std::copysign;
@@ -72,38 +75,54 @@ GasPrimitive gasCon2Prim(GasConserved const &con, Material const &mat) {
 	GasPrimitive gasPrim;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-	GAS_CONSERVED_PROPERTIES(con);
-	MATERIAL_PROPERTIES(mat)
+	EOS_PROPERTIES(eos)
 	GAS_PRIMITIVE_PROPERTIES(gasPrim);
 #pragma GCC diagnostic pop
 	auto const S2 = vectorDotProduct(S, S);
+
 	auto const S1 = sqrt(S2);
-	if (S2.value() == 0.0) {
+	auto const γo = sqrt(1 + S2 / sqr(c * D));
+	auto const τo = D * c2 * (γo - 1);
+	auto const Δ = max(EnergyDensityType(0.0), τ - τo);
+	auto const Θ = Δ / (γo * c2 * D);
+	auto const v_max = c2 * S1 / (τ + c2 * D);
+	auto const D2 = sqr(D);
+	if (Θ < Θ_dust) {
+		auto const β2 = S2 / (S2 + c2 * D2);
+		auto const iγ2 = 1.0 - β2;
+		auto const iγ = sqrt(iγ2);
+		auto const iD = 1 / D;
+		ρ = D * iγ;
+		v = S * iγ * iD;
+		ϰ = K * iD;
+		ε = eos.entropy2energy(ρ, ϰ);
+	} else if ((Θ > Θ_dust) && (v_max < v_hot)) {
 		auto const iρ = 1 / D;
 		ρ = D;
 		ε = τ * iρ;
 		v = S * iρ;
+		ϰ = K * iρ;
 	} else {
 		FwdAutoDiff<EnergyDensityType> W;
-		FwdAutoDiff<MassDensityType> _ρ;
-		FwdAutoDiff<SpecificEnergyType> _ε;
-		auto const F = [Γ, D, τ, S1, S2, &W, &_ε, &_ρ](double β) {
+		FwdAutoDiff<MassDensityType> ρ_;
+		FwdAutoDiff<SpecificEnergyType> ε_;
+		FwdAutoDiff<DimensionlessType> ϰ_;
+		auto const F = [this, Γ, eos, S1, S2, &W, &ϰ_, &ε_, &ρ_](double β) {
 			using AutoType = FwdAutoDiff<double>;
 			constexpr FwdAutoDiff<double> one = 1.0;
-			auto const _β = AutoType::independentVariable(β);
-			auto const p = (FwdAutoDiff(c * S1) / _β - FwdAutoDiff(c2 * D + τ));
-			auto const β2 = sqr(_β);
+			auto const β_ = AutoType::independentVariable(β);
+			auto const p = (FwdAutoDiff(c * S1) / β_ - FwdAutoDiff(c2 * D + τ));
+			auto const β2 = sqr(β_);
 			W = FwdAutoDiff(c2 * D + τ) + p;
 			auto const γ = sqrt(one / (one - β2));
-			auto const γ2 = sqr(γ);
 			auto const iγ = one / γ;
+			ρ_ = FwdAutoDiff(D) * iγ;
+			auto const γ2 = sqr(γ);
 			auto const iγ2 = one / γ2;
-			_ρ = FwdAutoDiff(D) * iγ;
-			auto const iρ = one / _ρ;
+			auto const iρ = one / ρ_;
 			auto const h = W * iγ2 * iρ;
-			_ε = h - c2 - p * iρ;
-			auto const f = (p - FwdAutoDiff(Γ - 1.0) * _ρ * _ε) / W;
-			return f;
+			ε_ = h - c2 - p * iρ;
+			return (p - FwdAutoDiff(eos.pressure(ρ_, ε_))) / W;
 		};
 		double β = tanh(double(c * S1 / (τ + c2 * D)));
 		double βmin = β * eps;
@@ -113,6 +132,7 @@ GasPrimitive gasCon2Prim(GasConserved const &con, Material const &mat) {
 		auto fRoot = F(β);
 		double f = fRoot.D(0).value();
 		for (int j = 0; abs(f) > toler; j++, k++) {
+			printf("%e %i\n", abs(f), j);
 			double const dfdβ = fRoot.D(1).value();
 			double const d2fdβ2 = fRoot.D(2).value();
 			double const den = 2 * sqr(dfdβ) - f * d2fdβ2;
@@ -145,52 +165,40 @@ GasPrimitive gasCon2Prim(GasConserved const &con, Material const &mat) {
 			}
 			β += dβ;
 		}
-		ρ = MassDensityType(_ρ);
-		ε = SpecificEnergyType(_ε);
+		ρ = MassDensityType(ρ_);
 		v = c2 * S / EnergyDensityType(W);
+		ε = SpecificEnergyType(ε_);
+		ϰ = eos.energy2entropy(ρ, ε);
 	}
 	return gasPrim;
 }
 
-GasConserved gasPrim2Con(GasPrimitive const &gasPrim, Material const &mat) {
+void GasPrimitive::updateEntropy(EquationOfState const &eos) {
+	ϰ = eos.energy2entropy(ρ, ε);
+}
+
+GasConserved GasPrimitive::toConserved(EquationOfState const &eos) const {
 	GasConserved con;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-	GAS_PRIMITIVE_PROPERTIES(gasPrim);
-	MATERIAL_PROPERTIES(mat)
+	EOS_PROPERTIES(eos)
 	GAS_CONSERVED_PROPERTIES(con);
 #pragma GCC diagnostic pop
-	EquationOfState pEos(mat);
 	auto const v2 = vectorDotProduct(v, v);
 	auto const β2 = double(ic2 * v2);
 	auto const γ2 = 1 / (1 - β2);
 	auto const γ = sqrt(γ2);
 	auto const iρ = 1 / ρ;
-	auto const p = pEos(ρ, ε);
+	auto const p = eos.pressure(ρ, ε);
 	auto const h = c2 + ε + p * iρ;
 	S = ρ * γ2 * h * ic2 * v;
 	D = ρ * γ;
 	τ = ρ * γ2 * ε + (γ2 - 1) * p + (D * c2 * (γ - 1));
+	K = D * ϰ;
 	return con;
 }
-// μ (Γ - 1) ε = p = kB nₐ T
-template<typename Type>
-auto gasEnergy2temperature(Material const &mat, Type ε) {
-	MATERIAL_PROPERTIES(mat);
-	return ε * ((μ * (Γ - 1)) / (kB * nₐ));
-}
 
-FwdAutoDiff<TemperatureType> gasEnergy2temperature(Material const &mat, FwdAutoDiff<SpecificEnergyType> const &ε) {
-	MATERIAL_PROPERTIES(mat);
-	return ε * FwdAutoDiff(gasEnergy2temperature(mat, ε.D(0)) / ε.D(0));
-}
-
-template<typename Type>
-auto radiationEnergy2temperature(Type const &Er) {
-	return sqrt(sqrt(Er / aR));
-}
-
-void implicitEnergySolve(GasPrimitive &prim, RadConserved &rad, Opacity const &opac, Material const &mat, cgs::Seconds const &dt) {
+void implicitEnergySolve(GasPrimitive &prim, RadConserved &rad, Opacity const &opac, EquationOfState const &eos, cgs::Seconds const &dt) {
 	using std::abs;
 	using std::copysign;
 	using std::max;
@@ -198,7 +206,7 @@ void implicitEnergySolve(GasPrimitive &prim, RadConserved &rad, Opacity const &o
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 	RADIATION_CONSERVED_PROPERTIES(rad);
-	MATERIAL_PROPERTIES(mat);
+	EOS_PROPERTIES(eos);
 	OPACITY_PROPERTIES(opac);
 	GAS_PRIMITIVE_PROPERTIES(prim);
 #pragma GCC diagnostic pop
@@ -207,28 +215,28 @@ void implicitEnergySolve(GasPrimitive &prim, RadConserved &rad, Opacity const &o
 	auto const Er0 = FwdAutoDiff(Er);
 	auto const Etot0 = Er0 + Eg0;
 	auto const λ = FwdAutoDiff(ρ * c * κₐ * dt);
-	auto const Fgas = [mat, Etot0, Er0, λ, ρ_](SpecificEnergyType ε_) {
+	auto const Fgas = [eos, Etot0, Er0, λ, ρ_](SpecificEnergyType ε_) {
 		constexpr auto one = FwdAutoDiff(DimensionlessType(1.0));
 		auto const ε = FwdAutoDiff<SpecificEnergyType>::independentVariable(ε_);
-		auto const Tg = gasEnergy2temperature(mat, ε);
+		auto const Tg = gasEnergy2temperature(eos, ε);
 		auto const Bp = FwdAutoDiff(aR) * sqr(sqr(Tg));
 		auto const Er = Etot0 - ρ_ * ε;
 		auto const f = ((one + λ) * Er - (Er0 + λ * Bp)) / Er0;
 		return f;
 	};
-	auto const Frad = [mat, Etot0, Er0, Eg0, λ, ρ_](EnergyDensityType Er_) {
+	auto const Frad = [eos, Etot0, Er0, Eg0, λ, ρ_](EnergyDensityType Er_) {
 		constexpr auto one = FwdAutoDiff(DimensionlessType(1.0));
 		auto const Er = FwdAutoDiff<EnergyDensityType>::independentVariable(Er_);
 		auto const ε = (Etot0 - Er) / ρ_;
-		auto const Tg = gasEnergy2temperature(mat, ε);
+		auto const Tg = gasEnergy2temperature(eos, ε);
 		auto const Bp = FwdAutoDiff(aR) * sqr(sqr(Tg));
 		auto const f = (λ * Bp - ((one + λ) * Er - Er0)) / Eg0;
 		return f;
 	};
 	double error = 1.0;
 	auto Tr = radiationEnergy2temperature(Er);
-	auto Tg = gasEnergy2temperature(mat, ε);
-	printf("Tr0 = %e | Tg0 = %e   %e  %e\n", Tr, Tg, (ρ * ε).value(), (Er).value());
+	auto Tg = gasEnergy2temperature(eos, ε);
+	printf("Tr0 = %e | Tg0 = %e   %e  %e\n", (double) Tr.value(), (double) Tg.value(), (double) (ρ * ε).value(), (double) (Er).value());
 	for (int j = 0; error > toler; j++) {
 		bool gasForm;
 		double e;
@@ -256,61 +264,59 @@ void implicitEnergySolve(GasPrimitive &prim, RadConserved &rad, Opacity const &o
 			e = Er.value();
 		}
 		error = abs((de / e).value());
+		printf("Er = %e\n", Er.value());
 		Tr = radiationEnergy2temperature(Er);
-		Tg = gasEnergy2temperature(mat, ε);
-		printf("%c: %i %e | Tr  = %e | Tg  = %e | %e  %e \n", gasForm ? 'G' : 'R', j, error, Tr, Tg, (ρ * ε).value(), (Er).value());
+		Tg = gasEnergy2temperature(eos, ε);
+		printf("%c: %i %e | Tr  = %e | Tg  = %e | %e  %e \n", gasForm ? 'G' : 'R', j, (double) error, (double) Tr.value(), (double) Tg.value(), (ρ * ε).value(),
+				(Er).value());
 	}
 }
 
-void implicitRadiationSolve(GasConserved &gas, RadConserved &rad, Opacity const &opac, Material const &mat, cgs::Seconds const &dt) {
+void implicitRadiationSolve(GasConserved &gasCon, RadConserved &radCon, Opacity const &opac, EquationOfState const &eos, cgs::Seconds const &dt) {
+	constexpr double toler = 4 * eps;
 	GasPrimitive gasPrim;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
-	GAS_CONSERVED_PROPERTIES(gas);
-	RADIATION_CONSERVED_PROPERTIES(rad);
+	GAS_CONSERVED_PROPERTIES(gasCon);
+	RADIATION_CONSERVED_PROPERTIES(radCon);
 	GAS_PRIMITIVE_PROPERTIES(gasPrim);
-	MATERIAL_PROPERTIES(mat)
+	EOS_PROPERTIES(eos)
 	OPACITY_PROPERTIES(opac)
+	auto const norm = sqrt(sqr(vectorMagnitude(F)) + sqr(Er) + sqr(vectorMagnitude(c * S)) + sqr(τ)).value();
 #pragma GCC diagnostic pop
-	gasPrim = gasCon2Prim(gas, mat);
-	auto const χ = κₐ + κₛ;
-	auto const implicitEnergySolve = [Γ, κₐ, μ, ρ, dt](auto &Er, auto &ε) {
-		auto const ρε0 = ρ * ε;
-		auto const ρκₐ = ρ * κₐ;
-		auto const cdt = c * dt;
-		double const λ = double(ρκₐ * cdt);
-		auto const a0 = (1 - λ) * (Er + ρε0) - Er;
-		auto const a1 = ρ * (λ - 1);
-		auto const a4 = λ * aR * sqr(sqr((μ * (Γ - 1)) / (kB * nₐ)));
-		for (int j = 0; j < 20; j++) {
-			auto const ε2 = sqr(ε);
-			auto const ε3 = ε * sqr(ε);
-			auto const ε4 = sqr(ε2);
-			auto const f = a0 + a1 * ε + a4 * ε4;
-			auto const dfdε = a1 + 4 * a4 * ε3;
-			auto const dε = -f / dfdε;
-			ε += dε;
-		}
-		Er += ρε0 - ρ * ε;
-	};
-	auto const implicitFluxSolve = [ρ, χ, dt](auto &F) {
-		auto const λ = ρ * c * χ * dt;
+	double error = 1.0;
+	auto const F0 = F;
+	auto const E0 = Er;
+	auto const S0 = S;
+	auto const τ0 = τ;
+	for (int j = 0; error > toler; j++) {
+		auto const F1 = F;
+		auto const E1 = Er;
+		gasPrim = gasCon.toPrimitive(eos);
+		auto const v2 = vectorDotProduct(v, v);
+		auto const β = sqrt(ic2 * v2);
+		auto const λ = ρ * c * (κₐ + κₛ) * dt;
+		auto R = radiationTensor(radCon);
+		auto Λ = boostTensor(gasPrim, -1);
+		auto iΛ = boostTensor(gasPrim, +1);
+		R = Λ * R * Λ;
+		Er = spaceTime2Scalar(R);
+		F = spaceTime2Vector(R);
+		implicitEnergySolve(gasPrim, radCon, opac, eos, dt);
 		F = F / (1 + λ);
-	};
-	auto const Rlab = radiationTensor(rad);
-	auto const iΛ = boostTensor(gasPrim);
-	auto const Λ = η * iΛ * η;
-	auto const Rco = Λ * Rlab * Λ;
-	auto zeroMom = 0.0 * cgs::g / (cgs::cm2 * cgs::s);
-	auto Sco = ColumnVector<decltype(zeroMom), ndim>(zeroMom);
-	auto εco = ε;
-	auto Eco = spaceTime2Scalar(Rco);
-	auto Fco = spaceTime2Vector(Rco);
-	implicitEnergySolve(Eco, εco);
-	implicitFluxSolve(Fco);
-	S += Sco;
-	ε = εco;
-	Er = Eco;
+		R = radiationTensor(radCon);
+		R = iΛ * R * iΛ;
+		Er = spaceTime2Scalar(R);
+		F = spaceTime2Vector(R);
+		auto const dF = F - F0;
+		auto const dE = Er - E0;
+		S = S0 - ic * dF;
+		τ = τ0 - dE;
+		F = F0 + dF;
+		Er = E0 + dE;
+		error = double(sqrt(sqr(vectorMagnitude(F - F1)) + sqr(Er - E1)).value() / norm);
+		printf("%i %e %e %e %e\n", j, (double) β.value(), (double) vectorMagnitude(F).value(), (double) λ, (double) error);
+	}
 }
 
 }

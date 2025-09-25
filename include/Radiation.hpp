@@ -15,31 +15,32 @@
 // Α,α,Β,β,Γ,γ,Δ,δ,Ε,ε,Ζ,ζ,Η,η,Θ,θ,ϑ,Ι,ι,Κ,κ,ϰ,Λ,λ,Μ,μ,Ν,ν,Ξ,ξ,Ο,ο,Π,π,ϖ,Ρ,ρ,ϱ,Σ,σ,ς,Τ,τ,Υ,υ,Φ,φ,ϕ,Χ,χ,Ψ,ψ,Ω,ω
 // ₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₒₓₕₖₗₘₙₚₛₜⱼ
 
-
-
 namespace Radiation {
 
 static constexpr int ndim = 3;
-using DimensionlessType = Quantity<Unit<0, 0, 0, 0>>;
-using LengthType = Quantity<Unit<1, 0, 0, 0>>;
-using MassType = Quantity<Unit<0, 1, 0, 0>>;
-using MassDensityType = Quantity<Unit<-3, 1, 0, 0>>;
-using TimeType = Quantity<Unit<0, 0, 1, 0>>;
-using TemperatureType = Quantity<Unit<0, 0, 0, 1>>;
-using VelocityType = Quantity<Unit<1, 0, -1, 0>>;
-using MomentumType = Quantity<Unit<1, 1, -1, 0>>;
-using MomentumDensityType = Quantity<Unit<-2, 1, -1, 0>>;
-using EnergyType = Quantity<Unit<2, 1, -2, 0>>;
-using EnergyDensityType = Quantity<Unit<-1, 1, -2, 0>>;
-using SpecificEnergyType = Quantity<Unit<2, 0, -2, 0>>;
-using EntropyType = Quantity<Unit<2, 1, -2, -1>>;
-using EntropyDensityType = Quantity<Unit<-1, 1, -2, -1>>;
-using SpecificEntropyType = Quantity<Unit<2, 0, -2, -1>>;
-using EntropyDensityPerKelvinCubed = Quantity<Unit<-1, 1, -2, -4>>;
-using AreaType = Quantity<Unit<2, 0, 0, 0>>;
-using SpecificAreaType = Quantity<Unit<2, -1, 0, 0>>;
-using VolumeType = Quantity<Unit<3, 0, 0, 0>>;
-using SpecificVolumeType = Quantity<Unit<3, 0, -1, 0>>;
+using DimensionlessType = Quantity<Unit<0, 0, 0, 0, 0>>;
+using LengthType = Quantity<Unit<1, 0, 0, 0, 0>>;
+using MassType = Quantity<Unit<0, 1, 0, 0, 0>>;
+using MassDensityType = Quantity<Unit<-3, 1, 0, 0, 0>>;
+using MolarMassType = Quantity<Unit<0, 1, 0, 0, -1>>;
+using TimeType = Quantity<Unit<0, 0, 1, 0, 0>>;
+using TemperatureType = Quantity<Unit<0, 0, 0, 1, 0>>;
+using VelocityType = Quantity<Unit<1, 0, -1, 0, 0>>;
+using MomentumType = Quantity<Unit<1, 1, -1, 0, 0>>;
+using MomentumDensityType = Quantity<Unit<-2, 1, -1, 0, 0>>;
+using TorqueType = Quantity<Unit<2, 1, -1, 0, 0>>;
+using EnergyType = Quantity<Unit<2, 1, -2, 0, 0>>;
+using EnergyDensityType = Quantity<Unit<-1, 1, -2, 0, 0>>;
+using SpecificEnergyType = Quantity<Unit<2, 0, -2, 0, 0>>;
+using EntropyType = Quantity<Unit<2, 1, -2, -1, 0>>;
+using EntropyDensityType = Quantity<Unit<-1, 1, -2, -1, 0>>;
+using SpecificEntropyType = Quantity<Unit<2, 0, -2, -1, 0>>;
+using EntropyDensityPerKelvinCubed = Quantity<Unit<-1, 1, -2, -4, 0>>;
+using AreaType = Quantity<Unit<2, 0, 0, 0, 0>>;
+using SpecificAreaType = Quantity<Unit<2, -1, 0, 0, 0>>;
+using VolumeType = Quantity<Unit<3, 0, 0, 0, 0>>;
+using SpecificVolumeType = Quantity<Unit<3, 0, -1, 0, 0>>;
+using MoleType = cgs::Mole;
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
@@ -47,11 +48,13 @@ using SpecificVolumeType = Quantity<Unit<3, 0, -1, 0>>;
 #define GAS_CONSERVED_PROPERTIES(arg) \
 		XXX(D, MassDensityType, arg, 1) \
 		XXX(τ, EnergyDensityType, arg, 1) \
+		XXX(K, MassDensityType, arg, 1)  \
 		XXX(S, MomentumDensityType, arg, 3)
 
 #define GAS_PRIMITIVE_PROPERTIES(arg) \
 		XXX(ρ, MassDensityType, arg, 1) \
 		XXX(ε, SpecificEnergyType, arg, 1)  \
+		XXX(ϰ, DimensionlessType, arg, 1)  \
 		XXX(v, VelocityType, arg, 3)
 
 #define RADIATION_CONSERVED_PROPERTIES(arg) \
@@ -62,28 +65,72 @@ using SpecificVolumeType = Quantity<Unit<3, 0, -1, 0>>;
 		XXX(κₐ, SpecificAreaType, arg, 1) \
 		XXX(κₛ, SpecificAreaType, arg, 1)
 
-#define MATERIAL_PROPERTIES(arg) \
-		XXX(μ, MassType, arg, 1) \
+#define EOS_PROPERTIES(arg) \
+		XXX(μ, MolarMassType, arg, 1) \
 		XXX(Γ, DimensionlessType, arg, 1)
 
 #pragma GCC diagnostic pop
 
 #define XXX(name, type, arg, dim) std::conditional_t<dim == 1, type, ColumnVector<type, dim>> name;
-struct GasConserved {
-	GAS_CONSERVED_PROPERTIES(0)
-};
-struct GasPrimitive {
-	GAS_PRIMITIVE_PROPERTIES(0)
-};
+
 struct RadConserved {
 	RADIATION_CONSERVED_PROPERTIES(0)
 };
+
 struct Opacity {
 	OPACITY_PROPERTIES(0)
 };
-struct Material {
-	MATERIAL_PROPERTIES(0)
+
+template<typename T>
+struct Underlying {
+	using type = T;
 };
+
+template<template<typename > class W, typename U>
+struct Underlying<W<U>> {
+	using type = U;
+};
+
+template<typename T>
+using UnderlyingType = typename Underlying<T>::type;
+
+struct EquationOfState {
+	EOS_PROPERTIES(0)
+	constexpr EquationOfState() = default;
+	constexpr EquationOfState(EquationOfState const&) = default;
+	constexpr EquationOfState& operator=(EquationOfState const&) = default;
+
+	constexpr EquationOfState(double Γ_, double μ_) :
+			μ(μ_), Γ(Γ_) {
+	}
+
+	template<typename Tρ, typename Tε>
+	auto pressure(Tρ const&, Tε const&) const;
+
+	template<typename Tε>
+	auto temperature(Tε const&) const;
+
+	template<typename Tρ, typename Tε>
+	auto energy2entropy(Tρ const&, Tε const&) const;
+
+	template<typename Tρ, typename Tϰ>
+	auto entropy2energy(Tρ const&, Tϰ const&) const;
+
+};
+
+struct GasPrimitive;
+
+struct GasConserved {
+	GAS_CONSERVED_PROPERTIES(0)
+	GasPrimitive toPrimitive(EquationOfState const&) const;
+};
+
+struct GasPrimitive {
+	GAS_PRIMITIVE_PROPERTIES(0)
+	GasConserved toConserved(EquationOfState const&) const;
+	void updateEntropy(EquationOfState const&);
+};
+
 #undef XXX
 
 template<typename Type>
@@ -101,42 +148,15 @@ using SpaceVectorType = ColumnVector<Type, ndim>;
 template<typename From, typename To>
 using copy_const_t = std::conditional_t<std::is_const_v<std::remove_reference_t<From>>, std::add_const_t<To>, To>;
 
-struct EquationOfState {
-#define XXX(name, type, arg, dim) name = arg.name;
-	constexpr EquationOfState(Material const &mat) {
-		MATERIAL_PROPERTIES(mat)
-	}
-#undef XXX
-	constexpr EnergyDensityType operator()(MassDensityType const &ρ, SpecificEnergyType const &ε) const {
-		return (Γ - 1) * ρ * ε;
-	}
-	constexpr SpecificEnergyType d_dρ(MassDensityType const &ρ, SpecificEnergyType const &ε) const {
-		return (Γ - 1) * ε;
-	}
-	constexpr auto d2_dρ2(MassDensityType const &ρ, SpecificEnergyType const &ε) const {
-		return SpecificEnergyType(0.0) / MassDensityType(1.0);
-	}
-	constexpr MassDensityType d_dε(MassDensityType const &ρ, SpecificEnergyType const &ε) const {
-		return (Γ - 1) * ρ;
-	}
-	constexpr auto d2_dε2(MassDensityType const &ρ, SpecificEnergyType const &ε) const {
-		return MassDensityType(0.0) / SpecificEnergyType(1.0);
-	}
-	constexpr auto d2_dρdε(MassDensityType const &ρ, SpecificEnergyType const &ε) const {
-		return (Γ - 1);
-	}
-private:
-#define XXX(name, type, arg, dim) type name;
-	MATERIAL_PROPERTIES(0) /**/
-#undef XXX
-};
-
 static constexpr int mantissaWidth = std::numeric_limits<double>::digits;
 static constexpr double π = 4 * atan(1);
-static constexpr double nₐ = 6.02214076e23;
+static constexpr auto amu = cgs::g / 6.02214076e23;
+static constexpr auto nₐ = DimensionlessType(1.0) / MoleType(cgs::mol / 6.02214076e23);
 static constexpr VelocityType c = 2.99792458e10 * cgs::cm / cgs::s;
 static constexpr EntropyType kB = 1.380658e-16 * cgs::g * cgs::cm2 / (cgs::s2 * cgs::K);
 static constexpr EntropyDensityPerKelvinCubed aR = 7.5657e-15 * cgs::erg / (cgs::cm3 * cgs::K4);
+static constexpr TorqueType ℎ = 6.62607015e-27 * cgs::g * cgs::cm2 / cgs::s;
+static constexpr TorqueType ℏ = ℎ / (2 * π);
 static constexpr auto c2 = sqr(c);
 static constexpr auto ic = 1.0 / c;
 static constexpr auto ic2 = sqr(ic);
@@ -156,6 +176,8 @@ static constexpr auto η = []() {
 	}
 	return η;
 }(); /**/
+// Α,α,Β,β,Γ,γ,Δ,δ,Ε,ε,Ζ,ζ,Η,η,Θ,θ,ϑ,Ι,ι,Κ,κ,ϰ,Λ,λ,Μ,μ,Ν,ν,Ξ,ξ,Ο,ο,Π,π,ϖ,Ρ,ρ,ϱ,Σ,σ,ς,Τ,τ,Υ,υ,Φ,φ,ϕ,Χ,χ,Ψ,ψ,Ω,ω
+// ₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₒₓₕₖₗₘₙₚₛₜⱼ
 
 template<typename QuantityType>
 static TensorType<QuantityType> space2SpaceTime(QuantityType s, SpaceVectorType<QuantityType> const &v, SpaceTensorType<QuantityType> const &t) {
@@ -205,24 +227,71 @@ static SpaceTensorType<QuantityType> spaceTime2Tensor(TensorType<QuantityType> c
 	return t;
 }
 
-GasPrimitive gasCon2Prim(GasConserved const&, Material const&);
-GasConserved gasPrim2Con(GasPrimitive const&, Material const&);
-void implicitEnergySolve(GasPrimitive&, RadConserved&, Opacity const&, Material const&, cgs::Seconds const&);
-void implicitRadiationSolve(GasConserved&, RadConserved&, Opacity const&, Material const&, cgs::Seconds const&);
-
+void implicitEnergySolve(GasPrimitive&, RadConserved&, Opacity const&, EquationOfState const&, cgs::Seconds const&);
+void implicitRadiationSolve(GasConserved&, RadConserved&, Opacity const&, EquationOfState const&, cgs::Seconds const&);
 
 #define XXX(name, type, arg, dim) copy_const_t<decltype(arg), std::conditional_t<dim == 1, type, ColumnVector<type, dim>>>& name = arg.name;
-
-inline SpecificEnergyType temperature2gasEnergy(Material const &mat, TemperatureType const &T) {
-	MATERIAL_PROPERTIES(mat);
-	return kB * nₐ / (μ * (Γ - 1)) * T;
-}
-
 
 inline EnergyDensityType temperature2radiationEnergy(TemperatureType const &T) {
 	return aR * sqr(sqr(T));
 }
+
+template<typename Type>
+auto gasEnergy2temperature(EquationOfState const &mat, Type const &ε) {
+	EOS_PROPERTIES(mat);
+	auto const C = ((μ * (Γ - 1)) / (kB * nₐ));
+	return ε * C;
+}
+
+template<typename Type>
+auto gasEnergy2specificEntropyPotential(EquationOfState const &mat, Type const &ε) {
+	using QuantityType = Quantity<Unit<-2, 0, 2, 1, 0>>;
+	EOS_PROPERTIES(mat);
+	using AutoType = std::conditional_t<std::is_same_v<Type, FwdAutoDiff<SpecificEnergyType>>, FwdAutoDiff<QuantityType>, QuantityType>;
+	return AutoType(μ * (Γ - 1) / (kB * nₐ)) * ε;
+}
+
+template<typename Type>
+inline auto temperature2gasEnergy(EquationOfState const &mat, Type const &T) {
+	using QuantityType = SpecificEntropyType;
+	EOS_PROPERTIES(mat);
+	using AutoType = std::conditional_t<std::is_same_v<Type, FwdAutoDiff<TemperatureType>>, FwdAutoDiff<QuantityType>, QuantityType>;
+	return AutoType(kB * nₐ / (μ * (Γ - 1))) * T;
+}
+
+template<typename Type>
+auto radiationEnergy2temperature(Type const &Er) {
+	return sqrt(sqrt(Er / aR));
+}
+
 #undef XXX
+
+template<typename Tε>
+auto EquationOfState::temperature(Tε const &ε) const {
+	return ε * ((μ * (Γ - 1)) / (kB * nₐ));
+}
+
+template<typename Tρ, typename Tε>
+auto EquationOfState::pressure(Tρ const &ρ, Tε const &ε) const {
+	return ρ * ε * (Γ - 1);
+}
+
+template<typename Tρ, typename Tε>
+auto EquationOfState::energy2entropy(Tρ const &ρ, Tε const &ε) const {
+	auto const iρo = 1 / MassDensityType(1);
+	auto const iεo = 1 / SpecificEnergyType(1);
+	double const Γm1 = double(Γ) - 1;
+	return iεo * ε * Γm1 / pow(ρ * iρo, Γm1);
+}
+
+template<typename Tρ, typename Tϰ>
+auto EquationOfState::entropy2energy(Tρ const &ρ, Tϰ const &ϰ) const {
+	auto const iρo = 1 / MassDensityType(1);
+	auto const Eo = SpecificEnergyType(1);
+	double const Γm1 = double(Γ) - 1;
+	double const iΓm1 = 1 / Γm1;
+	return Eo * ϰ * pow(ρ * iρo, Γm1) * iΓm1;
+}
 
 }
 #endif /* INCLUDE_RADIATION_HPP_ */

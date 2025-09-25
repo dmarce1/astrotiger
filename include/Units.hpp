@@ -14,12 +14,13 @@ enum class UnitType : int {
 	length, mass, time, temperature
 };
 
-template<int L, int M, int T, int K>
+template<int L, int M, int T, int K, int N>
 struct Unit {
 	static constexpr int L_ = L;
 	static constexpr int M_ = M;
 	static constexpr int T_ = T;
 	static constexpr int K_ = K;
+	static constexpr int N_ = N;
 };
 
 template<typename Type>
@@ -27,14 +28,14 @@ struct isUnit {
 	static constexpr bool value = false;
 };
 
-template<int L, int M, int T, int K>
-struct isUnit<Unit<L, M, T, K>> {
+template<int L, int M, int T, int K, int N>
+struct isUnit<Unit<L, M, T, K, N>> {
 	static constexpr bool value = true;
 };
 
 template<typename UnitA, int power, std::enable_if_t<isUnit<UnitA>::value, int> = 0>
 struct UnitPower {
-	using type = Unit<power * UnitA::L_, power * UnitA::M_, power * UnitA::T_, power * UnitA::K_>;
+	using type = Unit<power * UnitA::L_, power * UnitA::M_, power * UnitA::T_, power * UnitA::K_, power * UnitA::N_>;
 };
 
 template<typename UnitA, std::enable_if_t<isUnit<UnitA>::value, int> = 0>
@@ -44,7 +45,7 @@ struct UnitInverse {
 
 template<typename UnitA, typename UnitB, std::enable_if_t<isUnit<UnitA>::value && isUnit<UnitB>::value, int> = 0>
 struct UnitProduct {
-	using type = Unit<UnitA::L_ + UnitB::L_, UnitA::M_ + UnitB::M_, UnitA::T_ + UnitB::T_, UnitA::K_ + UnitB::K_>;
+	using type = Unit<UnitA::L_ + UnitB::L_, UnitA::M_ + UnitB::M_, UnitA::T_ + UnitB::T_, UnitA::K_ + UnitB::K_, UnitA::N_ + UnitB::N_>;
 };
 
 template<typename UnitA, typename UnitB, std::enable_if_t<isUnit<UnitA>::value && isUnit<UnitB>::value, int> = 0>
@@ -52,7 +53,7 @@ struct UnitQuotient {
 	using type = typename UnitProduct<UnitA, typename UnitInverse<UnitB>::type>::type;
 };
 
-template<typename Units = Unit<0, 0, 0, 0>, typename Type = double, Type scale = 1.0>
+template<typename Units = Unit<0, 0, 0, 0, 0>, typename Type = double, Type scale = 1.0>
 struct Quantity {
 	static constexpr Type a_ = scale;
 	static constexpr Type ia_ = Type(1) / a_;
@@ -96,13 +97,13 @@ struct Quantity {
 		return sum;
 	}
 	constexpr Quantity operator+(Type const &other) const {
-		static_assert(std::is_same<Unit<0,0,0,0>, Units>::value, "Units mismatch");
+		static_assert(std::is_same<Unit<0, 0, 0, 0, 0>, Units>::value, "Units mismatch");
 		Quantity sum;
 		sum.value_ = value_ + other * ia_;
 		return sum;
 	}
 	constexpr Quantity operator-(Type const &other) const {
-		static_assert(std::is_same<Unit<0,0,0,0>, Units>::value, "Units mismatch");
+		static_assert(std::is_same<Unit<0, 0, 0, 0, 0>, Units>::value, "Units mismatch");
 		Quantity sum;
 		sum.value_ = value_ - other * ia_;
 		return sum;
@@ -154,22 +155,22 @@ struct Quantity {
 		return *this;
 	}
 	template<Type otherScale>
-	constexpr Quantity operator*=(Quantity<Unit<0, 0, 0, 0>, Type, otherScale> const &other) {
+	constexpr Quantity operator*=(Quantity<Unit<0, 0, 0, 0, 0>, Type, otherScale> const &other) {
 		value_ *= other.value_ * other.a_ * ia_;
 		return *this;
 	}
 	template<Type otherScale>
-	constexpr Quantity operator/=(Quantity<Unit<0, 0, 0, 0>, Type, otherScale> const &other) {
+	constexpr Quantity operator/=(Quantity<Unit<0, 0, 0, 0, 0>, Type, otherScale> const &other) {
 		value_ /= other.value_ * other.a_ * ia_;
 		return *this;
 	}
 	constexpr Quantity& operator=(Type value) {
-		static_assert(std::is_same<Unit<0, 0, 0, 0>, Units>::value, "Units mismatch");
+		static_assert(std::is_same<Unit<0, 0, 0, 0, 0>, Units>::value, "Units mismatch");
 		value_ = value;
 		return *this;
 	}
 	constexpr explicit operator Type() const {
-		static_assert(std::is_same<Unit<0, 0, 0, 0>, Units>::value, "Units mismatch");
+		static_assert(std::is_same<Unit<0, 0, 0, 0, 0>, Units>::value, "Units mismatch");
 		return value_;
 	}
 	template<Type otherScale>
@@ -227,17 +228,17 @@ private:
 template<typename U>
 struct UnitSqrt;
 
-template<int L, int M, int T, int K>
-struct UnitSqrt<Unit<L, M, T, K>> {
-	using type = Unit<L / 2, M / 2, T / 2, K / 2>;
+template<int L, int M, int T, int K, int N>
+struct UnitSqrt<Unit<L, M, T, K, N>> {
+	using type = Unit<L / 2, M / 2, T / 2, K / 2, N / 2>;
 };
 
 template<typename U>
 struct UnitCbrt;
 
-template<int L, int M, int T, int K>
-struct UnitCbrt<Unit<L, M, T, K>> {
-	using type = Unit<L / 3, M / 3, T / 3, K / 3>;
+template<int L, int M, int T, int K, int N>
+struct UnitCbrt<Unit<L, M, T, K, N>> {
+	using type = Unit<L / 3, M / 3, T / 3, K / 3, N / 3>;
 };
 
 template<typename Units, typename Type, Type Scale>
@@ -262,19 +263,33 @@ constexpr auto cbrt(Quantity<Units, Type, Scale> const &q) {
 	return rc;
 }
 
+template<typename Type>
+constexpr auto log(Quantity<Unit<0, 0, 0, 0, 0>, Type> const &q) {
+	using QuantityType = Quantity<Unit<0, 0, 0, 0, 0>, Type>;
+	return QuantityType(log(q.value()));
+}
+
+template<typename Type>
+constexpr auto pow(Quantity<Unit<0, 0, 0, 0, 0>, Type> const &q, double r) {
+	using QuantityType = Quantity<Unit<0, 0, 0, 0, 0>, Type>;
+	return QuantityType(pow(q.value(), r));
+}
+
 namespace cgs {
-using One = Quantity<Unit<0, 0, 0, 0>>;
-using Centimeters = Quantity<Unit<1, 0, 0, 0>>;
-using Grams = Quantity<Unit<0, 1, 0, 0>>;
-using Seconds = Quantity<Unit<0, 0, 1, 0>>;
-using Kelvin = Quantity<Unit<0, 0, 0, 1>>;
-using Ergs = Quantity<Unit<2, 1, -2, 0>>;
-using ErgsPerCm3 = Quantity<Unit<-1, 1, -2, 0>>;
+using One = Quantity<Unit<0, 0, 0, 0, 0>>;
+using Centimeters = Quantity<Unit<1, 0, 0, 0, 0>>;
+using Grams = Quantity<Unit<0, 1, 0, 0, 0>>;
+using Seconds = Quantity<Unit<0, 0, 1, 0, 0>>;
+using Kelvin = Quantity<Unit<0, 0, 0, 1, 0>>;
+using Ergs = Quantity<Unit<2, 1, -2, 0, 0>>;
+using ErgsPerCm3 = Quantity<Unit<-1, 1, -2, 0, 0>>;
+using Mole = Quantity<Unit<0, 0, 0, 0, 1>>;
 static constexpr One one(1.0);
 static constexpr Centimeters cm(1.0);
 static constexpr Grams g(1.0);
 static constexpr Seconds s(1.0);
 static constexpr Kelvin K(1.0);
+static constexpr Mole mol(1.0);
 static constexpr auto s2 = s * s;
 static constexpr auto s3 = s2 * s;
 static constexpr auto cm2 = cm * cm;
