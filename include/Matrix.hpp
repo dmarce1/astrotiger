@@ -301,9 +301,12 @@ struct ColumnVector: public Matrix<T1, N, 1> {
 		ColumnVector<T1, N> const &A = *this;
 		ColumnVector<T2, N> B;
 		for (int n = 0; n < N; n++) {
-			B[n] = A[n];
+			B[n] = T2(A[n]);
 		}
 		return B;
+	}
+	operator Matrix<T1, N, 1>() const {
+		return static_cast<base_type const&>(*this);
 	}
 };
 
@@ -745,6 +748,12 @@ template<typename T1, int N>
 auto vectorMagnitude(Matrix<T1, N, 1> const &v) {
 	return sqrt(vectorDotProduct(v, v));
 }
+
+template<typename T1, int N>
+auto vectorNormalize(Matrix<T1, N, 1> const &v1) {
+	return v1 / vectorMagnitude(v1);
+}
+
 
 //template<typename T, auto N, int M, typename Container>
 //inline constexpr auto operator*(Matrix<T, N, M> const &A, Container const &B) {

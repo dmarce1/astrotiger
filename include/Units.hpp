@@ -53,33 +53,25 @@ struct UnitQuotient {
 	using type = typename UnitProduct<UnitA, typename UnitInverse<UnitB>::type>::type;
 };
 
-template<typename Units = Unit<0, 0, 0, 0, 0>, typename Type = double, Type scale = 1.0>
+template<typename Units, typename Type>
 struct Quantity {
-	static constexpr Type a_ = scale;
-	static constexpr Type ia_ = Type(1) / a_;
 
-	template<Type otherScale>
-	using ScaledOther = Quantity<Units, Type, otherScale>;
 
 	explicit constexpr Quantity(Type v = Type(0)) :
 			value_(v) {
 	}
-	template<Type otherScale>
-	constexpr Quantity(ScaledOther<otherScale> const &other) {
-		*this = other * other.a_ * ia_;
+	constexpr Quantity(Quantity const &other) {
+		*this = other;
 	}
-	template<Type otherScale>
-	constexpr Quantity(ScaledOther<otherScale> &&other) {
-		*this = std::move(other * other.a_ * ia_);
+	constexpr Quantity(Quantity &&other) {
+		*this = std::move(other);
 	}
-	template<Type otherScale>
-	constexpr Quantity& operator=(ScaledOther<otherScale> const &other) {
-		value_ = other.value_ * other.a_ * ia_;
+	constexpr Quantity& operator=(Quantity const &other) {
+		value_ = other.value_;
 		return *this;
 	}
-	template<Type otherScale>
-	constexpr Quantity& operator=(ScaledOther<otherScale> &&other) {
-		value_ = std::move(other.value_ * other.a_ * ia_);
+	constexpr Quantity& operator=(Quantity &&other) {
+		value_ = std::move(other.value_);
 		return *this;
 	}
 	constexpr Quantity operator+() const {
@@ -90,34 +82,32 @@ struct Quantity {
 		negation.value_ = -value_;
 		return negation;
 	}
-	template<Type otherScale>
-	constexpr Quantity operator+(ScaledOther<otherScale> const &other) const {
+	constexpr Quantity operator+(Quantity const &other) const {
 		Quantity sum;
-		sum.value_ = value_ + other.value_ * other.a_ * ia_;
+		sum.value_ = value_ + other.value_;
 		return sum;
 	}
 	constexpr Quantity operator+(Type const &other) const {
 		static_assert(std::is_same<Unit<0, 0, 0, 0, 0>, Units>::value, "Units mismatch");
 		Quantity sum;
-		sum.value_ = value_ + other * ia_;
+		sum.value_ = value_ + other;
 		return sum;
 	}
 	constexpr Quantity operator-(Type const &other) const {
 		static_assert(std::is_same<Unit<0, 0, 0, 0, 0>, Units>::value, "Units mismatch");
 		Quantity sum;
-		sum.value_ = value_ - other * ia_;
+		sum.value_ = value_ - other;
 		return sum;
 	}
-	template<Type otherScale>
-	constexpr Quantity operator-(ScaledOther<otherScale> const &other) const {
+	constexpr Quantity operator-(Quantity const &other) const {
 		Quantity difference;
-		difference.value_ = value_ - other.value_ * other.a_ * ia_;
+		difference.value_ = value_ - other.value_;
 		return difference;
 	}
-	template<typename OtherUnits, Type otherScale>
-	constexpr auto operator*(Quantity<OtherUnits, Type, otherScale> const &other) const {
-		Quantity<typename UnitProduct<Units, OtherUnits>::type, Type, a_> product;
-		product.value_ = value_ * other.value_ * other.a_ * ia_;
+	template<typename OtherUnits>
+	constexpr auto operator*(Quantity<OtherUnits, Type> const &other) const {
+		Quantity<typename UnitProduct<Units, OtherUnits>::type, Type> product;
+		product.value_ = value_ * other.value_;
 		return product;
 	}
 	constexpr auto operator*(Type const &other) const {
@@ -125,43 +115,39 @@ struct Quantity {
 		product.value_ = value_ * other;
 		return product;
 	}
-	template<typename OtherUnits, Type otherScale>
-	constexpr auto operator/(Quantity<OtherUnits, Type, otherScale> const &other) const {
-		Quantity<typename UnitQuotient<Units, OtherUnits>::type, Type, ia_> quotient;
-		quotient.value_ = value_ * a_ * other.ia_ / other.value_;
+	template<typename OtherUnits>
+	constexpr auto operator/(Quantity<OtherUnits, Type> const &other) const {
+		Quantity<typename UnitQuotient<Units, OtherUnits>::type, Type> quotient;
+		quotient.value_ = value_ / other.value_;
 		return quotient;
 	}
 	constexpr auto operator/(Type const &other) const {
 		Quantity quotient;
-		quotient.value_ = value_ * a_ / other;
+		quotient.value_ = value_ / other;
 		return quotient;
 	}
-	template<Type otherScale>
-	constexpr Quantity operator+=(ScaledOther<otherScale> const &other) {
-		value_ += other.value_ * other.a_ * ia_;
+	constexpr Quantity operator+=(Quantity const &other) {
+		value_ += other.value_;
 		return *this;
 	}
-	template<Type otherScale>
-	constexpr Quantity operator-=(ScaledOther<otherScale> const &other) {
-		value_ -= other.value_ * other.a_ * ia_;
+	constexpr Quantity operator-=(Quantity const &other) {
+		value_ -= other.value_;
 		return *this;
 	}
 	constexpr Quantity operator*=(Type const &other) {
-		value_ *= other * ia_;
+		value_ *= other;
 		return *this;
 	}
 	constexpr Quantity operator/=(Type const &other) {
-		value_ /= other * ia_;
+		value_ /= other;
 		return *this;
 	}
-	template<Type otherScale>
-	constexpr Quantity operator*=(Quantity<Unit<0, 0, 0, 0, 0>, Type, otherScale> const &other) {
-		value_ *= other.value_ * other.a_ * ia_;
+	constexpr Quantity operator*=(Quantity<Unit<0, 0, 0, 0, 0>, Type> const &other) {
+		value_ *= other.value_;
 		return *this;
 	}
-	template<Type otherScale>
-	constexpr Quantity operator/=(Quantity<Unit<0, 0, 0, 0, 0>, Type, otherScale> const &other) {
-		value_ /= other.value_ * other.a_ * ia_;
+	constexpr Quantity operator/=(Quantity<Unit<0, 0, 0, 0, 0>, Type> const &other) {
+		value_ /= other.value_;
 		return *this;
 	}
 	constexpr Quantity& operator=(Type value) {
@@ -173,53 +159,45 @@ struct Quantity {
 		static_assert(std::is_same<Unit<0, 0, 0, 0, 0>, Units>::value, "Units mismatch");
 		return value_;
 	}
-	template<Type otherScale>
-	constexpr bool operator==(ScaledOther<otherScale> const &other) const {
-		return value_ == other.value_ * other.a_ * ia_;
+	constexpr bool operator==(Quantity const &other) const {
+		return value_ == other.value_;
 	}
-	template<Type otherScale>
-	constexpr bool operator!=(ScaledOther<otherScale> const &other) const {
-		return value_ != other.value_ * other.a_ * ia_;
+	constexpr bool operator!=(Quantity const &other) const {
+		return value_ != other.value_;
 	}
-	template<Type otherScale>
-	constexpr bool operator>=(ScaledOther<otherScale> const &other) const {
-		return value_ >= other.value_ * other.a_ * ia_;
+	constexpr bool operator>=(Quantity const &other) const {
+		return value_ >= other.value_;
 	}
-	template<Type otherScale>
-	constexpr bool operator<=(ScaledOther<otherScale> const &other) const {
-		return value_ <= other.value_ * other.a_ * ia_;
+	constexpr bool operator<=(Quantity const &other) const {
+		return value_ <= other.value_;
 	}
-	template<Type otherScale>
-	constexpr bool operator>(ScaledOther<otherScale> const &other) const {
-		return value_ > other.value_ * other.a_ * ia_;
+	constexpr bool operator>(Quantity const &other) const {
+		return value_ > other.value_;
 	}
-	template<Type otherScale>
-	constexpr bool operator<(ScaledOther<otherScale> const &other) const {
-		return value_ < other.value_ * other.a_ * ia_;
+	constexpr bool operator<(Quantity const &other) const {
+		return value_ < other.value_;
 	}
 	friend constexpr auto operator*(Type const &value, Quantity const &other) {
 		Quantity product;
-		product.value_ = value * other.value_ * other.a_;
+		product.value_ = value * other.value_;
 		return product;
 	}
 	constexpr Type value() const noexcept {
 		return value_;
 	}
 	friend constexpr auto operator/(Type const &value, Quantity const &other) {
-		Quantity<typename UnitInverse<Units>::type, Type, ia_> quotient;
-		quotient.value_ = value * other.ia_ / other.value_;
+		Quantity<typename UnitInverse<Units>::type, Type> quotient;
+		quotient.value_ = value  / other.value_;
 		return quotient;
 	}
-	template<Type otherScale>
-	friend constexpr Quantity operator+(Type const &a, ScaledOther<otherScale> const &b) {
+	friend constexpr Quantity operator+(Type const &a, Quantity const &b) {
 		return b + a;
 
 	}
-	template<Type otherScale>
-	friend constexpr Quantity operator-(Type const &a, ScaledOther<otherScale> const &b) {
+	friend constexpr Quantity operator-(Type const &a, Quantity const &b) {
 		return -(b - a);
 	}
-	template<typename, typename OtherType, OtherType>
+	template<typename, typename>
 	friend class Quantity;
 private:
 	Type value_;
@@ -241,22 +219,20 @@ struct UnitCbrt<Unit<L, M, T, K, N>> {
 	using type = Unit<L / 3, M / 3, T / 3, K / 3, N / 3>;
 };
 
-template<typename Units, typename Type, Type Scale>
-constexpr auto sqrt(Quantity<Units, Type, Scale> const &q) {
+template<typename Units, typename Type>
+constexpr auto sqrt(Quantity<Units, Type> const &q) {
 	using std::sqrt;
-	constexpr auto returnScale = sqrt(Scale);
-	using QuantityType = Quantity<typename UnitSqrt<Units>::type, Type, returnScale>;
+	using QuantityType = Quantity<typename UnitSqrt<Units>::type, Type>;
 	QuantityType units(1.0);
 	auto const sroot = sqrt(q.value());
 	QuantityType const rc = sroot * units;
 	return rc;
 }
 
-template<typename Units, typename Type, Type Scale>
-constexpr auto cbrt(Quantity<Units, Type, Scale> const &q) {
+template<typename Units, typename Type>
+constexpr auto cbrt(Quantity<Units, Type> const &q) {
 	using std::cbrt;
-	constexpr auto returnScale = cbrt(Scale);
-	using QuantityType = Quantity<typename UnitCbrt<Units>::type, Type, returnScale>;
+	using QuantityType = Quantity<typename UnitCbrt<Units>::type, Type>;
 	QuantityType units(1.0);
 	auto const sroot = cbrt(q.value());
 	QuantityType const rc = sroot * units;
@@ -275,15 +251,21 @@ constexpr auto pow(Quantity<Unit<0, 0, 0, 0, 0>, Type> const &q, double r) {
 	return QuantityType(pow(q.value(), r));
 }
 
+template<typename Type>
+constexpr auto pow(Quantity<Unit<0, 0, 0, 0, 0>, Type> const &q, Quantity<Unit<0, 0, 0, 0, 0>, Type> r) {
+	using QuantityType = Quantity<Unit<0, 0, 0, 0, 0>, Type>;
+	return QuantityType(pow(q.value(), r.value()));
+}
+
 namespace cgs {
-using One = Quantity<Unit<0, 0, 0, 0, 0>>;
-using Centimeters = Quantity<Unit<1, 0, 0, 0, 0>>;
-using Grams = Quantity<Unit<0, 1, 0, 0, 0>>;
-using Seconds = Quantity<Unit<0, 0, 1, 0, 0>>;
-using Kelvin = Quantity<Unit<0, 0, 0, 1, 0>>;
-using Ergs = Quantity<Unit<2, 1, -2, 0, 0>>;
-using ErgsPerCm3 = Quantity<Unit<-1, 1, -2, 0, 0>>;
-using Mole = Quantity<Unit<0, 0, 0, 0, 1>>;
+using One = Quantity<Unit<0, 0, 0, 0, 0>, double>;
+using Centimeters = Quantity<Unit<1, 0, 0, 0, 0>, double>;
+using Grams = Quantity<Unit<0, 1, 0, 0, 0>, double>;
+using Seconds = Quantity<Unit<0, 0, 1, 0, 0>, double>;
+using Kelvin = Quantity<Unit<0, 0, 0, 1, 0>, double>;
+using Ergs = Quantity<Unit<2, 1, -2, 0, 0>, double>;
+using ErgsPerCm3 = Quantity<Unit<-1, 1, -2, 0, 0>, double>;
+using Mole = Quantity<Unit<0, 0, 0, 0, 1>, double>;
 static constexpr One one(1.0);
 static constexpr Centimeters cm(1.0);
 static constexpr Grams g(1.0);

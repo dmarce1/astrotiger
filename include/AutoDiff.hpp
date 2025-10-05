@@ -194,7 +194,8 @@ public:
 		print(os, jet.C_.data(), O, D - 1);
 		return os;
 	}
-	friend AutoDiff compose(std::function<T1(T1, int)> const &f, AutoDiff const &gj) {
+	template<class Function>
+	friend auto compose(Function const &f, AutoDiff const &gj) {
 		AutoDiff H;
 		std::array<T1, O> dfdg;
 		T1 const g0 = gj[0];
@@ -222,41 +223,38 @@ public:
 		}
 		return H;
 	}
-	friend AutoDiff operator/(AutoDiff const &R, T1 const &A) {
+	friend auto operator/(AutoDiff const &R, T1 const &A) {
 		return R * (T1(1) / A);
 	}
 //	friend AutoDiff operator/(AutoDiff const &y, AutoDiff const &x) {
 //		return y * (T1(1) / x);
 //	}
-	friend AutoDiff pow(AutoDiff const &x, T1 const &k) {
+	friend auto pow(AutoDiff const &x, T1 const &k) {
 		return compose([k](T1 const &x, int n) {
 			return factorialPower(k, n) * pow(x, k - n);
 		}, x);
 	}
-	friend AutoDiff sqr(AutoDiff const &x) {
-		return x * x;
-	}
-	friend AutoDiff sqrt(AutoDiff const &x) {
+	friend auto sqrt(AutoDiff const &x) {
 		return compose([](T1 const &x, int n) {
 			return factorialPower(0.5, n) * std::sqrt(x) / ipow(x, n);
 		},x);
 	}
-	friend AutoDiff exp(AutoDiff const &x) {
+	friend auto exp(AutoDiff const &x) {
 		return compose([](T1 const &x, int) {
 			return std::exp(x);
 		}, x);
 	}
-	friend AutoDiff log(AutoDiff const &x) {
+	friend auto log(AutoDiff const &x) {
 		return compose([](T1 const &x, int) {
 			return std::log(x);
 		}, x);
 	}
-	friend AutoDiff tanh(AutoDiff const &x) {
+	friend auto tanh(AutoDiff const &x) {
 		return compose([](T1 const &x, int) {
 			return std::tanh(x);
 		}, x);
 	}
-	friend AutoDiff atanh(AutoDiff const &x) {
+	friend auto atanh(AutoDiff const &x) {
 		return compose([](T1 const &x, int) {
 			return std::atanh(x);
 		}, x);

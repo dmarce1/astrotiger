@@ -222,7 +222,7 @@ inline constexpr T risingFactorial(T x, int n) {
 
 template<typename T>
 inline constexpr T factorialPower(T q, int n) {
-	T fpwr = 1;
+	T fpwr = T(1);
 	for (int i = 0; i < n; i++) {
 		fpwr *= q - T(i);
 	}
