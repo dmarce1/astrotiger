@@ -1,0 +1,14 @@
+*.h5
+*.h5.xmf
+*.log
+debug/
+release/
+profile/
+generated_source/
+tests/
+.cproject
+.project
+.settings/
+include/.cproject
+include/.project
+include/.settings/
