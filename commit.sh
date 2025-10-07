@@ -1,6 +1,6 @@
-git add ./include/*.hpp
-git add ./src/*.cpp
-git add ./tests/*.cpp
+git add ./include/*
+git add ./src/*
+git add ./tests/*
 git add CMakeLists.txt
 git add build.sh
 git add commit.sh
