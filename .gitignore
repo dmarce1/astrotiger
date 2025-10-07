@@ -5,7 +5,6 @@ debug/
 release/
 profile/
 generated_source/
-tests/
 .cproject
 .project
 .settings/

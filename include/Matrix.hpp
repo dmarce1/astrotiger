@@ -735,24 +735,24 @@ std::string toMathematica(Matrix<Type, R, C> const &M) {
 }
 
 template<typename T1, typename T2, int N>
-auto vectorDotProduct(Matrix<T1, N, 1> const &v1, Matrix<T2, N, 1> const &v2) {
+auto operator|(Matrix<T1, N, 1> const &v1, Matrix<T2, N, 1> const &v2) {
 	return (matrixTranspose(v1) * v2)(0, 0);
 }
 
 template<typename T1, typename T2, int N, typename T3 = decltype(T1() * T2())>
-auto vectorDyadicProduct(Matrix<T1, N, 1> const &v1, Matrix<T2, N, 1> const &v2) {
+auto operator^(Matrix<T1, N, 1> const &v1, Matrix<T2, N, 1> const &v2) {
 	return v1 * matrixTranspose(v2);
 }
 
-template<typename T1, int N>
-auto vectorMagnitude(Matrix<T1, N, 1> const &v) {
-	return sqrt(vectorDotProduct(v, v));
-}
-
-template<typename T1, int N>
-auto vectorNormalize(Matrix<T1, N, 1> const &v1) {
-	return v1 / vectorMagnitude(v1);
-}
+//template<typename T1, int N>
+//auto vectorMagnitude(Matrix<T1, N, 1> const &v) {
+//	return sqrt(vectorDotProduct(v, v));
+//}
+//
+//template<typename T1, int N>
+//auto vectorNormalize(Matrix<T1, N, 1> const &v1) {
+//	return v1 / vectorMagnitude(v1);
+//}
 
 
 //template<typename T, auto N, int M, typename Container>

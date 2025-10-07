@@ -26,11 +26,9 @@ struct RadTestCase {
 };
 
 TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[implicitEnergySolve]") {
-	EquationOfState eos;
-	eos.Γ = 5.0 / 3.0;
-	eos.μ = 1.0 * cgs::g / cgs::mol;
+	EquationOfState eos(MolarMassType(1.0));
 
-    // @formatter:off
+	// @formatter:off
     std::vector<RadTestCase> cases = {
         // idx | ρ     κₐ     κₛ       β={vx,vy,vz}     Er       Ffrac={Fx,Fy,Fz}              Tg     dt    description
         /* 0 */ {1.0,  1.0,   0.0,     {0.0,0.0,0.0},   1.0,     {0.01,0.0,0.0},                1e6,   1.0, "Thick diffusion"},
@@ -51,7 +49,7 @@ TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[impli
         /*15 */ {1.0,  1.0,   0.0,     {0.0,0.0,0.0},   1.0,     {0.2,0.0,0.0},                 1e3,   1.0, "Absorption-only"},
         /*16 */ {1.0,  0.0,   1.0,     {0.8,0.0,0.0},   1.0,     {0.6,0.0,0.0},                 1e6,   1.0, "Scattering-only"}
     };
-    // @formatter:on
+    	// @formatter:on
 
 	for (int i = 0; i < cases.size(); i++) {
 		auto const &tc = cases[i];
@@ -60,15 +58,15 @@ TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[impli
 		RadConserved radCon;
 
 		gasPrim.ρ = MassDensityType(tc.rho);
-		gasPrim.ε = temperature2gasEnergy(eos, TemperatureType(tc.Tg));
+		gasPrim.ε = eos.temperature2energy(gasPrim.ρ, TemperatureType(tc.Tg));
 		gasPrim.β[0] = tc.beta[0];
 		gasPrim.β[1] = tc.beta[1];
 		gasPrim.β[2] = tc.beta[2];
 
 		radCon.Er = temperature2radiationEnergy(TemperatureType(tc.E)); // treat E as equivalent radiation T^4
-		radCon.F[0] = tc.Ffrac[0] * radCon.Er;
-		radCon.F[1] = tc.Ffrac[1] * radCon.Er;
-		radCon.F[2] = tc.Ffrac[2] * radCon.Er;
+		radCon.F[0] = c * tc.Ffrac[0] * radCon.Er;
+		radCon.F[1] = c * tc.Ffrac[1] * radCon.Er;
+		radCon.F[2] = c * tc.Ffrac[2] * radCon.Er;
 
 		opac.κₐ = SpecificAreaType(tc.kappaA);
 		opac.κₛ = SpecificAreaType(tc.kappaS);

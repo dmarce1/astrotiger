@@ -1,3 +1,4 @@
+#include "numbers.hpp"
 #include "MultiPrecision.hpp"
 #include "MultiIndex.hpp"
 #include "DifferentialPolynomial.hpp"
@@ -816,7 +817,6 @@ auto FD(HalfInteger<int> const &k, Type η_, Type β_) {
 	return /*pow(β, k + 1) * */Ia + Ib + Ic + Id;
 }
 
-#include "Rational.hpp"
 
 
 template<typename Type, int order, int dimCount>
