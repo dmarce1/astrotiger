@@ -1,9 +1,4 @@
-/******************************************************************************
- Copyright (C) 2024  Dominic C. Marcello
-*******************************************************************************/
-
-#ifndef INCLUDE_UNITS1_UNITS_HPP_
-#define INCLUDE_UNITS1_UNITS_HPP_
+#pragma once
 
 #include "numbers.hpp"
 
@@ -70,4 +65,3 @@ struct UnitQuotient {
 
 using NullUnitType = Unit<0, 0, 0, 0, 0>;
 
-#endif /* INCLUDE_UNITS_UNITS_HPP_ */

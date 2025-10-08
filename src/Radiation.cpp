@@ -35,7 +35,7 @@ inline auto radiationTensor(RadConserved const &rad) {
 }
 
 template<typename T>
-using AD = FwdAutoDiff<T, 2, DimensionlessType>;
+using AD = AutoDiffQuantity<T, 1, 1>;
 
 auto GasPrimitive::dualEnergySwitch(EquationOfState const &eos) const {
 	auto const h = c2 + ε + eos.energy2pressure(ρ, ε) / ρ;
@@ -45,8 +45,9 @@ auto GasPrimitive::dualEnergySwitch(EquationOfState const &eos) const {
 }
 
 GasPrimitive GasConserved::toPrimitive(EquationOfState const &eos) const {
-	constexpr double toler = 2 * eps;
-	constexpr DimensionlessType Φo(1e-3);
+	static constexpr AD<DimensionlessType> one(DimensionlessType(1.0));
+	static constexpr double toler = 2 * eps;
+	static constexpr DimensionlessType Φo(1e-3);
 	using std::abs;
 	using std::copysign;
 	using std::ignore;
@@ -76,7 +77,6 @@ GasPrimitive GasConserved::toPrimitive(EquationOfState const &eos) const {
 		AD<DimensionlessType> ϰ_;
 		using Function = std::function<AD<DimensionlessType>(AD<DimensionlessType>)>;
 		Function const fEnergy = [this, eos, S1, S2, τo, &W, &ϰ_, &ε_, &ρ_](AD<DimensionlessType> β) {
-			auto const one = makeConstantLike(β, DimensionlessType(1));
 			auto const p = (AD<EnergyDensityType>(c * S1) / β - AD<EnergyDensityType>(c2 * D + max(τ, τo)));
 			AD<DimensionlessType> const β2 = β * β;
 			W = AD<EnergyDensityType>(c2 * D + max(τ, τo)) + p;

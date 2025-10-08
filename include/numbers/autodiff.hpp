@@ -1,286 +1,288 @@
-#pragma once
-#include <algorithm>
 #include <array>
 #include <cmath>
-#include <cstddef>
-#include <tuple>
-#include <utility>
-#include <vector>
+#include <type_traits>
 
-template<int Dim, int Order>
-constexpr auto makeMultiIndexTable() {
-	// Enumerate non-decreasing index tuples of length k=0..Order.
-	std::vector<std::array<int, Order>> indices;
-	std::array<int, Order> cur { };
+#include "numbers/rational.hpp"
+#include "BellPolynomial.hpp"
 
-	auto recurse = [&](auto &&self, int depth, int start) -> void {
-		if (depth == Order) {
-			indices.push_back(cur);
-			return;
+template<int O, int D>
+class FwdAutoDiff {
+	using index_type = typename std::conditional<D == 1, size_t, std::array<size_t, D>>::type;
+	static constexpr size_t size() {
+		size_t size = 1;
+		for (size_t d = 0; d < D; d++) {
+			size *= d;
 		}
-		for (int i = start; i < Dim; ++i) {
-			cur[depth] = i;
-			self(self, depth + 1, i); // allow repetition (mixed partials symmetrical)
+		return size;
+	}
+	static constexpr double factorial(size_t n) {
+		if (n > 0) {
+			return n * factorial(n - 1);
+		} else {
+			return 1.0;
 		}
-	};
-	recurse(recurse, 0, 0);
-	return indices;
-}
-
-// -----------------------------------------------------------------------------
-// Compile-time factorial and combinatorics
-// -----------------------------------------------------------------------------
-constexpr int factorial(int n) {
-	return (n <= 1) ? 1 : n * factorial(n - 1);
-}
-
-// number of combinations with repetition: C(Dim+Order,Order)
-constexpr int numDerivatives(int Dim, int Order) {
-	int num = 1;
-	for (int i = 1; i <= Order; ++i)
-		num = num * (Dim + i - 1) / i;
-	return num;
-}
-
-// -----------------------------------------------------------------------------
-// Multi-index enumeration (constexpr version)
-// -----------------------------------------------------------------------------
-template<int Dim, int Order>
-struct MultiIndexTable {
-	static constexpr int N = numDerivatives(Dim, Order);
-	std::array<std::array<int, Order>, N> data { };
-
-	constexpr MultiIndexTable() {
-		int k = 0;
-		std::array<int, Order> cur { };
-		auto recurse = [&](auto &&self, int depth, int start) -> void {
-			if (depth == Order) {
-				data[k++] = cur;
-				return;
+	}
+	static constexpr double factorialPower(int x, size_t n) {
+		if (n == 0) {
+			return 1.0;
+		} else {
+			n--;
+			return (x - n) * factorialPower(x, n);
+		}
+	}
+	static constexpr bool lte(index_type const &α, index_type const &β) {
+		for (int d = 0; d < D; d++) {
+			if (α[d] > β[d]) {
+				return false;
 			}
-			for (int i = start; i < Dim; ++i) {
-				cur[depth] = i;
-				self(self, depth + 1, i);
+		}
+		return true;
+	}
+	static constexpr bool lt(index_type const &α, index_type const &β) {
+		return !gte(α, β);
+	}
+	static constexpr bool gt(index_type const &α, index_type const &β) {
+		return !lte(α, β);
+	}
+	static constexpr bool gte(index_type const &α, index_type const &β) {
+		return lte(β, α);
+	}
+	static constexpr bool eq(index_type const &α, index_type const &β) {
+		for (int d = 0; d < D; d++) {
+			if (α[d] != β[d]) {
+				return false;
 			}
-		};
-		recurse(recurse, 0, 0);
+		}
+		return true;
 	}
-};
-
-// -----------------------------------------------------------------------------
-// FwdAutoDiffDouble
-// -----------------------------------------------------------------------------
-template<int Dim, int Order>
-struct FwdAutoDiffDouble {
-	static constexpr int dim() {
-		return Dim;
+	static constexpr bool neq(index_type const &α, index_type const &β) {
+		return !eq(α, β);
 	}
-	static constexpr int order() {
-		return Order;
+	static constexpr size_t abs(index_type const &α) {
+		size_t sum = 0;
+		for (size_t d = 0; d < D; d++) {
+			sum += α[d];
+		}
+		return sum;
 	}
-	static constexpr int count() {
-		return numDerivatives(Dim, Order);
+	static constexpr double factorial(index_type const &α) {
+		double f = 1.0;
+		for (size_t d = 0; d < D; d++) {
+			f *= factorial(α[d]);
+		}
+		return f;
 	}
-
-	std::array<double, count()> coeffs { }; // value + derivatives
-
-	// Constructors
-	constexpr FwdAutoDiffDouble() :
-			coeffs { } {
+	static constexpr size_t flatten(index_type const &α) {
+		size_t a = 0;
+		for (size_t i = 0; i < D; i++) {
+			a = O * a + α[i];
+		}
+		return a;
 	}
-	constexpr explicit FwdAutoDiffDouble(double v) {
+	static constexpr bool increment(index_type &α, index_type const &β) {
+		int dim = D - 1;
+		while (++α[dim] + β[dim] == O) {
+			if (dim == 0) {
+				return false;
+			}
+			α[dim--] = 0;
+		}
+		return true;
+	}
+	static constexpr bool increment(index_type &α) {
+		constexpr auto ζ = zero();
+		return increment(α, ζ);
+	}
+	static constexpr index_type zero() {
+		index_type ζ;
+		ζ.fill(0);
+		return ζ;
+	}
+	static constexpr index_type add(index_type const &α, index_type const &β) {
+		index_type γ;
+		for (size_t i = 0; i < D; i++) {
+			γ[i] = α[i] + β[i];
+		}
+		return γ;
+	}
+	static constexpr index_type sub(index_type const &α, index_type const &β) {
+		index_type γ;
+		for (size_t i = 0; i < D; i++) {
+			γ[i] = α[i] - β[i];
+		}
+		return γ;
+	}
+	template<class Function>
+	friend auto compose(Function const &f, FwdAutoDiff const &gj) {
+		FwdAutoDiff H;
+		std::array<double, O> dfdg;
+		T1 const g0 = gj[0];
+		for (int k = 0; k < O; k++) {
+			dfdg[k] = f(g0, k);
+		}
+		H[0] = dfdg[0];
+		auto α = zero();
+		for (increment(α);; increment(α)) {
+			double h = 0.0;
+			auto β = zero();
+			for (increment(β, α);; increment(β, α)) {
+				auto const Bnk = multivariateBellPolynomial<D, 1>(α, β);
+				double Bg = 0.0;
+				for (auto const &term : Bnk) {
+					double product = 1.0;
+					for (auto const &factor : term) {
+						auto const γ = factor.first;
+						auto const δ = factor.second;
+						product *= ipow(gj[γ], δ[0]) / T1(factorial(δ[0]));
+					}
+					Bg += product;
+				}
+				h += dfdg[k] * Bg;
+			}
+			H[N] = h;
+		}
+		return H;
+	}
+	constexpr auto inverse() const {
+		FwdAutoDiff g;
+		auto const f = coeffs[0];
+		g.coeffs.fill(0.0);
+		g.coeffs[0] = 1.0 / f;
+		auto α = zero();
+		for (increment(α);; increment(α)) {
+			auto const a = flatten(α);
+			g.coeffs[a] = 0.0;
+			auto β = zero();
+			for (increment(β);; increment(β)) {
+				if (lt(β, α)) {
+					index_type const γ = sub(α, β);
+					g.coeffs[a] += coeffs[flatten(β)] * g.coeffs[flatten(γ)];
+				}
+			}
+		}
+		return g;
+	}
+public:
+	constexpr FwdAutoDiff() {
 		coeffs.fill(0.0);
-		coeffs[0] = v;
 	}
-
-	static constexpr FwdAutoDiffDouble variable(double v, int i) {
-		FwdAutoDiffDouble x;
-		x.coeffs.fill(0.0);
-		x.coeffs[0] = v;
-		if constexpr (Order >= 1) {
-			// index 1..Dim correspond to first derivatives
-			x.coeffs[1 + i] = 1.0;
+	constexpr FwdAutoDiff(FwdAutoDiff const &other) {
+		*this = other;
+	}
+	constexpr FwdAutoDiff(FwdAutoDiff &&other) {
+		*this = std::move(other);
+	}
+	constexpr FwdAutoDiff(double value) {
+		*this = value;
+	}
+	constexpr FwdAutoDiff& operator=(FwdAutoDiff const &other) {
+		coeffs = other.coeffs;
+		return *this;
+	}
+	constexpr FwdAutoDiff& operator=(FwdAutoDiff &&other) {
+		coeffs = std::move(other.coeffs);
+		return *this;
+	}
+	constexpr FwdAutoDiff& operator=(double value) {
+		coeffs.fill(0.0);
+		coeffs[0] = value;
+		return *this;
+	}
+	static constexpr FwdAutoDiff independent(double value, size_t dim) {
+		FwdAutoDiff diff;
+		index_type indices;
+		indices.fill(0);
+		indices[dim] = 1;
+		diff.coeffs.fill(0.0);
+		diff.coeffs[0] = value;
+		diff.coeffs[flatten(indices)] = 1.0;
+	}
+	auto operator+() const {
+		return *this;
+	}
+	auto operator-() const {
+		auto A = *this;
+		for (int i = 0; i < size(); i++) {
+			A.coeffs[i] = -this->coeffs[i];
 		}
-		return x;
+		return A;
 	}
-
-	// Access
-	constexpr double value() const {
-		return coeffs[0];
-	}
-	constexpr double& value() {
-		return coeffs[0];
-	}
-
-	// simple arithmetic (first-order correct; extendable)
-	constexpr FwdAutoDiffDouble operator+(FwdAutoDiffDouble const &b) const {
-		FwdAutoDiffDouble r;
-		for (std::size_t n = 0; n < coeffs.size(); ++n) {
-			r.coeffs[n] = coeffs[n] + b.coeffs[n];
+	auto operator+(FwdAutoDiff A) const {
+		for (int i = 0; i < size(); i++) {
+			A.coeffs[i] += this->coeffs[i];
 		}
-		return r;
+		return A;
 	}
-
-	constexpr FwdAutoDiffDouble operator-(FwdAutoDiffDouble const &b) const {
-		FwdAutoDiffDouble r;
-		for (std::size_t n = 0; n < coeffs.size(); ++n) {
-			r.coeffs[n] = coeffs[n] - b.coeffs[n];
-		}
-		return r;
+	auto operator-(FwdAutoDiff A) const {
+		return *this + (-A);
 	}
-
-	constexpr FwdAutoDiffDouble operator*(double s) const {
-		FwdAutoDiffDouble r(*this);
-		for (auto &c : r.coeffs) {
-			c *= s;
-		}
-		return r;
-	}
-
-	friend constexpr FwdAutoDiffDouble operator*(double s, FwdAutoDiffDouble const &x) {
-		return x * s;
-	}
-
-	// Product rule for first-order derivatives
-	constexpr FwdAutoDiffDouble operator*(FwdAutoDiffDouble const &b) const {
-		FwdAutoDiffDouble r;
-		r.coeffs[0] = coeffs[0] * b.coeffs[0];
-		if constexpr (Order >= 1) {
-			for (int i = 0; i < Dim; ++i) {
-				r.coeffs[1 + i] = coeffs[1 + i] * b.coeffs[0] + coeffs[0] * b.coeffs[1 + i];
+	auto operator*(FwdAutoDiff const &B) const {
+		auto const &A = *this;
+		FwdAutoDiff C;
+		C.coeffs.fill(0.0);
+		for (auto α = zero();; increment(α)) {
+			for (auto β = zero();; increment(β, α)) {
+				auto const γ = add(α, β);
+				C.coeffs[flatten(γ)] += A.coeffs[flatten(α)] * B.coeffs[flatten(β)];
 			}
 		}
-		return r;
+		return C;
 	}
-
-	constexpr FwdAutoDiffDouble operator/(FwdAutoDiffDouble const &b) const {
-		FwdAutoDiffDouble r;
-		double inv = 1.0 / b.coeffs[0];
-		r.coeffs[0] = coeffs[0] * inv;
-		if constexpr (Order >= 1) {
-			for (int i = 0; i < Dim; ++i) {
-				r.coeffs[1 + i] = (coeffs[1 + i] * b.coeffs[0] - coeffs[0] * b.coeffs[1 + i]) * inv * inv;
+	auto operator/(FwdAutoDiff const &B) const {
+		return operator*(inverse(B));
+	}
+	auto operator+(double b) const {
+		auto A = *this;
+		for (int i = 0; i < size(); i++) {
+			A.coeffs[i] += b;
+		}
+		return A;
+	}
+	auto operator-(double b) const {
+		auto A = *this;
+		return A + (-b);
+	}
+	auto operator*(double b) const {
+		auto A = *this;
+		for (int i = 0; i < size(); i++) {
+			A.coeffs[i] *= b;
+		}
+		return A;
+	}
+	auto operator/(double b) const {
+		return operator*(1.0 / b);
+	}
+	friend auto operator+(double b, FwdAutoDiff A) {
+		return A + b;
+	}
+	friend auto operator-(double b, FwdAutoDiff A) {
+		return -A + b;
+	}
+	friend auto operator*(double b, FwdAutoDiff A) {
+		return A * b;
+	}
+	friend auto operator/(double b, FwdAutoDiff A) {
+		return b * inverse(A);
+	}
+	friend constexpr auto exp(FwdAutoDiff const &f) {
+		using std::exp;
+		FwdAutoDiff g { };
+		g.coeffs.fill(0.0);
+		g.coeffs[0] = exp(f.coeffs[0]);
+		auto α = zero();
+		for (increment(α);; increment(α)) {
+			auto const a = flatten(α);
+			g.coeffs[a] = 0.0;
+			auto β = zero();
+			for (increment(β, α);; increment(β, α)) {
+				auto const fβ = f.coeffs[flatten(β)];
+				auto const gαβ = g.coeffs[flatten(sub(α, β))];
+				g.coeffs[a] += fβ * gαβ / factorial(β);
 			}
 		}
-		return r;
+		return g;
 	}
 
-	// Common unary functions (first-order)
-	friend constexpr FwdAutoDiffDouble sin(FwdAutoDiffDouble const &x) {
-		FwdAutoDiffDouble r;
-		double s = std::sin(x.coeffs[0]);
-		double c = std::cos(x.coeffs[0]);
-		r.coeffs[0] = s;
-		if constexpr (Order >= 1) {
-			for (int i = 0; i < Dim; ++i)
-				r.coeffs[1 + i] = x.coeffs[1 + i] * c;
-		}
-		return r;
-	}
-
-	friend constexpr FwdAutoDiffDouble cos(FwdAutoDiffDouble const &x) {
-		FwdAutoDiffDouble r;
-		double s = std::sin(x.coeffs[0]);
-		double c = std::cos(x.coeffs[0]);
-		r.coeffs[0] = c;
-		if constexpr (Order >= 1) {
-			for (int i = 0; i < Dim; ++i)
-				r.coeffs[1 + i] = -x.coeffs[1 + i] * s;
-		}
-		return r;
-	}
-
-	friend constexpr FwdAutoDiffDouble exp(FwdAutoDiffDouble const &x) {
-		FwdAutoDiffDouble r;
-		double e = std::exp(x.coeffs[0]);
-		r.coeffs[0] = e;
-		if constexpr (Order >= 1) {
-			for (int i = 0; i < Dim; ++i)
-				r.coeffs[1 + i] = e * x.coeffs[1 + i];
-		}
-		return r;
-	}
-};
-
-#include "units.hpp"
-
-template<typename Unit, int Dim, int Order>
-struct AutoDiffQuantity {
-	using ValueType = FwdAutoDiffDouble<Dim, Order>;
-	using UnitType = Unit;
-
-	ValueType data { };
-
-	constexpr AutoDiffQuantity() = default;
-	constexpr explicit AutoDiffQuantity(Quantity<Unit> const &q) :
-			data(q.value()) {
-	}
-	constexpr explicit AutoDiffQuantity(double v) :
-			data(v) {
-	}
-
-	static constexpr AutoDiffQuantity variable(Quantity<Unit> const &q, int i) {
-		AutoDiffQuantity r;
-		r.data = ValueType::variable(q.value(), i);
-		return r;
-	}
-
-	constexpr Quantity<Unit> value() const {
-		return Quantity<Unit>(data.value());
-	}
-
-	// add/sub same unit
-	constexpr AutoDiffQuantity operator+(AutoDiffQuantity const &b) const {
-		AutoDiffQuantity r;
-		r.data = data + b.data;
-		return r;
-	}
-
-	constexpr AutoDiffQuantity operator-(AutoDiffQuantity const &b) const {
-		AutoDiffQuantity r;
-		r.data = data - b.data;
-		return r;
-	}
-
-	// multiply/divide by scalar
-	constexpr AutoDiffQuantity operator*(double s) const {
-		AutoDiffQuantity r;
-		r.data = data * s;
-		return r;
-	}
-	friend constexpr AutoDiffQuantity operator*(double s, AutoDiffQuantity const &x) {
-		return x * s;
-	}
-
-	// multiply/divide with other quantities (unit algebra)
-	template<typename U2>
-	constexpr auto operator*(AutoDiffQuantity<U2, Dim, Order> const &b) const {
-		using OutUnit = typename UnitMultiply<Unit, U2>::type;
-		AutoDiffQuantity<OutUnit, Dim, Order> r;
-		r.data = data * b.data;
-		return r;
-	}
-
-	template<typename U2>
-	constexpr auto operator/(AutoDiffQuantity<U2, Dim, Order> const &b) const {
-		using OutUnit = typename UnitDivide<Unit, U2>::type;
-		AutoDiffQuantity<OutUnit, Dim, Order> r;
-		r.data = data / b.data;
-		return r;
-	}
-
-	// common unary
-	friend constexpr AutoDiffQuantity sin(AutoDiffQuantity const &x) {
-		static_assert(Unit::isDimensionless, "sin() requires dimensionless argument");
-		AutoDiffQuantity r;
-		r.data = sin(x.data);
-		return r;
-	}
-
-	friend constexpr AutoDiffQuantity exp(AutoDiffQuantity const &x) {
-		static_assert(Unit::isDimensionless, "exp() requires dimensionless argument");
-		AutoDiffQuantity r;
-		r.data = exp(x.data);
-		return r;
-	}
+private:
+	std::array<double, size()> coeffs;
 };

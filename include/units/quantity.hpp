@@ -1,17 +1,10 @@
-/******************************************************************************
- Copyright (C) 2024  Dominic C. Marcello
- *******************************************************************************/
-
-#ifndef INCLUDE_UNITS_QUANTITY_HPP_
-#define INCLUDE_UNITS_QUANTITY_HPP_
+#pragma once
 
 #include "units/units.hpp"
 
-template<typename, typename >
-struct Quantity;
-
 template<typename Units, typename Type = double>
 struct Quantity {
+	using units_type = Units;
 	explicit constexpr Quantity(Type v = Type(0)) :
 			value_(v) {
 	}
@@ -158,7 +151,6 @@ private:
 	Type value_;
 };
 
-
 template<Rational P, typename U, typename T>
 constexpr auto pow(Quantity<U, T> const &q) {
 	using UnitType = typename UnitPower<U, P>::type;
@@ -180,4 +172,4 @@ constexpr auto exp(Quantity<NullUnitType, T> const &q) {
 	return exp(q.value());
 }
 
-#endif /* INCLUDE_UNITS_QUANTITY_HPP_ */
+
