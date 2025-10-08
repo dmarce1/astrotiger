@@ -10,7 +10,7 @@
 template<typename, typename >
 struct Quantity;
 
-template<typename Units, typename Type>
+template<typename Units, typename Type = double>
 struct Quantity {
 	explicit constexpr Quantity(Type v = Type(0)) :
 			value_(v) {

@@ -6,6 +6,7 @@
 #define INCLUDE_NUMBERS_HPP_
 
 
+#include "numbers/autodiff.hpp"
 #include "numbers/rational.hpp"
 
 
