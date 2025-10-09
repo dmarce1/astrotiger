@@ -172,4 +172,216 @@ constexpr auto exp(Quantity<NullUnitType, T> const &q) {
 	return exp(q.value());
 }
 
+#include "numbers/autodiff.hpp"
+
+template<typename, int, typename >
+struct FwdAutoDiff;
+
+template<typename U1, int O, typename I>
+class FwdAutoDiff {
+	static constexpr size_t D = std::tuple_size<I>::value;
+	using index_type = typename FwdAutoDiffDouble<O, D>::index_type;
+	using value_type = Quantity<U1, double>;
+	static constexpr auto nextLower(index_type α) {
+		size_t dim = -1;
+		for (size_t d = 0; d < D; d++) {
+			if (α[d]) {
+				dim = d;
+				α[d]--;
+				break;
+			}
+		}
+		return std::pair(dim, α);
+	}
+public:
+	constexpr FwdAutoDiff() :
+			autodiff_() {
+	}
+	constexpr FwdAutoDiff(FwdAutoDiff const &other) :
+			autodiff_(other.autodiff_) {
+	}
+	constexpr FwdAutoDiff(FwdAutoDiff &&other) :
+			autodiff_(std::move(other.autodiff_)) {
+	}
+	constexpr FwdAutoDiff(value_type const &qty) :
+			autodiff_(qty.value()) {
+	}
+	constexpr FwdAutoDiff& operator=(FwdAutoDiff const &other) {
+		autodiff_ = other.autodiff_;
+		return *this;
+	}
+	constexpr FwdAutoDiff& operator=(FwdAutoDiff &&other) {
+		autodiff_ = std::move(other.autodiff_);
+		return *this;
+	}
+	constexpr FwdAutoDiff& operator=(value_type const &qty) {
+		autodiff_ = qty.value();
+		return *this;
+	}
+	template<size_t dim = 0>
+	static constexpr auto independent(value_type const &qty) {
+		FwdAutoDiff<U1, O, I> var;
+		var.autodiff_ = FwdAutoDiffDouble<O, D>::independent(qty.value(), dim);
+		return var;
+	}
+	auto operator+() const {
+		return *this;
+	}
+	auto operator-() const {
+		FwdAutoDiff A;
+		A.autodiff_ = -autodiff_;
+		return A;
+	}
+	FwdAutoDiff& operator+=(FwdAutoDiff const &A) {
+		*this = *this + A;
+		return *this;
+	}
+	auto operator+(FwdAutoDiff A) const {
+		FwdAutoDiff B;
+		B.autodiff_ = autodiff_ + A.autodiff_;
+		return B;
+	}
+	FwdAutoDiff& operator-=(FwdAutoDiff const &A) {
+		*this = *this - A;
+		return *this;
+	}
+	auto operator-(FwdAutoDiff A) const {
+		FwdAutoDiff B;
+		B.autodiff_ = autodiff_ - A.autodiff_;
+		return B;
+	}
+	FwdAutoDiff& operator*=(FwdAutoDiff const &A) {
+		*this = *this * A;
+		return *this;
+	}
+	FwdAutoDiff& operator*=(value_type const &a) {
+		static_assert(std::is_same<NullUnitType, typename value_type::units_type>::value, "Units mismatch");
+		*this = *this * a;
+		return *this;
+	}
+	template<typename U2>
+	auto operator*(FwdAutoDiff<U2, O, I> const &A) const {
+		using U3 = typename UnitProduct<U1, U2>::type;
+		FwdAutoDiff<U3, O, I> B;
+		B.autodiff_ = autodiff_ * A.autodiff_;
+		return B;
+	}
+	template<typename U2>
+	auto operator*(Quantity<U2, double> const &a) const {
+		using U3 = typename UnitProduct<U1, U2>::type;
+		FwdAutoDiff<U3, O, I> B;
+		B.autodiff_ = autodiff_ * a.value();
+		return B;
+	}
+	auto operator*(double a) const {
+		FwdAutoDiff<U1, O, I> B;
+		B.autodiff_ = autodiff_ * a;
+		return B;
+	}
+	template<typename U2>
+	friend auto operator*(Quantity<U2, double> b, FwdAutoDiff A) {
+		return A * b;
+	}
+	FwdAutoDiff& operator/=(FwdAutoDiff const &A) {
+		*this = *this / A;
+		return *this;
+	}
+	FwdAutoDiff& operator/=(value_type const &a) {
+		static_assert(std::is_same<NullUnitType, typename value_type::units_types>::value, "Units mismatch");
+		*this = *this / a;
+		return *this;
+	}
+	template<typename U2>
+	auto operator/(FwdAutoDiff<U2, O, I> const &A) const {
+		using U3 = typename UnitQuotient<U1, U2>::type;
+		FwdAutoDiff<U3, O, I> B;
+		B.autodiff_ = autodiff_ / A.autodiff_;
+		return B;
+	}
+	template<typename U2>
+	auto operator/(Quantity<U2, double> const &a) const {
+		using U3 = typename UnitQuotient<U1, U2>::type;
+		FwdAutoDiff<U3, O, I> B;
+		B.autodiff_ = autodiff_ / a.value();
+		return B;
+	}
+	auto operator/(double a) const {
+		FwdAutoDiff<U1, O, I> B;
+		B.autodiff_ = autodiff_ / a;
+		return B;
+	}
+	template<typename U2>
+	friend auto operator/(Quantity<U2, double> b, FwdAutoDiff A) {
+		return b.value() / A;
+	}
+	friend auto operator/(double b, FwdAutoDiff A) {
+		return A / b;
+	}
+	friend auto exp(FwdAutoDiff x) {
+		static_assert(std::is_same<NullUnitType, typename value_type::units_type>::value, "Units mismatch");
+		x.autodiff_ = exp(x.autodiff_);
+		return x;
+	}
+	friend auto log(FwdAutoDiff x) {
+		static_assert(std::is_same<NullUnitType, typename value_type::units_type>::value, "Units mismatch");
+		x.autodiff_ = log(x.autodiff_);
+		return x;
+	}
+	template<Rational power>
+	friend auto pow(FwdAutoDiff const &x) {
+		using U2 = typename UnitPower<U1, power>::type;
+		FwdAutoDiff<U2, O, I> B;
+		B.autodiff_ = pow<power>(x.autodiff_);
+		return B;
+	}
+	friend auto sqrt(FwdAutoDiff const &x) {
+		using U2 = typename UnitPower<U1, Rational(1, 2)>::type;
+		FwdAutoDiff<U2, O, I> B;
+		B.autodiff_ = sqrt(x.autodiff_);
+		return B;
+	}
+	friend auto cbrt(FwdAutoDiff const &x) {
+		using U2 = typename UnitPower<U1, Rational(1, 3)>::type;
+		FwdAutoDiff<U2, O, I> B;
+		B.autodiff_ = cbrt(x.autodiff_);
+		return B;
+	}
+	template<index_type α>
+	auto get() const {
+		using R = typename UnitQuotient<U1, decltype(typeHelper<α>())>::type;
+		return Quantity<R, double>(autodiff_[α]);
+	}
+	template<index_type α>
+	constexpr auto typeHelper() const {
+		constexpr auto rc = nextLower(α);
+		constexpr auto β = rc.second;
+		constexpr auto dim = rc.first;
+		if constexpr (α != β) {
+			using ThisType = typename std::tuple_element<dim, I>::type;
+			using RestType = decltype(typeHelper<β>());
+			using NextType = typename UnitProduct<typename ThisType::units_type, RestType>::type;
+			constexpr NextType rc { };
+			return rc;
+		} else {
+			constexpr NullUnitType rc { };
+			return rc;
+		}
+	}
+	template<size_t a>
+	auto get() const {
+		constexpr index_type α { a };
+		using R = typename UnitQuotient<U1, decltype(typeHelper<α>())>::type;
+		return Quantity<R, double>(autodiff_[a]);
+	}
+	static constexpr size_t size() {
+		return pow<O>(D);
+	}
+	constexpr operator value_type() const {
+		return value_type(double(autodiff_));
+	}
+	template<typename, int, typename >
+	friend struct FwdAutoDiff;
+private:
+	FwdAutoDiffDouble<O, D> autodiff_;
+};
 

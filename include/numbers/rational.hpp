@@ -202,6 +202,12 @@ struct Rational {
 			d_ /= d;
 		}
 	}
+	constexpr Type denominator() const {
+		return d_;
+	}
+	constexpr Type numerator() const {
+		return n_;
+	}
 	Type n_ = 0;
 	Type d_ = 1;
 };
