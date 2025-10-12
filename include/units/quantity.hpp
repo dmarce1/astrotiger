@@ -5,7 +5,8 @@
 template<typename Units, typename Type = double>
 struct Quantity {
 	using units_type = Units;
-	explicit constexpr Quantity(Type v = Type(0)) :
+	explicit constexpr Quantity() = default;
+	explicit constexpr Quantity(Type v) :
 			value_(v) {
 	}
 	constexpr Quantity(Quantity const &other) {
@@ -355,8 +356,8 @@ public:
 	constexpr auto typeHelper() const {
 		constexpr auto rc = nextLower(α);
 		constexpr auto β = rc.second;
-		constexpr auto dim = rc.first;
 		if constexpr (α != β) {
+			constexpr auto dim = rc.first;
 			using ThisType = typename std::tuple_element<dim, I>::type;
 			using RestType = decltype(typeHelper<β>());
 			using NextType = typename UnitProduct<typename ThisType::units_type, RestType>::type;
@@ -367,11 +368,16 @@ public:
 			return rc;
 		}
 	}
-	template<size_t a>
+	template<auto γ>
 	auto get() const {
-		constexpr index_type α { a };
-		using R = typename UnitQuotient<U1, decltype(typeHelper<α>())>::type;
-		return Quantity<R, double>(autodiff_[a]);
+		if constexpr (std::is_same<decltype(γ), index_type>::value) {
+			using R = typename UnitQuotient<U1, decltype(typeHelper<γ>())>::type;
+			return Quantity<R, double>(autodiff_[γ]);
+		} else {
+			constexpr index_type α { γ };
+			using R = typename UnitQuotient<U1, decltype(typeHelper<α>())>::type;
+			return Quantity<R, double>(autodiff_[α]);
+		}
 	}
 	static constexpr size_t size() {
 		return pow<O>(D);

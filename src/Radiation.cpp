@@ -80,11 +80,11 @@ GasPrimitive GasConserved::toPrimitive(EquationOfState const &eos) const {
 			auto const p = (AD<EnergyDensityType>(c * S1) / β - AD<EnergyDensityType>(c2 * D + max(τ, τo)));
 			AD<DimensionlessType> const β2 = β * β;
 			W = AD<EnergyDensityType>(c2 * D + max(τ, τo)) + p;
-			AD<DimensionlessType> const γ = sqrt(one / (one - β2));
+			auto const iγ2 = one - β2;
+			auto const γ2 = one / iγ2;
+			auto const γ = sqrt(γ2);
 			auto const iγ = one / γ;
 			ρ_ = AD<MassDensityType>(D) * iγ;
-			auto const γ2 = sqr(γ);
-			auto const iγ2 = one / γ2;
 			auto const iρ = one / ρ_;
 			auto const h = W * iγ2 * iρ;
 			ε_ = h - c2 - p * iρ;
@@ -118,16 +118,15 @@ GasPrimitive GasConserved::toPrimitive(EquationOfState const &eos) const {
 		β1 = min(β1, βmax);
 		β1 = max(β1, βmin);
 		F = useEntropy ? fEntropy : fEnergy;
-		auto fRoot = F(AD<DimensionlessType>::independent<0>(DimensionlessType(β1)));
+		auto fRoot = F(AD<DimensionlessType>::independent < 0 > (DimensionlessType(β1)));
 		f = fRoot.get<0>().value();
-		printf("%e %e %e\n", fRoot.get<0>().value(), fRoot.get<1>().value(), fRoot.get<2>().value());
 		for (int j = 0; abs(f) > toler; j++) {
 			double const dfdβ = fRoot.get<1>().value();
 			double dβ = -f / dfdβ;
 			βmin = 0.5 * β1;
 			βmax = 0.5 + 0.5 * β1;
 			dβ = max(min(β1 + dβ, βmax), βmin) - β1;
-			fRoot = F(AD<DimensionlessType>::independent<0>(DimensionlessType(β1 + dβ)));
+			fRoot = F(AD<DimensionlessType>::independent < 0 > (DimensionlessType(β1 + dβ)));
 			auto const f0 = f;
 			f = fRoot.get<0>().value();
 			β1 += dβ;
@@ -136,6 +135,7 @@ GasPrimitive GasConserved::toPrimitive(EquationOfState const &eos) const {
 				dβ *= 0.5;
 				β1 += dβ;
 				fRoot = F(AD<DimensionlessType>::independent(DimensionlessType(β1)));
+				printf("%e %e %e\n", fRoot.get<0>().value(), fRoot.get<1>().value(), fRoot.get<2>().value());
 				f = fRoot.get<0>().value();
 			}
 		}
@@ -208,7 +208,7 @@ void implicitEnergySolve(GasPrimitive &prim, RadConserved &rad, Opacity const &o
 	auto const Etot0 = AD<EnergyDensityType>(Er0 + Eg0);
 	auto const λ = AD<DimensionlessType>(ρ * c * κₐ * dt);
 	auto const Fgas = [eos, prim, Etot0, Er0, Eg0, λ, ρ_, one](SpecificEnergyType ε_) {
-		auto const ε = AD<SpecificEnergyType>::independent<0>(ε_);
+		auto const ε = AD<SpecificEnergyType>::independent < 0 > (ε_);
 		auto const Tg = prim.temperature(eos);
 		auto const Tg2 = Tg * Tg;
 		auto const Tg4 = Tg2 * Tg2;
@@ -218,7 +218,7 @@ void implicitEnergySolve(GasPrimitive &prim, RadConserved &rad, Opacity const &o
 		return f;
 	};
 	auto const Frad = [eos, prim, Etot0, Er0, Eg0, λ, ρ_, one](EnergyDensityType Er_) {
-		auto const Er = AD<EnergyDensityType>::independent<0>(Er_);
+		auto const Er = AD<EnergyDensityType>::independent < 0 > (Er_);
 		auto const Tg = prim.temperature(eos);
 		auto const Bp = aR * sqr(sqr(Tg));
 		auto const f = (λ * Bp - ((one + λ) * Er - Er0)) / (Er0 + Eg0);

@@ -38,44 +38,52 @@ set(astrotiger_src
 )
 
 set(astrotiger_header
-   include/AutoDiff.hpp		 
-   include/Constants.hpp		  
-   include/DifferentialPolynomial.hpp  
-   include/Face.hpp	       
-   include/FwdAutoDiff.hpp 
-   include/Hdf5.hpp		 
-   include/Indent.hpp	 
-   include/Multidices.hpp    
-   include/Octogrid.hpp	   
-   include/Polynomial.hpp      
-   include/Range.hpp     
-   include/RungeKutta.hpp   
-   include/TriIndex.hpp
-   include/BellPolynomial.hpp	
-   include/ContainerArithmetic.hpp  
-   include/DoubleReal.hpp	     
-   include/FermiDirac.hpp   
-   include/Hypergeometric.hpp 
-   include/Integrate.hpp  
-   include/MultiIndex.hpp    
-   include/Options.hpp	 
-   include/Quadrature.hpp    
-   include/Rational.hpp 
-   include/stateCodegen.hpp 
-   include/Units.hpp
-   include/BiconjugateGradient.hpp  
-   include/Definitions.hpp	  
-   include/EulerState.hpp	    
-   include/HalfInteger.hpp 
-   include/HyperSubgrid.hpp  
-   include/Matrix.hpp	 
-   include/MultiPrecision.hpp
-   include/PadeApproximant.hpp 
-   include/RadiationState.hpp 
-   include/Radiation.hpp 
-   include/Real.hpp    
-   include/Symbolic.hpp   
-   include/Util.hpp
+	include/AutoDiff.hpp
+	include/BellPolynomial.hpp
+	include/BiconjugateGradient.hpp
+	include/constants.hpp
+	include/Constants.hpp
+	include/ContainerArithmetic.hpp
+	include/Definitions.hpp
+	include/DifferentialPolynomial.hpp
+	include/DoubleReal.hpp
+	include/EulerState.hpp
+	include/Face.hpp
+	include/FermiDirac.hpp
+	include/FwdAutoDiff.hpp
+	include/HalfInteger.hpp
+	include/Hdf5.hpp
+	include/Hypergeometric.hpp
+	include/HyperSubgrid.hpp
+	include/Indent.hpp
+	include/Integrate.hpp
+	include/Matrix.hpp
+	include/Multidices.hpp
+	include/MultiIndex.hpp
+	include/MultiPrecision.hpp
+	include/numbers.hpp
+	include/Octogrid.hpp
+	include/Options.hpp
+	include/PadeApproximant.hpp
+	include/Polynomial.hpp
+	include/Quadrature.hpp
+	include/radiation.hpp
+	include/Radiation.hpp
+	include/RadiationState.hpp
+	include/Range.hpp
+	include/Real.hpp
+	include/RungeKutta.hpp
+	include/srhd.hpp
+	include/stateCodegen.hpp
+	include/Symbolic.hpp
+	include/TriIndex.hpp
+	include/units.hpp
+	include/Util.hpp
+	include/numbers/autodiff.hpp
+	include/numbers/rational.hpp
+	include/units/cgs.hpp
+	include/units/quantity.hpp
+	include/units/units.hpp
 )
 
 
@@ -177,7 +185,7 @@ set_property(TARGET astrotiger PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 
 target_compile_options(astrotiger PUBLIC
   $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3 -g -fopt-info-vec-optimized >>
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fno-omit-frame-pointer>>
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fno-omit-frame-pointer >>
   $<$<CONFIG:Profile>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -g -pg -O2 -DNDEBUG>>
   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS} -G>>
   $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS} --use_fast_math -DNDEBUG Xcompiler=-Ofast>>
@@ -185,7 +193,7 @@ target_compile_options(astrotiger PUBLIC
 )
 
 target_link_options(astrotiger PUBLIC
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -rdynamic>>
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -rdynamic >>
 )
 
 # ------------------------------------------------------------------------------
@@ -199,7 +207,7 @@ set(test_sources
   include/FwdAutoDiff.hpp 
   include/Matrix.hpp 
   include/Radiation.hpp 
-  include/Units.hpp 
+  tests/test_autodiff.cpp
   tests/test_con2prim.cpp
   tests/test_implicit_radiation.cpp
   src/Radiation.cpp
@@ -225,8 +233,13 @@ target_include_directories(unit_tests
 )
 
 target_compile_options(unit_tests PUBLIC
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g>>
-  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3>>
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fsanitize=address>>
+  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3 -fsanitize=address>>
+)
+
+target_link_options(unit_tests PUBLIC
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fsanitize=address>>
+  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3 -fsanitize=address>>
 )
 
 include(CTest)

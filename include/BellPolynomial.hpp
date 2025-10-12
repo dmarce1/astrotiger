@@ -8,28 +8,28 @@
 #include "Multidices.hpp"
 
 template<int D1, int D2>
-auto const& multivariateBellPolynomial(Multidices<D1> const &N, Multidices<D2> const &K) {
-	using TermType = std::vector<std::pair<Multidices<D1>, Multidices<D2>>>;
+auto const& multivariateBellPolynomial(Multidices<D1> const &N, size_t const &K) {
+	using TermType = std::vector<std::pair<Multidices<D1>, size_t>>;
 	using ResultType = std::vector<TermType>;
-	using MBMapType = std::unordered_map<Multidices<D1>, Multidices<D2>>;
-	static thread_local std::unordered_map<Multidices<D1>, std::unordered_map<Multidices<D2>, std::shared_ptr<ResultType>>> memory;
+	using MBMapType = std::unordered_map<Multidices<D1>, size_t>;
+	static thread_local std::unordered_map<Multidices<D1>, std::unordered_map<size_t, std::shared_ptr<ResultType>>> memory;
 	auto &mapN = memory[N];
 	auto iterator = mapN.find(K);
 	if (iterator == mapN.end()) {
-		MBMapType J2K;
-		std::vector<MBMapType> J2Ks;
-		std::function<void(Multidices<D1>, Multidices<D1> const&, Multidices<D2> const&)> recurse;
-		recurse = [&recurse, &J2K, &J2Ks](Multidices<D1> J, Multidices<D1> const &N, Multidices<D2> const &K) {
-			for (Multidices<D2> Kj = 0; J * abs(Kj) <= N; Kj++) {
-				auto const JabsK = J * abs(Kj);
-				if ((JabsK <= N) && (Kj <= K)) {
+		MBMapType J2k;
+		std::vector<MBMapType> J2ks;
+		std::function<void(Multidices<D1>, Multidices<D1> const&, size_t const&)> recurse;
+		recurse = [&recurse, &J2k, &J2ks](Multidices<D1> J, Multidices<D1> const &N, int k) {
+			for (int kj = 0; J * kj <= N; kj++) {
+				auto const JabsK = J * kj;
+				if ((JabsK <= N) && (kj <= k)) {
 					auto const N1 = N - JabsK;
-					auto const K1 = K - Kj;
-					if (abs(Kj) > 0) {
-						J2K[J] = Kj;
+					auto const k1 = k - kj;
+					if (kj > 0) {
+						J2k[J] = kj;
 					}
-					if ((abs(N1) == 0) && (abs(K1) == 0)) {
-						J2Ks.push_back(J2K);
+					if ((abs(N1) == 0) && (k1 == 0)) {
+						J2ks.push_back(J2k);
 					} else {
 						bool end = false;
 						auto J1 = J;
@@ -41,16 +41,16 @@ auto const& multivariateBellPolynomial(Multidices<D1> const &N, Multidices<D2> c
 							}
 						} while (!(J1 <= N));
 						if (!end) {
-							recurse(J1, N1, K1);
+							recurse(J1, N1, k1);
 						}
 					}
 				}
 			}
-			J2K.erase(J);
+			J2k.erase(J);
 		};
 		recurse(Multidices<D1>(1), N, K);
 		ResultType result;
-		for (auto const &j2k : J2Ks) {
+		for (auto const &j2k : J2ks) {
 			TermType term;
 			for (auto const &t : j2k) {
 				term.push_back(t);
