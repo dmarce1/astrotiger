@@ -10,17 +10,7 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-variable"
 
-#define GAS_CONSERVED_PROPERTIES(arg, ndim) \
-		XXX(D, MassDensityType, arg, 1) \
-		XXX(τ, EnergyDensityType, arg, 1) \
-		XXX(K, EntropyDensityType, arg, 1) \
-		XXX(S, MomentumDensityType, arg, ndim)
 
-#define GAS_PRIMITIVE_PROPERTIES(arg, ndim) \
-		XXX(ρ, MassDensityType, arg, 1) \
-		XXX(ε, SpecificEnergyType, arg, 1)  \
-		XXX(γ, DimensionlessType, arg, 1)  \
-		XXX(β, DimensionlessType, arg, ndim)
 
 #pragma GCC diagnostic pop
 
@@ -31,7 +21,7 @@ template<int>
 struct GasPrimitive;
 
 template<typename Type, int ndim>
-using Tensor2 = SquareMatrix<Type, ndim>;
+using Tensor2 = SquareMatrix<Type, ndim, true>;
 
 template<typename Type, int ndim>
 using Tensor1 = Vector<Type, ndim>;

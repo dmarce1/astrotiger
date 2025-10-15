@@ -13,29 +13,29 @@ struct SingularMatrixError: public std::runtime_error {
 	}
 };
 
-template<typename Type, int rowCount, int columnCount>
+template<typename Type, int rowCount, int columnCount, bool isSymmetric = false>
 struct Matrix;
 
-template<typename Type, int count>
-using SquareMatrix = Matrix<Type, count, count>;
+template<typename Type, int count, bool isSymmetric = false>
+using SquareMatrix = Matrix<Type, count, count, isSymmetric>;
 
 template<typename >
 struct IsMatrix {
 	static constexpr bool value = false;
 };
 
-template<typename Type, int rowCount, int columnCount>
-struct IsMatrix<Matrix<Type, rowCount, columnCount>> {
+template<typename Type, int rowCount, int columnCount, bool isSymmetric>
+struct IsMatrix<Matrix<Type, rowCount, columnCount, isSymmetric>> {
 	static constexpr bool value = true;
 };
 
-template<typename Type, int rowCount, int columnCount>
+template<typename Type, int rowCount, int columnCount, bool isSymmetric>
 struct Matrix {
 	constexpr Matrix() = default;
 	constexpr Matrix(Matrix&&) = default;
 	constexpr Matrix(Matrix const&) = default;
 	template<typename OtherType>
-	constexpr Matrix(Matrix<OtherType, rowCount, columnCount> const &other) :
+	constexpr Matrix(Matrix<OtherType, rowCount, columnCount, isSymmetric> const &other) :
 			μ_(other.μ_) {
 	}
 	constexpr Matrix(std::array<std::array<Type, columnCount>, rowCount> const &init) {
@@ -60,14 +60,28 @@ struct Matrix {
 		return *this;
 	}
 	constexpr Type const& operator()(int n, int m) const {
-		return μ_[n * columnCount + m];
+		return μ_[flatIndex(n, m)];
 	}
 	constexpr Type& operator()(int n, int m) {
-		return μ_[n * columnCount + m];
+		return μ_[flatIndex(n, m)];
 	}
-	constexpr Matrix& operator+=(Matrix const &A) {
-		μ_ += A.μ_;
-		return *this;
+	template<bool otherSymmetric>
+	friend constexpr Matrix& operator+=(Matrix<Type, rowCount, columnCount, false> &A, Matrix<Type, rowCount, columnCount, otherSymmetric> const &B) {
+		if constexpr (isSymmetric) {
+			for (int l = 0; l < rowCount; l++) {
+				for (int m = 0; m <= l; m++) {
+					A(l, m) += B(l, m);
+				}
+			}
+			return A;
+		} else {
+			for (int l = 0; l < rowCount; l++) {
+				for (int m = 0; m < columnCount; m++) {
+					A(l, m) += B(l, m);
+				}
+			}
+			return A;
+		}
 	}
 	constexpr Matrix& operator-=(Matrix const &A) {
 		μ_ -= A.μ_;
@@ -90,7 +104,7 @@ struct Matrix {
 	template<typename OtherType, typename = std::enable_if_t<!IsMatrix<OtherType>::value>>
 	friend constexpr auto operator*(Matrix const &b, OtherType const &c) {
 		using ReturnType = decltype(Type() * OtherType());
-		Matrix<ReturnType, rowCount, columnCount> a;
+		Matrix<ReturnType, rowCount, columnCount, isSymmetric> a;
 		a.μ_ = b.μ_ * c;
 		return a;
 	}
@@ -111,9 +125,24 @@ struct Matrix {
 		a.μ_ = -a.μ_;
 		return a;
 	}
-	friend constexpr Matrix operator+(Matrix a, Matrix const &b) {
-		a.μ_ += b.μ_;
-		return a;
+	template<bool otherSymmetric>
+	friend constexpr Matrix operator+(Matrix A, Matrix<Type, rowCount, columnCount, otherSymmetric> const &B) {
+		if constexpr (isSymmetric) {
+			static_assert(!(otherSymmetric && !isSymmetric));
+			for (int l = 0; l < rowCount; l++) {
+				for (int m = 0; m <= l; m++) {
+					A(l, m) += B(l, m);
+				}
+			}
+			return A;
+		} else {
+			for (int l = 0; l < rowCount; l++) {
+				for (int m = 0; m < columnCount; m++) {
+					A(l, m) += B(l, m);
+				}
+			}
+			return A;
+		}
 	}
 	friend constexpr Matrix operator-(Matrix a, Matrix const &b) {
 		a.μ_ -= b.μ_;
@@ -140,21 +169,38 @@ struct Matrix {
 	constexpr Type minor(int, int) const;
 	constexpr Type cofactor(int, int) const;
 	static constexpr size_t size() {
-		return columnCount * rowCount;
+		if constexpr (isSymmetric) {
+			static_assert(rowCount == columnCount);
+			return ((columnCount + 1) * rowCount) >> 1;
+		} else {
+			return columnCount * rowCount;
+		}
 	}
-	template<typename, int, int>
+	template<typename, int, int, bool>
 	friend class Matrix;
 private:
+	constexpr int flatIndex(int n, int m) const {
+		using std::min;
+		using std::max;
+		if constexpr (isSymmetric) {
+			auto const j = max(n, m);
+			auto const k = min(n, m);
+			return ((j * (j + 1)) >> 1) + k;
+		} else {
+			return n * columnCount + m;
+		}
+	}
 	Vector<Type, size()> μ_;
 };
 
 template<typename Type, int count>
 inline Type determinant(SquareMatrix<Type, count> const&);
 
-template<typename TypeA, typename TypeB, int rowCount, int commonCount, int columnCount>
-constexpr auto operator*(Matrix<TypeA, rowCount, commonCount> const &a, Matrix<TypeB, commonCount, columnCount> const &b) {
+template<typename TypeA, typename TypeB, int rowCount, int commonCount, int columnCount, bool isSymmetricA, bool isSymmetricB>
+constexpr auto operator*(Matrix<TypeA, rowCount, commonCount, isSymmetricA> const &a, Matrix<TypeB, commonCount, columnCount, isSymmetricB> const &b) {
 	using ReturnType = decltype(TypeA() * TypeB());
-	Matrix<ReturnType, rowCount, columnCount> c;
+	constexpr bool isSymmetricC = isSymmetricA && isSymmetricB;
+	Matrix<ReturnType, rowCount, columnCount, isSymmetricC> c;
 	for (int l = 0; l < rowCount; l++) {
 		for (int m = 0; m < columnCount; m++) {
 			c(l, m) = ReturnType(0);
@@ -166,13 +212,13 @@ constexpr auto operator*(Matrix<TypeA, rowCount, commonCount> const &a, Matrix<T
 	return c;
 }
 
-template<typename Type, int rowCount, int columnCount>
-constexpr Type Matrix<Type, rowCount, columnCount>::minor(int row, int col) const {
+template<typename Type, int rowCount, int columnCount, bool isSymmetric>
+constexpr Type Matrix<Type, rowCount, columnCount, isSymmetric>::minor(int row, int col) const {
 	return determinant(submatrix(row, col));
 }
 
-template<typename Type, int rowCount, int columnCount>
-constexpr Type Matrix<Type, rowCount, columnCount>::cofactor(int row, int col) const {
+template<typename Type, int rowCount, int columnCount, bool isSymmetric>
+constexpr Type Matrix<Type, rowCount, columnCount, isSymmetric>::cofactor(int row, int col) const {
 	return nonepow(row + col) * minor(row, col);
 }
 
@@ -185,15 +231,19 @@ inline Type trace(SquareMatrix<Type, count> const &a) {
 	return traceA;
 }
 
-template<typename Type, int rowCount, int columnCount>
-inline auto transpose(Matrix<Type, rowCount, columnCount> const &a) {
-	Matrix<Type, columnCount, rowCount> transposeA;
-	for (int n = 0; n < rowCount; n++) {
-		for (int m = 0; m < columnCount; m++) {
-			transposeA(m, n) = a(n, m);
+template<typename Type, int rowCount, int columnCount, bool isSymmetric>
+inline auto transpose(Matrix<Type, rowCount, columnCount, isSymmetric> const &a) {
+	if constexpr (isSymmetric) {
+		return a;
+	} else {
+		Matrix<Type, columnCount, rowCount> transposeA;
+		for (int n = 0; n < rowCount; n++) {
+			for (int m = 0; m < columnCount; m++) {
+				transposeA(m, n) = a(n, m);
+			}
 		}
+		return transposeA;
 	}
-	return transposeA;
 }
 
 template<typename Type, int count>
@@ -235,8 +285,8 @@ constexpr SquareMatrix<Type, count> inverse(SquareMatrix<Type, count> const &a) 
 }
 
 template<typename Type, int count>
-constexpr SquareMatrix<Type, count> identity() {
-	SquareMatrix<Type, count> I;
+constexpr auto identity() {
+	SquareMatrix<Type, count, true> I;
 	for (int n = 0; n < count; n++) {
 		I(n, n) = Type(1);
 		for (int m = 0; m < n; m++) {

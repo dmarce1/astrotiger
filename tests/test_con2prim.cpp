@@ -1,4 +1,3 @@
-
 /******************************************************************************
  Copyright (C) 2024  Dominic C. Marcello
  *******************************************************************************/
@@ -7,7 +6,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include "radiation.hpp"
-
 
 constexpr int ndim = 3;
 
@@ -38,7 +36,7 @@ TEST_CASE("Ultra-relativistic γ~100", "[con2prim]") {
 	prim.ρ = MassDensityType(1.0);
 	prim.β = { (DimensionlessType) 0.99995, (DimensionlessType) 0.0, (DimensionlessType) 0.0 };
 	prim.ε = 0.00001 * c2;
-	prim.updateLorentz();
+
 	roundTripCheck(prim, eos, 1e-6);
 }
 
@@ -49,7 +47,7 @@ TEST_CASE("Normal gas ", "[con2prim]") {
 	prim.ρ = MassDensityType(1.0);
 	prim.β = { (DimensionlessType) 0.01, (DimensionlessType) 0.0, (DimensionlessType) 0.0 };
 	prim.ε = 1.0e-1 * c2;
-	prim.updateLorentz();
+
 	roundTripCheck(prim, eos, 1e-5);
 }
 
@@ -59,7 +57,7 @@ TEST_CASE("Cold gas near rest", "[con2prim]") {
 	prim.ρ = MassDensityType(1.0);
 	prim.β = { (DimensionlessType) 0.0, (DimensionlessType) 0.0, (DimensionlessType) 0.0 };
 	prim.ε = SpecificEnergyType(1e-6);
-	prim.updateLorentz();
+
 	roundTripCheck(prim, eos);
 }
 
@@ -70,7 +68,7 @@ TEST_CASE("Mildly relativistic γ~2", "[con2prim]") {
 	prim.ρ = MassDensityType(1.0);
 	prim.β = { (DimensionlessType) 0.866, (DimensionlessType) 0.0, (DimensionlessType) 0.0 }; // gamma ~ 2
 	prim.ε = 0.1 * c2;
-	prim.updateLorentz();
+
 	roundTripCheck(prim, eos, 1e-8);
 }
 
@@ -81,7 +79,7 @@ TEST_CASE("Ultra-relativistic γ~1000", "[con2prim]") {
 	prim.ρ = MassDensityType(1.0);
 	prim.β = { (DimensionlessType) 0.9999995, (DimensionlessType) 0.0, (DimensionlessType) 0.0 };
 	prim.ε = 0.5 * c2;
-	prim.updateLorentz();
+
 	roundTripCheck(prim, eos, 1e-6);
 }
 
@@ -92,7 +90,7 @@ TEST_CASE("Ultra-relativistic γ~10", "[con2prim]") {
 	prim.ρ = MassDensityType(1.0);
 	prim.β = { DimensionlessType(0.995), DimensionlessType(0.0), DimensionlessType(0.0) }; // gamma ~ 10
 	prim.ε = 0.5 * c2;
-	prim.updateLorentz();
+
 	roundTripCheck(prim, eos, 1e-6); // allow looser tolerance
 }
 
@@ -103,7 +101,6 @@ TEST_CASE("Hot gas (ε >> c^2)", "[con2prim]") {
 	prim.ρ = MassDensityType(1.0);
 	prim.β = { DimensionlessType(0.2), DimensionlessType(0.1), DimensionlessType(0.0) };
 	prim.ε = 50.0 * c2;
-	prim.updateLorentz();
 
 	roundTripCheck(prim, eos, 1e-5);
 }
@@ -114,7 +111,6 @@ TEST_CASE("Low-density / vacuum-like", "[con2prim]") {
 	prim.ρ = MassDensityType(1e-12);
 	prim.β = { DimensionlessType(0.0), DimensionlessType(0.0), DimensionlessType(0.0) };
 	prim.ε = SpecificEnergyType(1.0);
-	prim.updateLorentz();
 
 	roundTripCheck(prim, eos, 1e-6);
 }

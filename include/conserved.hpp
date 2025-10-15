@@ -28,13 +28,12 @@ private:
 	}
 };
 
-
-
 template<int NDIM>
 struct GasConserved {
-#define XXX(name, type, arg, dim) std::conditional_t<dim == 1, Tensor0<type, dim>, Tensor1<type, dim>> name;
-	GAS_CONSERVED_PROPERTIES(0, NDIM)
-#undef XXX
+	MassDensityType D;
+	EnergyDensityType τ;
+	EntropyDensityType K;
+	Vector<MomentumDensityType, NDIM> S;
 	GasPrimitive<NDIM> toPrimitive(EquationOfState const &eos) const {
 		using namespace Constants;
 		static constexpr FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>> one(DimensionlessType(1.0));
@@ -47,17 +46,16 @@ struct GasConserved {
 		using std::max;
 		using std::min;
 		using std::tanh;
-		GasPrimitive<NDIM> gasPrim;
-#define XXX(name, type, arg, dim) CopyConstType<decltype(arg), std::conditional_t<dim == 1, Tensor0<type, dim>, Tensor1<type, dim>>>& name = arg.name;
-		GAS_PRIMITIVE_PROPERTIES(gasPrim, NDIM);
-#undef XXX
+		GasPrimitive<NDIM> prim;
+		MassDensityType &ρ = prim.ρ;
+		SpecificEnergyType &ε = prim.ε;
+		Vector<DimensionlessType, NDIM> &β = prim.β;
 		auto const S2 = S.dot(S);
 		auto const D2 = sqr(D);
 		auto const S1 = sqrt(S2);
 		auto const τo = c * (sqrt(c2 * D2 + S2) - c * D);
 		if (S2.value() < tiny) {
 			auto const iρ = 1 / D;
-			γ = 1.0;
 			ρ = D;
 			ε = max(τ, τo) * iρ;
 			β = S * iρ * ic;
@@ -68,7 +66,8 @@ struct GasConserved {
 			FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>> ϰ_;
 			using Function = std::function<FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>>(FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>>)>;
 			Function const fEnergy = [this, eos, S1, S2, τo, &W, &ϰ_, &ε_, &ρ_](FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>> β) {
-				auto const p = (FwdAutoDiff<EnergyDensityType, NDIM, std::tuple<DimensionlessType>>(c * S1) / β - FwdAutoDiff<EnergyDensityType, NDIM, std::tuple<DimensionlessType>>(c2 * D + max(τ, τo)));
+				auto const p = (FwdAutoDiff<EnergyDensityType, NDIM, std::tuple<DimensionlessType>>(c * S1) / β
+						- FwdAutoDiff<EnergyDensityType, NDIM, std::tuple<DimensionlessType>>(c2 * D + max(τ, τo)));
 				FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>> const β2 = β * β;
 				W = FwdAutoDiff<EnergyDensityType, NDIM, std::tuple<DimensionlessType>>(c2 * D + max(τ, τo)) + p;
 				auto const iγ2 = one - β2;
@@ -135,17 +134,15 @@ struct GasConserved {
 			ρ = MassDensityType(ρ_);
 			β = c * S / EnergyDensityType(W);
 			ε = SpecificEnergyType(ε_);
-			γ = sqrt(1.0 / (1.0 - β1 * β1));
 			if (!useEntropy) {
-				if (gasPrim.dualEnergySwitch(eos) < Φo) {
+				if (prim.dualEnergySwitch(eos) < Φo) {
 					useEntropy = true;
 					goto REDO_PRIMITIVE;
 				}
 			}
 		}
-		return gasPrim;
+		return prim;
 	}
 };
-
 
 #endif /* INCLUDE_SRHD_CONSERVED_HPP_ */

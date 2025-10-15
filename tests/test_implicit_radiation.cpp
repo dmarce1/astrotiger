@@ -68,10 +68,10 @@ TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[impli
 		gasPrim.β[1] = tc.beta[1];
 		gasPrim.β[2] = tc.beta[2];
 
-		radCon.Er = temperature2radiationEnergy(TemperatureType(tc.E));
-		radCon.F[0] = c * tc.Ffrac[0] * radCon.Er;
-		radCon.F[1] = c * tc.Ffrac[1] * radCon.Er;
-		radCon.F[2] = c * tc.Ffrac[2] * radCon.Er;
+		radCon.E = temperature2radiationEnergy(TemperatureType(tc.E));
+		radCon.F[0] = c * tc.Ffrac[0] * radCon.E;
+		radCon.F[1] = c * tc.Ffrac[1] * radCon.E;
+		radCon.F[2] = c * tc.Ffrac[2] * radCon.E;
 
 		opac.κₐ = SpecificAreaType(tc.kappaA);
 		opac.κₛ = SpecificAreaType(tc.kappaS);
@@ -81,10 +81,10 @@ TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[impli
 
 		implicitRadiationSolve<ndim>(gasCon, radCon, opac, eos, TimeType(tc.dt));
 
-		auto deltaE = radCon0.Er - radCon.Er;
+		auto deltaE = radCon0.E - radCon.E;
 
 		double Eg0 = (gasPrim.ρ * gasPrim.ε).value();
-		double Er0 = radCon0.Er.value();
+		double Er0 = radCon0.E.value();
 		double Eg1 = Eg0 - deltaE.value();
 		double Er1 = Er0 + deltaE.value();
 
