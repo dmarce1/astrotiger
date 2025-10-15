@@ -2,8 +2,7 @@
  Copyright (C) 2024  Dominic C. Marcello
  *******************************************************************************/
 
-#ifndef INCLUDE_RATIONAL_HPP_
-#define INCLUDE_RATIONAL_HPP_
+#pragma once
 
 #include <cmath>
 #include <cstdint>
@@ -212,4 +211,3 @@ struct Rational {
 	Type d_ = 1;
 };
 
-#endif /* INCLUDE_RATIONAL_HPP_ */

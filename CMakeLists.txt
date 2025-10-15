@@ -27,132 +27,34 @@ find_package(HPX  REQUIRED)
 # SOURCES
 # ------------------------------------------------------------------------------
 set(astrotiger_src
-  src/main.cpp
-  src/Constants.cpp
-  src/FermiDirac.cpp
-  src/Options.cpp
-  src/Util.cpp
-  src/Radiation.cpp
-  src/SodShockTube.cpp
-  src/Symbolic.cpp
+   src/main.cpp
+   src/fpe.cpp
+   src/io.cpp
 )
 
 set(astrotiger_header
-	include/AutoDiff.hpp
-	include/BellPolynomial.hpp
-	include/BiconjugateGradient.hpp
+	include/autodiff.hpp
+	include/cgs.hpp
+	include/conserved.hpp
 	include/constants.hpp
-	include/Constants.hpp
-	include/ContainerArithmetic.hpp
-	include/Definitions.hpp
-	include/DifferentialPolynomial.hpp
-	include/DoubleReal.hpp
-	include/EulerState.hpp
-	include/Face.hpp
-	include/FermiDirac.hpp
-	include/FwdAutoDiff.hpp
-	include/HalfInteger.hpp
-	include/Hdf5.hpp
-	include/Hypergeometric.hpp
-	include/HyperSubgrid.hpp
+	include/eos.hpp
+	include/fpe.hpp
 	include/Indent.hpp
-	include/Integrate.hpp
-	include/Matrix.hpp
-	include/Multidices.hpp
-	include/MultiIndex.hpp
-	include/MultiPrecision.hpp
-	include/numbers.hpp
-	include/Octogrid.hpp
-	include/Options.hpp
-	include/PadeApproximant.hpp
-	include/Polynomial.hpp
-	include/Quadrature.hpp
+	include/indices.hpp
+	include/io.hpp
+	include/math.hpp
+	include/matrix.hpp
+	include/primitive.hpp
+	include/quantity.hpp
 	include/radiation.hpp
-	include/Radiation.hpp
-	include/RadiationState.hpp
-	include/Range.hpp
-	include/Real.hpp
-	include/RungeKutta.hpp
+	include/rational.hpp
 	include/srhd.hpp
-	include/stateCodegen.hpp
-	include/Symbolic.hpp
-	include/TriIndex.hpp
+	include/type_traits.hpp
 	include/units.hpp
-	include/Util.hpp
-	include/numbers/autodiff.hpp
-	include/numbers/rational.hpp
-	include/units/cgs.hpp
-	include/units/quantity.hpp
-	include/units/units.hpp
+	include/vector.hpp
 )
 
 
-# ------------------------------------------------------------------------------
-# CODEGEN
-# ------------------------------------------------------------------------------
-add_executable(codegen
-  	src/codegen.cpp
-  	src/stateCodegen.cpp
-  	src/Util.cpp
-  	include/Definitions.hpp
-  	include/Indent.hpp
-  	include/stateCodegen.hpp
-	include/Symbolic.hpp
- 	include/Util.hpp
-)
-
-target_include_directories(codegen PRIVATE
-  ${PROJECT_SOURCE_DIR}/include
-)
-
-target_link_libraries(codegen PUBLIC
-    gmp
-	stdc++_libbacktrace
-    quadmath    
-    symengine
-)
-
-target_compile_options(codegen PUBLIC
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -march=native -O0 -g -fno-omit-frame-pointer>>
-  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -march=native -O2>>
-  $<$<CONFIG:Profile>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -g -pg -march=native -O2 -DNDEBUG>>
-)
-
-target_link_options(codegen PUBLIC
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -march=native -rdynamic>>
-  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -march=native>>
-  $<$<CONFIG:Profile>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -pg -march=native>>
-)
-
-# ------------------------------------------------------------------------------
-# GENERATED CODE
-# ------------------------------------------------------------------------------
-set(GENERATED_SOURCE_DIR ${CMAKE_BINARY_DIR}/generated_source)
-file(MAKE_DIRECTORY ${GENERATED_SOURCE_DIR})
-set(GENERATED_DG_TRANSFORMS "${GENERATED_SOURCE_DIR}/dgTransforms.hpp")
-
-add_custom_command(
-  OUTPUT  "${GENERATED_DG_TRANSFORMS}"
-          "${GENERATED_SOURCE_DIR}/.codegen.stamp"
-  COMMAND "${CMAKE_COMMAND}" -E make_directory "${GENERATED_SOURCE_DIR}"
-  COMMAND codegen --output-dir "${GENERATED_SOURCE_DIR}"
-  COMMAND "${CMAKE_COMMAND}" -E compare_files
-          "${GENERATED_DG_TRANSFORMS}" "${GENERATED_DG_TRANSFORMS}"
-  COMMAND "${CMAKE_COMMAND}" -E touch
-          "${GENERATED_SOURCE_DIR}/.codegen.stamp"
-  DEPENDS codegen
-  COMMENT "Running codegen → ${GENERATED_SOURCE_DIR}"
-  VERBATIM
-)
-
-add_custom_target(generate_code
-  DEPENDS "${GENERATED_DG_TRANSFORMS}"
-)
-
-file(GLOB_RECURSE GENERATED_SOURCES
-  CONFIGURE_DEPENDS
-  "${GENERATED_SOURCE_DIR}/*.cpp"
-)
 
 # ------------------------------------------------------------------------------
 # ASTROTIGER EXECUTABLE
@@ -172,7 +74,6 @@ add_hpx_executable(
     ${astrotiger_header}
 )
 
-add_dependencies(astrotiger generate_code)
 
 target_include_directories(astrotiger
   PUBLIC
@@ -204,14 +105,11 @@ add_subdirectory(extern/Catch2)
 
 # Define test sources
 set(test_sources
-  include/FwdAutoDiff.hpp 
-  include/Matrix.hpp 
-  include/Radiation.hpp 
+  ${astrotiger_header}  
   tests/test_autodiff.cpp
   tests/test_con2prim.cpp
   tests/test_implicit_radiation.cpp
-  src/Radiation.cpp
-  src/Util.cpp
+  src/fpe.cpp
 )
 
 add_executable(unit_tests ${test_sources} )

@@ -5,8 +5,10 @@
 #ifndef INCLUDE_CONSTANTS_HPP_
 #define INCLUDE_CONSTANTS_HPP_
 
-#include "units.hpp"
-#include "Matrix.hpp"
+#include "cgs.hpp"
+#include "matrix.hpp"
+
+namespace Constants {
 
 static constexpr double π = 4 * atan(1);
 static constexpr auto amu = MassType(1.0 / 6.02214076e23);
@@ -22,8 +24,8 @@ static constexpr auto ic2 = ic * ic;
 static constexpr double tiny = sqrt(std::numeric_limits<double>::min());
 static constexpr double huge = sqrt(std::numeric_limits<double>::max());
 static constexpr double eps = std::numeric_limits<double>::epsilon();
-
 template<int D>
-static constexpr auto δ = SquareMatrix<DimensionlessType, D>::identity();
+static constexpr auto δ = identity<DimensionlessType, D>();
 
+}
 #endif /* INCLUDE_CONSTANTS_HPP_ */

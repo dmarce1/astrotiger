@@ -1,20 +1,19 @@
+
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch_all.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <iostream>
 
-#include "numbers/autodiff.hpp" // your header with the class template
+#include "autodiff.hpp"
 
 using Catch::Approx;
 
-// ----------------- Helpers -----------------
 template<int O, int D>
-static void forAllMultiIndices(std::function<void(std::array<int, D> const&)> const &f) {
-	std::array<int, D> α { };
-	α.fill(0);
+static void forAllMultiIndices(std::function<void(Indices<O, D, int> const&)> const &f) {
+	auto α = Indices<O, D, int>::zero();
 	while (true) {
 		f(α);
-		// increment base-O counter over D dims: 0..O-1 in each slot
 		int d = D - 1;
 		while (d >= 0) {
 			α[d] += 1;
@@ -31,13 +30,13 @@ static void forAllMultiIndices(std::function<void(std::array<int, D> const&)> co
 }
 
 template<int O, int D>
-static double getCoeff(FwdAutoDiffDouble<O, D> const &a, int n) {
+static double getCoeff(FwdAutoDiff< double, O, std::array<double, D> > const &a, int n) {
 	static_assert(D == 1, "D==1 overload only");
 	return a[n];
 }
 
 template<int O, int D>
-static double getCoeff(FwdAutoDiffDouble<O, D> const &a, std::array<int, D> const &α) {
+static double getCoeff(FwdAutoDiff< double, O, std::array<double, D>> const &a, Indices<O, D, int> const &α) {
 	if constexpr (D == 1) {
 		return a[α[0]];
 	} else {
@@ -46,39 +45,31 @@ static double getCoeff(FwdAutoDiffDouble<O, D> const &a, std::array<int, D> cons
 }
 
 template<int O, int D>
-static void expectSeriesEqual(FwdAutoDiffDouble<O, D> const &A, FwdAutoDiffDouble<O, D> const &B, double tol = 1e-12) {
+static void expectSeriesEqual(FwdAutoDiff< double, O, std::array<double, D> > const &A, FwdAutoDiff< double, O, std::array<double, D> > const &B, double tol = 1e-12) {
 	if constexpr (D == 1) {
 		for (int n = 0; n < O; ++n) {
 			REQUIRE(getCoeff<O, D>(A, n) == Approx(getCoeff<O, D>(B, n)).margin(tol));
 		}
 	} else {
-		forAllMultiIndices<O, D>([&](std::array<int, D> const &α) {
+		forAllMultiIndices<O, D>([&](Indices<O, D, int> const &α) {
 			REQUIRE(getCoeff<O, D>(A, α) == Approx(getCoeff<O, D>(B, α)).margin(tol));
 		});
 	}
 }
 
-//// ----------------- Main -----------------
-//int main(int argc, char* argv[]) {
-//	return Catch::Session().run(argc, argv);
-//}
 
 TEST_CASE("FwdAutoDiffDouble<O=6,D=1>: basic identities", "[FwdAutoDiffDouble][univariate]") {
 	constexpr int O = 6;
 	constexpr int D = 1;
-	using AD = FwdAutoDiffDouble<O, D>;
+	using AD = FwdAutoDiff< double, O, std::array<double, D> >;
 
-	// choose a positive expansion point so log/sqrt/cbrt are well-defined
 	double const a = 1.3;
 
 	AD x = AD::independent(a, 0);
 	AD y;
-//	SECTION("exp(log(x)) == x (series equality)") {
-//		y = exp(x);
-//	}
 	SECTION("exp(log(x)) == x (series equality)") {
-		FwdAutoDiffDouble<O, D> z = log(x);
-		FwdAutoDiffDouble<O, D> y = exp(z);
+		FwdAutoDiff< double, O, std::array<double, D> > z = log(x);
+		FwdAutoDiff< double, O, std::array<double, D> > y = exp(z);
 		expectSeriesEqual<O, D>(y, x, 1e-12);
 	}
 	SECTION("x * (1/x) == 1 (series equality)") {
@@ -109,9 +100,8 @@ TEST_CASE("FwdAutoDiffDouble<O=6,D=1>: basic identities", "[FwdAutoDiffDouble][u
 TEST_CASE("FwdAutoDiffDouble<O=5,D=2>: multivariate composition/product identities", "[FwdAutoDiffDouble][bivariate]") {
 	constexpr int O = 5;
 	constexpr int D = 2;
-	using AD = FwdAutoDiffDouble<O, D>;
+	using AD = FwdAutoDiff< double, O, std::array<double, D> >;
 
-	// positive expansion point for both dims
 	double const ax = 0.9;
 	double const ay = 1.2;
 
@@ -139,11 +129,10 @@ TEST_CASE("FwdAutoDiffDouble<O=5,D=2>: multivariate composition/product identiti
 	}
 }
 
-// Optional: quick numerical sanity via evaluated series at a point (uses operator())
 TEST_CASE("Evaluation at a point agrees with constructed identities", "[FwdAutoDiffDouble][eval]") {
 	constexpr int O = 6;
 	constexpr int D = 1;
-	using AD = FwdAutoDiffDouble<O, D>;
+	using AD = FwdAutoDiff< double, O, std::array<double, D> >;
 
 	double const a = 1.1;
 	AD x = AD::independent(a, 0);
