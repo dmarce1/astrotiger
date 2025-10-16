@@ -17,8 +17,6 @@
 #include <tuple>
 #include "autodiff.hpp"
 
-
-
 struct ImplicitEnergyFailure: public std::runtime_error {
 	explicit ImplicitEnergyFailure(std::string const &msg, double rhoVal, double epsVal, double EVal, double fVal, double dfVal, double stepVal, int iter) :
 			std::runtime_error(makeMessage(msg, rhoVal, epsVal, EVal, fVal, dfVal, stepVal, iter)) {
@@ -65,7 +63,7 @@ auto RadConserved<NDIM>::pressure() const {
 	auto const ξ = (3 + 4 * f2) / (5 + 2 * sqrt(4 - 3 * f2));
 	auto const Ωdif = 0.5 * (1 - ξ);
 	auto const Ωstr = 0.5 * (3 * ξ - 1);
-	auto const P = E * (Ωdif * δ < NDIM > +Ωstr * (n * n));
+	auto const P = E * (Ωdif * δ < NDIM > +Ωstr * sqr(n));
 	return P;
 }
 
@@ -166,13 +164,13 @@ void implicitRadiationSolve(GasConserved<NDIM> &gasCon, RadConserved<NDIM> &radC
 	enableFPE();
 	GasPrimitive<NDIM> gasPrim;
 	EnergyDensityType &τ = gasCon.τ;
-	EnergyDensityType& E = radCon.E;
+	EnergyDensityType &E = radCon.E;
 	EntropyDensityType &K = gasCon.K;
 	MassDensityType &D = gasCon.D;
 	MassDensityType &ρ = gasPrim.ρ;
 	SpecificEnergyType &ε = gasPrim.ε;
 	Vector<DimensionlessType, NDIM> &β = gasPrim.β;
-	Vector<EnergyFluxType, NDIM>& F = radCon.F;
+	Vector<EnergyFluxType, NDIM> &F = radCon.F;
 	Vector<MomentumDensityType, NDIM> &S = gasCon.S;
 	auto const norm = sqrt(sqr(sqrt(F.dot(F))) * ic2 + sqr(E) + c2 * sqr(sqrt(S.dot(S))) + sqr(τ)).value();
 	double error = 1.0;
@@ -186,17 +184,17 @@ void implicitRadiationSolve(GasConserved<NDIM> &gasCon, RadConserved<NDIM> &radC
 		auto const E1 = E;
 		gasPrim = gasCon.toPrimitive(eos);
 		auto const γ = gasPrim.lorentzFactor();
-		auto const Λ = space2spaceTime<DimensionlessType>(γ, γ * β, δ < NDIM > + (sqr(γ) / (γ + 1)) * (β * β));
 		auto const dt0 = dt / γ;
-		auto const iΛ = space2spaceTime<DimensionlessType>(γ, -γ * β, δ < NDIM > +(sqr(γ) / (γ + 1)) * (β * β));
+		auto const Λ = space2spaceTime<DimensionlessType>(γ, γ * β, δ<NDIM> + (sqr(γ) / (γ + 1)) * sqr(β));
+		auto const iΛ = space2spaceTime<DimensionlessType>(γ, -γ * β, δ<NDIM> + (sqr(γ) / (γ + 1)) * sqr(β));
 		auto const λ = ρ * c * (opac.κₐ + opac.κₛ) * dt0;
-		auto R = Λ * R0 * Λ;
+		auto R = symmetric(Λ * R0 * Λ);
 		E = spaceTime2Tensor0(R);
 		F = c * spaceTime2Tensor1(R);
 		implicitEnergySolve<NDIM>(ε, E, ρ, opac.κₛ, eos, dt0);
 		F = F / (1 + λ);
 		R = radCon.stressEnergy();
-		R = iΛ * R * iΛ;
+		R = symmetric(iΛ * R * iΛ);
 		E = spaceTime2Tensor0(R);
 		F = c * spaceTime2Tensor1(R);
 		S = S0 + (F - F0) * ic2;
