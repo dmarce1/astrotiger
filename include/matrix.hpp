@@ -551,39 +551,5 @@ constexpr auto antisymmetric(SquareMatrix<Type, count, symmetry> const &a) {
 	return c;
 }
 
-template<typename Type, int dimensionCount, SymmetryType symmetry>
-constexpr auto QR(SquareMatrix<Type, dimensionCount, symmetry> const &A) {
-	using ColumnType = Vector<Type, dimensionCount>;
-	constexpr Type zero(0);
-	SquareMatrix<Type, dimensionCount> Q;
-	SquareMatrix<Type, dimensionCount> R;
-	std::array<ColumnType, dimensionCount> a;
-	std::array<ColumnType, dimensionCount> e;
-	std::array<ColumnType, dimensionCount> u;
-	auto const proj = [](ColumnType const &u, ColumnType const &a) {
-		auto const ua = u.dot(a);
-		auto const uu = u.dot(u);
-		return u * (ua / uu);
-	};
-	for (int j = 0; j < dimensionCount; j++) {
-		a[j] = A.column(j);
-	}
-	for (int k = 0; k < dimensionCount; k++) {
-		u[k] = a[k];
-		for (int j = 0; j < k; j++) {
-			u[k] = u[k] - proj(u[j], u[k]);
-		}
-	}
-	for (int k = 0; k < dimensionCount; k++) {
-		e[k] = u[k] / sqrt(u.dot(u));
-	}
-	for (int k = 0; k < dimensionCount; k++) {
-		for (int j = 0; j < dimensionCount; j++) {
-			R(j, k) = (j < k) ? zero : e[k].dot(a[j]);
-			Q(j, k) = e[k][j];
-		}
-	}
-	return std::pair(Q, R);
-}
 
 #undef ASSIGN_BINARY_OP

@@ -7,17 +7,20 @@
 
 #include "constants.hpp"
 #include "cgs.hpp"
+#include "rational.hpp"
 
+
+template<typename Type>
 struct EquationOfState {
 	constexpr EquationOfState() = default;
 	constexpr EquationOfState(EquationOfState const&) = default;
 	constexpr EquationOfState& operator=(EquationOfState const&) = default;
-	constexpr EquationOfState(MolarMassType μ_) :
+	constexpr EquationOfState(MolarMassType<Type> μ_) :
 			μ(μ_) {
 	}
 	template<typename Tρ, typename Tε>
-	auto energy2pressure(Tρ const &ρ, Tε const &ε) const {
-		return ρ * ε * (Γ - 1);
+	decltype(Tε() * Tρ()) energy2pressure(Tρ const &ρ, Tε const &ε) const {
+		return (ρ * ε) * (Γ - 1);
 	}
 	template<typename Tρ, typename Tε>
 	auto energy2temperature(Tρ const &ρ, Tε const &ε) const {
@@ -47,7 +50,7 @@ struct EquationOfState {
 	}
 private:
 	static constexpr Rational Γ = Rational(5, 3);
-	MolarMassType const μ;
+	MolarMassType<Type> const μ;
 };
 
 

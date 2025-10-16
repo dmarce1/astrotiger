@@ -6,12 +6,12 @@
 
 #include "srhd.hpp"
 
-template<int NDIM>
+template<typename Type, int dimensionCount>
 struct GasPrimitive {
-	MassDensityType ρ;
-	SpecificEnergyType ε;
-	Vector<DimensionlessType, NDIM> β;
-	auto dualEnergySwitch(EquationOfState const &eos) const {
+	MassDensityType<Type> ρ;
+	SpecificEnergyType<Type> ε;
+	Vector<DimensionlessType<Type>, dimensionCount> β;
+	auto dualEnergySwitch(EquationOfState<Type> const &eos) const {
 		using namespace Constants;
 		auto const h = enthalpy(eos);
 		auto const γ = lorentzFactor();
@@ -19,20 +19,20 @@ struct GasPrimitive {
 		auto const den = ρ * γ * (γ * h - c2);
 		return num / den;
 	}
-	SpecificEnergyType enthalpy(EquationOfState const &eos) const {
+	SpecificEnergyType<Type> enthalpy(EquationOfState<Type> const &eos) const {
 		using namespace Constants;
 		return c2 + ε + eos.energy2pressure(ρ, ε) / ρ;
 	}
-	DimensionlessType lorentzFactor() const {
+	DimensionlessType<Type> lorentzFactor() const {
 		return sqrt(1 / (1 - β.dot(β)));
 	}
-	GasConserved<NDIM> toConserved(EquationOfState const &eos) const {
+	GasConserved<Type, dimensionCount> toConserved(EquationOfState<Type> const &eos) const {
 		using namespace Constants;
-		GasConserved<NDIM> con;
-		MassDensityType &D = con.D;
-		EnergyDensityType &τ = con.τ;
-		EntropyDensityType &K = con.K;
-		Vector<MomentumDensityType, NDIM> &S = con.S;
+		GasConserved<Type, dimensionCount> con;
+		MassDensityType<Type> &D = con.D;
+		EnergyDensityType<Type> &τ = con.τ;
+		EntropyDensityType<Type> &K = con.K;
+		Vector<MomentumDensityType<Type>, dimensionCount> &S = con.S;
 		auto const γ = lorentzFactor();
 		auto const γ2 = sqr(γ);
 		auto const iρ = 1 / ρ;
@@ -46,7 +46,7 @@ struct GasPrimitive {
 		K = D * ϰ;
 		return con;
 	}
-	auto temperature(EquationOfState const &eos) const {
+	auto temperature(EquationOfState<Type> const &eos) const {
 		return eos.energy2temperature(ρ, ε);
 	}
 };

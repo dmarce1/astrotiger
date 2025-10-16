@@ -20,32 +20,85 @@ using g_per_cm3 = Unit<-3, 1, 0, 0, 0>;
 using erg_per_g = Unit<2, 0, -2, 0, 0>;
 }
 
-using DimensionlessType = Quantity<Unit<0, 0, 0, 0, 0>, double>;
-using LengthType = Quantity<Unit<1, 0, 0, 0, 0>, double>;
-using NumberDensityType = Quantity<Unit<-3, 0, 0, 0, 0>, double>;
-using MassType = Quantity<Unit<0, 1, 0, 0, 0>, double>;
-using MolarMassType = Quantity<Unit<0, 1, 0, 0, -1>, double>;
-using TimeType = Quantity<Unit<0, 0, 1, 0, 0>, double>;
-using TemperatureType = Quantity<Unit<0, 0, 0, 1, 0>, double>;
-using VelocityType = Quantity<Unit<1, 0, -1, 0, 0>, double>;
-using MomentumType = Quantity<Unit<1, 1, -1, 0, 0>, double>;
-using MomentumDensityType = Quantity<Unit<-2, 1, -1, 0, 0>, double>;
-using TorqueType = Quantity<Unit<2, 1, -1, 0, 0>, double>;
-using EnergyType = Quantity<Unit<2, 1, -2, 0, 0>, double>;
-using EnergyDensityType = Quantity<Unit<-1, 1, -2, 0, 0>, double>;
-using SpecificEnergyType = Quantity<Unit<2, 0, -2, 0, 0>, double>;
-using PowerType = Quantity<Unit<2, 1, -3, 0, 0>, double>;
-using EnergyFluxType = Quantity<Unit<0, 1, -3, 0, 0>, double>;
-using EntropyType = Quantity<Unit<2, 1, -2, -1, 0>, double>;
-using EntropyDensityType = Quantity<Unit<-1, 1, -2, -1, 0>, double>;
-using MassDensityType = Quantity<Unit<-3, 1, 0, 0, 0>, double>;
-using SpecificEntropyType = Quantity<Unit<2, 0, -2, -1, 0>, double>;
-using EntropyDensityPerKelvinCubedType = Quantity<Unit<-1, 1, -2, -4, 0>, double>;
-using AreaType = Quantity<Unit<2, 0, 0, 0, 0>, double>;
-using SpecificAreaType = Quantity<Unit<2, -1, 0, 0, 0>, double>;
-using VolumeType = Quantity<Unit<3, 0, 0, 0, 0>, double>;
-using SpecificVolumeType = Quantity<Unit<3, 0, -1, 0, 0>, double>;
-using MoleType = Quantity<Unit<0, 0, 0, 0, 1>, double>;
-using PerMoleType = Quantity<Unit<0, 0, 0, 0, -1>, double>;
+template<typename T>
+using DimensionlessType = Quantity<Unit<0, 0, 0, 0, 0>, T>;
+
+template<typename T>
+using LengthType = Quantity<Unit<1, 0, 0, 0, 0>, T>;
+
+template<typename T>
+using NumberDensityType = Quantity<Unit<-3, 0, 0, 0, 0>, T>;
+
+template<typename T>
+using MassType = Quantity<Unit<0, 1, 0, 0, 0>, T>;
+
+template<typename T>
+using MolarMassType = Quantity<Unit<0, 1, 0, 0, -1>, T>;
+
+template<typename T>
+using TimeType = Quantity<Unit<0, 0, 1, 0, 0>, T>;
+
+template<typename T>
+using TemperatureType = Quantity<Unit<0, 0, 0, 1, 0>, T>;
+
+template<typename T>
+using VelocityType = Quantity<Unit<1, 0, -1, 0, 0>, T>;
+
+template<typename T>
+using MomentumType = Quantity<Unit<1, 1, -1, 0, 0>, T>;
+
+template<typename T>
+using MomentumDensityType = Quantity<Unit<-2, 1, -1, 0, 0>, T>;
+
+template<typename T>
+using TorqueType = Quantity<Unit<2, 1, -1, 0, 0>, T>;
+
+template<typename T>
+using EnergyType = Quantity<Unit<2, 1, -2, 0, 0>, T>;
+
+template<typename T>
+using EnergyDensityType = Quantity<Unit<-1, 1, -2, 0, 0>, T>;
+
+template<typename T>
+using SpecificEnergyType = Quantity<Unit<2, 0, -2, 0, 0>, T>;
+
+template<typename T>
+using PowerType = Quantity<Unit<2, 1, -3, 0, 0>, T>;
+
+template<typename T>
+using EnergyFluxType = Quantity<Unit<0, 1, -3, 0, 0>, T>;
+
+template<typename T>
+using EntropyType = Quantity<Unit<2, 1, -2, -1, 0>, T>;
+
+template<typename T>
+using EntropyDensityType = Quantity<Unit<-1, 1, -2, -1, 0>, T>;
+
+template<typename T>
+using MassDensityType = Quantity<Unit<-3, 1, 0, 0, 0>, T>;
+
+template<typename T>
+using SpecificEntropyType = Quantity<Unit<2, 0, -2, -1, 0>, T>;
+
+template<typename T>
+using EntropyDensityPerKelvinCubedType = Quantity<Unit<-1, 1, -2, -4, 0>, T>;
+
+template<typename T>
+using AreaType = Quantity<Unit<2, 0, 0, 0, 0>, T>;
+
+template<typename T>
+using SpecificAreaType = Quantity<Unit<2, -1, 0, 0, 0>, T>;
+
+template<typename T>
+using VolumeType = Quantity<Unit<3, 0, 0, 0, 0>, T>;
+
+template<typename T>
+using SpecificVolumeType = Quantity<Unit<3, 0, -1, 0, 0>, T>;
+
+template<typename T>
+using MoleType = Quantity<Unit<0, 0, 0, 0, 1>, T>;
+
+template<typename T>
+using PerMoleType = Quantity<Unit<0, 0, 0, 0, -1>, T>;
 
 #endif /* INCLUDE_UNITS_CGS_HPP_ */

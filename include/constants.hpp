@@ -24,8 +24,8 @@ static constexpr auto ic2 = ic * ic;
 static constexpr double tiny = sqrt(std::numeric_limits<double>::min());
 static constexpr double huge = sqrt(std::numeric_limits<double>::max());
 static constexpr double eps = std::numeric_limits<double>::epsilon();
-template<int D>
-static constexpr auto δ = identity<DimensionlessType, D>();
+template<typename Type, int dimensionCount>
+static constexpr auto δ = identity<DimensionlessType<Type>, dimensionCount>();
 
 }
 #endif /* INCLUDE_CONSTANTS_HPP_ */

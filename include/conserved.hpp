@@ -28,17 +28,17 @@ private:
 	}
 };
 
-template<int NDIM>
+template<typename Type, int dimensionCount>
 struct GasConserved {
-	MassDensityType D;
-	EnergyDensityType τ;
-	EntropyDensityType K;
-	Vector<MomentumDensityType, NDIM> S;
-	GasPrimitive<NDIM> toPrimitive(EquationOfState const &eos) const {
+	MassDensityType<Type> D;
+	EnergyDensityType<Type> τ;
+	EntropyDensityType<Type> K;
+	Vector<MomentumDensityType<Type>, dimensionCount> S;
+	GasPrimitive<Type, dimensionCount> toPrimitive(EquationOfState<Type> const &eos) const {
 		using namespace Constants;
-		static constexpr FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>> one(DimensionlessType(1.0));
+		static constexpr FwdAutoDiff<DimensionlessType<Type>, 2, std::tuple<DimensionlessType<Type>>> one(DimensionlessType<Type>(1.0));
 		static constexpr double toler = 2 * eps;
-		static constexpr DimensionlessType Φo(1e-3);
+		static constexpr DimensionlessType<Type> Φo(1e-3);
 		static constexpr int maxIter = 100;
 		using std::abs;
 		using std::copysign;
@@ -46,10 +46,10 @@ struct GasConserved {
 		using std::max;
 		using std::min;
 		using std::tanh;
-		GasPrimitive<NDIM> prim;
-		MassDensityType &ρ = prim.ρ;
-		SpecificEnergyType &ε = prim.ε;
-		Vector<DimensionlessType, NDIM> &β = prim.β;
+		GasPrimitive<Type, dimensionCount> prim;
+		MassDensityType<Type> &ρ = prim.ρ;
+		SpecificEnergyType<Type> &ε = prim.ε;
+		Vector<DimensionlessType<Type>, dimensionCount> &β = prim.β;
 		auto const S2 = S.dot(S);
 		auto const D2 = sqr(D);
 		auto const S1 = sqrt(S2);
@@ -60,43 +60,44 @@ struct GasConserved {
 			ε = max(τ, τo) * iρ;
 			β = S * iρ * ic;
 		} else {
-			FwdAutoDiff<EnergyDensityType, NDIM, std::tuple<DimensionlessType>> W;
-			FwdAutoDiff<MassDensityType, NDIM, std::tuple<DimensionlessType>> ρ_;
-			FwdAutoDiff<SpecificEnergyType, NDIM, std::tuple<DimensionlessType>> ε_;
-			FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>> ϰ_;
-			using Function = std::function<FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>>(FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>>)>;
-			Function const fEnergy = [this, eos, S1, S2, τo, &W, &ϰ_, &ε_, &ρ_](FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>> β) {
-				auto const p = (FwdAutoDiff<EnergyDensityType, NDIM, std::tuple<DimensionlessType>>(c * S1) / β
-						- FwdAutoDiff<EnergyDensityType, NDIM, std::tuple<DimensionlessType>>(c2 * D + max(τ, τo)));
-				FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>> const β2 = β * β;
-				W = FwdAutoDiff<EnergyDensityType, NDIM, std::tuple<DimensionlessType>>(c2 * D + max(τ, τo)) + p;
+			using AutoEnergyDensity = FwdAutoDiff<EnergyDensityType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
+			using AutoMassDensity = FwdAutoDiff<MassDensityType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
+			using AutoDimensionless = FwdAutoDiff<DimensionlessType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
+			using AutoSpecificEnergy = FwdAutoDiff<SpecificEnergyType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
+			using Function = std::function<AutoDimensionless(AutoDimensionless)>;
+			AutoEnergyDensity W;
+			AutoMassDensity ρ_;
+			AutoSpecificEnergy ε_;
+			AutoDimensionless ϰ_;
+			Function const fEnergy = [this, eos, S1, S2, τo, &W, &ϰ_, &ε_, &ρ_](AutoDimensionless β) {
+				auto const p = (AutoEnergyDensity(c * S1) / β - AutoEnergyDensity(c2 * D + max(τ, τo)));
+				AutoDimensionless const β2 = β * β;
+				W = AutoEnergyDensity(c2 * D + max(τ, τo)) + p;
 				auto const iγ2 = one - β2;
 				auto const γ2 = one / iγ2;
 				auto const γ = sqrt(γ2);
 				auto const iγ = one / γ;
-				ρ_ = FwdAutoDiff<MassDensityType, NDIM, std::tuple<DimensionlessType>>(D) * iγ;
+				ρ_ = AutoMassDensity(D) * iγ;
 				auto const iρ = one / ρ_;
 				auto const h = W * iγ2 * iρ;
 				ε_ = h - c2 - p * iρ;
-				auto const peos = FwdAutoDiff<EnergyDensityType, NDIM, std::tuple<DimensionlessType>>(eos.energy2pressure(ρ_, ε_));
-				auto const rc = FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>>((p - peos) / W);
-				return rc;
+				AutoEnergyDensity const peos = eos.energy2pressure(ρ_, ε_);
+				return AutoDimensionless((p - peos) / W);
 			};
-			Function const fEntropy = [this, eos, S2, D2](FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>> β) {
-				FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>> const one(DimensionlessType(1.0));
+			Function const fEntropy = [this, eos, S2, D2](AutoDimensionless β) {
+				AutoDimensionless const one(DimensionlessType(1.0));
 				auto const β2 = β;
 				auto const γ = one / sqrt(one - β2);
-				auto const ρ = FwdAutoDiff<MassDensityType, NDIM, std::tuple<DimensionlessType>>(D) / γ;
+				auto const ρ = AutoMassDensity(D) / γ;
 				auto const ϰ(K / D);
 				auto const Tg(eos.entropy2temperature(ρ, ϰ));
 				auto const e = eos.temperature2energy(ρ, Tg);
-				auto const ε = FwdAutoDiff<SpecificEnergyType, NDIM, std::tuple<DimensionlessType>>(e);
+				auto const ε = AutoSpecificEnergy(e);
 				auto const p = eos.energy2pressure(ρ, ε);
 				auto const h = c2 + ε + p / ρ;
 				auto const h2 = h * h;
 				auto const γ2 = γ * γ;
-				auto const rc = FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>>(γ2 - (c2 * S2) / (D2 * h2) - one);
-				return rc;
+				return AutoDimensionless(γ2 - (c2 * S2) / (D2 * h2) - one);
 			};
 			bool useEntropy = false;
 			REDO_PRIMITIVE: double β1, βmin, βmax, f;
@@ -107,7 +108,7 @@ struct GasConserved {
 			β1 = min(β1, βmax);
 			β1 = max(β1, βmin);
 			F = useEntropy ? fEntropy : fEnergy;
-			auto fRoot = F(FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>>::template independent<0>(DimensionlessType(β1)));
+			auto fRoot = F(AutoDimensionless::template independent<0>(DimensionlessType(β1)));
 			f = fRoot.template get<0>().value();
 			int iter = 0;
 			while (abs(f) > toler) {
@@ -119,7 +120,7 @@ struct GasConserved {
 				βmin = 0.5 * β1;
 				βmax = 0.5 + 0.5 * β1;
 				dβ = max(min(β1 + dβ, βmax), βmin) - β1;
-				fRoot = F(FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>>::template independent<0>(DimensionlessType(β1 + dβ)));
+				fRoot = F(AutoDimensionless::template independent<0>(DimensionlessType(β1 + dβ)));
 				auto const f0 = f;
 				f = fRoot.template get<0>().value();
 				β1 += dβ;
@@ -127,13 +128,13 @@ struct GasConserved {
 					β1 -= dβ;
 					dβ *= 0.5;
 					β1 += dβ;
-					fRoot = F(FwdAutoDiff<DimensionlessType, NDIM, std::tuple<DimensionlessType>>::template independent<0>(DimensionlessType(β1)));
+					fRoot = F(AutoDimensionless::template independent<0>(DimensionlessType(β1)));
 					f = fRoot.template get<0>().value();
 				}
 			}
-			ρ = MassDensityType(ρ_);
-			β = c * S / EnergyDensityType(W);
-			ε = SpecificEnergyType(ε_);
+			ρ = MassDensityType<Type>(ρ_);
+			β = c * S / EnergyDensityType<Type>(W);
+			ε = SpecificEnergyType<Type>(ε_);
 			if (!useEntropy) {
 				if (prim.dualEnergySwitch(eos) < Φo) {
 					useEntropy = true;

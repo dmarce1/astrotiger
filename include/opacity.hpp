@@ -6,9 +6,10 @@
 
 #include "cgs.hpp"
 
+template<typename Type>
 struct Opacity {
-	SpecificAreaType κₐ;
-	SpecificAreaType κₛ;
+	SpecificAreaType<Type> κₐ;
+	SpecificAreaType<Type> κₛ;
 };
 
 

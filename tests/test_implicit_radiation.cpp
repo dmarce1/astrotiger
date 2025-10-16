@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
 	return Catch::Session().run(argc, argv);
 }
 
-EquationOfState makeEquationOfState(double Γ, double μ);
+EquationOfState<double> makeEquationOfState(double Γ, double μ);
 
 struct RadTestCase {
 	double rho;
@@ -31,7 +31,7 @@ struct RadTestCase {
 
 TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[implicitEnergySolve]") {
 	using namespace Constants;
-	EquationOfState eos(MolarMassType(1.0));
+	EquationOfState<double> eos(MolarMassType(1.0));
 
 	// @formatter:off
     std::vector<RadTestCase> cases = {
@@ -58,17 +58,17 @@ TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[impli
 
 	for (size_t i = 0; i < cases.size(); i++) {
 		auto const &tc = cases[i];
-		Opacity opac;
-		GasPrimitive<ndim> gasPrim;
-		RadConserved<ndim> radCon;
+		Opacity<double> opac;
+		GasPrimitive<double, ndim> gasPrim;
+		RadConserved<double, ndim> radCon;
 
-		gasPrim.ρ = MassDensityType(tc.rho);
-		gasPrim.ε = eos.temperature2energy(gasPrim.ρ, TemperatureType(tc.Tg));
+		gasPrim.ρ = MassDensityType<double>(tc.rho);
+		gasPrim.ε = eos.temperature2energy(gasPrim.ρ, TemperatureType<double>(tc.Tg));
 		gasPrim.β[0] = tc.beta[0];
 		gasPrim.β[1] = tc.beta[1];
 		gasPrim.β[2] = tc.beta[2];
 
-		radCon.E = temperature2radiationEnergy(TemperatureType(tc.E));
+		radCon.E = temperature2radiationEnergy<double>(TemperatureType<double>(tc.E));
 		radCon.F[0] = c * tc.Ffrac[0] * radCon.E;
 		radCon.F[1] = c * tc.Ffrac[1] * radCon.E;
 		radCon.F[2] = c * tc.Ffrac[2] * radCon.E;
@@ -79,7 +79,7 @@ TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[impli
 		auto const radCon0 = radCon;
 		auto gasCon = gasPrim.toConserved(eos);
 
-		implicitRadiationSolve<ndim>(gasCon, radCon, opac, eos, TimeType(tc.dt));
+		implicitRadiationSolve<double, ndim>(gasCon, radCon, opac, eos, TimeType<double>(tc.dt));
 
 		auto deltaE = radCon0.E - radCon.E;
 
