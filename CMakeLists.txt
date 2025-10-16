@@ -37,18 +37,21 @@ set(astrotiger_header
 	include/cgs.hpp
 	include/conserved.hpp
 	include/constants.hpp
+	include/eigen.hpp
 	include/eos.hpp
+	include/forward.hpp
 	include/fpe.hpp
 	include/Indent.hpp
 	include/indices.hpp
 	include/io.hpp
 	include/math.hpp
 	include/matrix.hpp
+	include/opacity.hpp
 	include/primitive.hpp
 	include/quantity.hpp
 	include/radiation.hpp
 	include/rational.hpp
-	include/srhd.hpp
+	include/tensor.hpp
 	include/type_traits.hpp
 	include/units.hpp
 	include/vector.hpp
@@ -109,6 +112,7 @@ set(test_sources
   tests/test_autodiff.cpp
   tests/test_con2prim.cpp
   tests/test_implicit_radiation.cpp
+  tests/test_matrix.cpp
   src/fpe.cpp
 )
 

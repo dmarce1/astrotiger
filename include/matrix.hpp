@@ -264,19 +264,18 @@ struct Matrix {
 			return c;
 		}
 	}
-	constexpr auto submatrix(int row, int column) const {
-		constexpr int count = rowCount - 1;
+	constexpr auto submatrix(int p, int q) const {
 		auto const &a = *this;
 		Matrix<Type, rowCount - 1, columnCount - 1> sub;
-		for (int rowFrom, rowTo = 0; rowTo < count; rowTo++, rowFrom++) {
-			if (rowFrom == row) {
-				rowFrom++;
+		for (int n = 0, j = 0; j + 1 < rowCount; j++, n++) {
+			if (n == p) {
+				n++;
 			}
-			for (int columnFrom, columnTo = 0; columnTo < count; columnTo++, columnFrom++) {
-				if (columnFrom == column) {
-					columnFrom++;
+			for (int m = 0, k = 0; k + 1 < columnCount; k++, m++) {
+				if (m == q) {
+					m++;
 				}
-				sub(rowTo, columnTo) = a(rowFrom, columnFrom);
+				sub(j, k) = a(n, m);
 			}
 		}
 		return sub;
@@ -392,11 +391,13 @@ template<typename Type, int rowCount, int columnCount, SymmetryType symmetry>
 inline auto transpose(Matrix<Type, rowCount, columnCount, symmetry> const &a) {
 	if constexpr (symmetry == SymmetryType::symmetric) {
 		return a;
+	} else if constexpr (symmetry == SymmetryType::antisymmetric) {
+		return -a;
 	} else {
 		Matrix<Type, columnCount, rowCount> transposeA;
-		for (int n = 0; n < rowCount; n++) {
-			for (int m = 0; m < columnCount; m++) {
-				transposeA(m, n) = a(n, m);
+		for (int n = 0; n < columnCount; n++) {
+			for (int m = 0; m < rowCount; m++) {
+				transposeA(n, m) = a(m, n);
 			}
 		}
 		return transposeA;
@@ -550,6 +551,5 @@ constexpr auto antisymmetric(SquareMatrix<Type, count, symmetry> const &a) {
 	}
 	return c;
 }
-
 
 #undef ASSIGN_BINARY_OP

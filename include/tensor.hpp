@@ -2,16 +2,9 @@
  Copyright (C) 2024  Dominic C. Marcello
  *******************************************************************************/
 
-#ifndef INCLUDE_SRHD_SRHD_HPP_
-#define INCLUDE_SRHD_SRHD_HPP_
+#pragma once
 
 #include "type_traits.hpp"
-
-template<typename, int>
-struct GasConserved;
-
-template<typename, int>
-struct GasPrimitive;
 
 template<typename Type, int dimensionCount>
 using Tensor2 = SquareMatrix<Type, dimensionCount, SymmetryType::symmetric>;
@@ -70,7 +63,3 @@ inline auto spaceTime2Tensor2(Tensor2<Type, dimensionCount> const &τ) {
 	return t;
 }
 
-#include "conserved.hpp"
-#include "primitive.hpp"
-
-#endif /* INCLUDE_SRHD_SRHD_HPP_ */

@@ -6,7 +6,7 @@ template<typename Units, typename Type = double>
 struct Quantity {
 	using units_type = Units;
 	explicit constexpr Quantity() = default;
-	explicit constexpr Quantity(Type v) :
+	constexpr Quantity(Type v) :
 			value_(v) {
 	}
 	constexpr Quantity(Quantity const &other) {

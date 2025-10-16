@@ -2,18 +2,18 @@
  Copyright (C) 2024  Dominic C. Marcello
  *******************************************************************************/
 
-#ifndef INCLUDE_SRHD_CONSERVED_HPP_
-#define INCLUDE_SRHD_CONSERVED_HPP_
+#pragma once
 
 #include <functional>
-#include "autodiff.hpp"
 
-#include "matrix.hpp"
-#include "vector.hpp"
-#include "eos.hpp"
+#include "autodiff.hpp"
 #include "constants.hpp"
+#include "eos.hpp"
+#include "forward.hpp"
 #include "math.hpp"
-#include "srhd.hpp"
+#include "matrix.hpp"
+#include "tensor.hpp"
+#include "vector.hpp"
 
 struct PrimitiveRecoveryFailure: public std::runtime_error {
 	explicit PrimitiveRecoveryFailure(std::string const &msg, double Dval, double tauVal, double S2val, double fval, double betaVal, int iter) :
@@ -30,10 +30,6 @@ private:
 
 template<typename Type, int dimensionCount>
 struct GasConserved {
-	MassDensityType<Type> D;
-	EnergyDensityType<Type> τ;
-	EntropyDensityType<Type> K;
-	Vector<MomentumDensityType<Type>, dimensionCount> S;
 	GasPrimitive<Type, dimensionCount> toPrimitive(EquationOfState<Type> const &eos) const {
 		using namespace Constants;
 		static constexpr FwdAutoDiff<DimensionlessType<Type>, 2, std::tuple<DimensionlessType<Type>>> one(DimensionlessType<Type>(1.0));
@@ -49,7 +45,7 @@ struct GasConserved {
 		GasPrimitive<Type, dimensionCount> prim;
 		MassDensityType<Type> &ρ = prim.ρ;
 		SpecificEnergyType<Type> &ε = prim.ε;
-		Vector<DimensionlessType<Type>, dimensionCount> &β = prim.β;
+		Vector<VelocityType<Type>, dimensionCount> &v = prim.v;
 		auto const S2 = S.dot(S);
 		auto const D2 = sqr(D);
 		auto const S1 = sqrt(S2);
@@ -58,7 +54,7 @@ struct GasConserved {
 			auto const iρ = 1 / D;
 			ρ = D;
 			ε = max(τ, τo) * iρ;
-			β = S * iρ * ic;
+			v = S * iρ;
 		} else {
 			using AutoEnergyDensity = FwdAutoDiff<EnergyDensityType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
 			using AutoMassDensity = FwdAutoDiff<MassDensityType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
@@ -133,7 +129,7 @@ struct GasConserved {
 				}
 			}
 			ρ = MassDensityType<Type>(ρ_);
-			β = c * S / EnergyDensityType<Type>(W);
+			v = c2 * S / EnergyDensityType<Type>(W);
 			ε = SpecificEnergyType<Type>(ε_);
 			if (!useEntropy) {
 				if (prim.dualEnergySwitch(eos) < Φo) {
@@ -144,6 +140,12 @@ struct GasConserved {
 		}
 		return prim;
 	}
+	friend GasPrimitive<Type, dimensionCount> ;
+	friend RadConserved<Type, dimensionCount> ;
+private:
+	MassDensityType<Type> D;
+	EnergyDensityType<Type> τ;
+	EntropyDensityType<Type> K;
+	Vector<MomentumDensityType<Type>, dimensionCount> S;
 };
 
-#endif /* INCLUDE_SRHD_CONSERVED_HPP_ */

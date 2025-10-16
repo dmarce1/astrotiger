@@ -111,7 +111,6 @@ TEST_CASE("FwdAutoDiffDouble<O=5,D=2>: multivariate composition/product identiti
 	SECTION("exp(log(x*y)) == x*y (series equality)") {
 		AD xy = x * y;
 		AD f  = exp(log(xy));
-		std::cout << xy << "\n" << f << "\n";
 		expectSeriesEqual<O, D>(f, xy, 1e-12);
 	}
 

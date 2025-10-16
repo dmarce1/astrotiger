@@ -4,13 +4,10 @@
 #ifndef INCLUDE_SRHD_PRIMITIVE_HPP_
 #define INCLUDE_SRHD_PRIMITIVE_HPP_
 
-#include "srhd.hpp"
+#include "tensor.hpp"
 
 template<typename Type, int dimensionCount>
 struct GasPrimitive {
-	MassDensityType<Type> ρ;
-	SpecificEnergyType<Type> ε;
-	Vector<DimensionlessType<Type>, dimensionCount> β;
 	auto dualEnergySwitch(EquationOfState<Type> const &eos) const {
 		using namespace Constants;
 		auto const h = enthalpy(eos);
@@ -24,7 +21,8 @@ struct GasPrimitive {
 		return c2 + ε + eos.energy2pressure(ρ, ε) / ρ;
 	}
 	DimensionlessType<Type> lorentzFactor() const {
-		return sqrt(1 / (1 - β.dot(β)));
+		using namespace Constants;
+		return sqrt(1 / (1 - v.dot(v) * ic2));
 	}
 	GasConserved<Type, dimensionCount> toConserved(EquationOfState<Type> const &eos) const {
 		using namespace Constants;
@@ -40,7 +38,7 @@ struct GasPrimitive {
 		auto const T = eos.energy2temperature(ρ, ε);
 		auto const ϰ = eos.temperature2entropy(ρ, T);
 		auto const h = c2 + ε + p * iρ;
-		S = ρ * γ2 * h * β * ic;
+		S = ρ * γ2 * h * v * ic2;
 		D = ρ * γ;
 		τ = ρ * γ2 * ε + (γ2 - 1) * p + c2 * D * (γ - 1);
 		K = D * ϰ;
@@ -49,6 +47,36 @@ struct GasPrimitive {
 	auto temperature(EquationOfState<Type> const &eos) const {
 		return eos.energy2temperature(ρ, ε);
 	}
+	void setMassDensity(MassDensityType<Type> const &ρ_) {
+		ρ = ρ_;
+	}
+	void setSpecificEnergy(SpecificEnergyType<Type> const &ε_) {
+		ε = ε_;
+	}
+	void setVelocity(Vector<VelocityType<Type>, dimensionCount> const &v_) {
+		v = v_;
+	}
+	void setVelocity(int k, VelocityType<Type> const &v_) {
+		v[k] = v_;
+	}
+	MassDensityType<Type> getMassDensity() const {
+		return ρ;
+	}
+	SpecificEnergyType<Type> getSpecificEnergy() const {
+		return ε;
+	}
+	Vector<VelocityType<Type>, dimensionCount> getVelocity() const {
+		return v;
+	}
+	VelocityType<Type> getVelocity(int k) const {
+		return v[k];
+	}
+	friend GasConserved<Type, dimensionCount> ;
+	friend RadConserved<Type, dimensionCount> ;
+private:
+	MassDensityType<Type> ρ;
+	SpecificEnergyType<Type> ε;
+	Vector<VelocityType<Type>, dimensionCount> v;
 };
 
 #endif /* INCLUDE_SRHD_PRIMITIVE_HPP_ */
