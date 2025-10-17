@@ -10,8 +10,9 @@
 
 constexpr int ndim = 3;
 using Catch::Approx;
+static constexpr PhysicalConstants<double> pc { };
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
 	enableFPE();
 	return Catch::Session().run(argc, argv);
 }
@@ -27,11 +28,10 @@ struct RadTestCase {
 	double Ffrac[3];  // flux fractions relative to Er
 	double Tg;        // gas temperature for initial ε
 	double dt;
-	const char* name;
+	const char *name;
 };
 
 TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[implicitEnergySolve]") {
-	using namespace Constants;
 	EquationOfState<double> eos(MolarMassType(1.0));
 
 	// @formatter:off
@@ -54,28 +54,23 @@ TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[impli
 		{1.0,  1.0,   0.0,     {0.0,0.0,0.0},   1.0,     {0.2,0.0,0.0},                 1e3,   1.0, "Absorption-only"},
 		{1.0,  0.0,   1.0,     {0.8,0.0,0.0},   1.0,     {0.6,0.0,0.0},                 1e6,   1.0, "Scattering-only"}
 	};
-	// @formatter:on
+		// @formatter:on
 
 	for (size_t i = 0; i < cases.size(); i++) {
-		auto const& tc = cases[i];
+		auto const &tc = cases[i];
 		Opacity<double> opac;
 		GasPrimitive<double, ndim> gasPrim;
 		RadConserved<double, ndim> radCon;
 		gasPrim.setMassDensity(MassDensityType<double>(tc.rho));
 		auto const ε = eos.temperature2energy(gasPrim.getMassDensity(), TemperatureType<double>(tc.Tg));
 		gasPrim.setSpecificEnergy(ε);
-		gasPrim.setVelocity({
-			c * DimensionlessType<double>(tc.beta[0]),
-			c * DimensionlessType<double>(tc.beta[1]),
-			c * DimensionlessType<double>(tc.beta[2])
-		});
+		gasPrim.setVelocity(
+				{ pc.c * DimensionlessType<double>(tc.beta[0]), pc.c * DimensionlessType<double>(tc.beta[1]), pc.c * DimensionlessType<double>(tc.beta[2]) });
 		auto const Er = temperature2radiationEnergy<double>(TemperatureType<double>(tc.E));
 		radCon.setEnergy(Er);
-		radCon.setFlux({
-			c * DimensionlessType<double>(tc.Ffrac[0]) * Er,
-			c * DimensionlessType<double>(tc.Ffrac[1]) * Er,
-			c * DimensionlessType<double>(tc.Ffrac[2]) * Er
-		});
+		radCon.setFlux(
+				{ pc.c * DimensionlessType<double>(tc.Ffrac[0]) * Er, pc.c * DimensionlessType<double>(tc.Ffrac[1]) * Er, pc.c
+						* DimensionlessType<double>(tc.Ffrac[2]) * Er });
 		opac.κₐ = SpecificAreaType(tc.kappaA);
 		opac.κₛ = SpecificAreaType(tc.kappaS);
 		auto const radCon0 = radCon;
@@ -87,11 +82,8 @@ TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[impli
 		double const Eg1 = Eg0 - deltaE.value();
 		double const Er1 = Er0 + deltaE.value();
 		INFO("Case: " << tc.name);
-		INFO("rho=" << tc.rho
-			 << " kappaA=" << tc.kappaA
-			 << " kappaS=" << tc.kappaS
-			 << " beta=(" << tc.beta[0] << "," << tc.beta[1] << "," << tc.beta[2] << ")"
-			 << " E=" << tc.E << " dt=" << tc.dt);
+		INFO(
+				"rho=" << tc.rho << " kappaA=" << tc.kappaA << " kappaS=" << tc.kappaS << " beta=(" << tc.beta[0] << "," << tc.beta[1] << "," << tc.beta[2] << ")" << " E=" << tc.E << " dt=" << tc.dt);
 
 		REQUIRE(Eg0 + Er0 == Approx(Eg1 + Er1).epsilon(1e-10));
 	}

@@ -152,6 +152,12 @@ struct Indices {
 		ζ[i] = 1;
 		return ζ;
 	}
+	template<auto i>
+	static constexpr Indices unit() {
+		Indices ζ = zero();
+		ζ[i] = 1;
+		return ζ;
+	}
 	static constexpr Indices end() {
 		Indices ζ;
 		ζ.α_.fill(maxIndex + 1);

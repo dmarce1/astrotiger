@@ -48,16 +48,19 @@ template<typename T>
 using MomentumType = Quantity<Unit<1, 1, -1, 0, 0>, T>;
 
 template<typename T>
-using MomentumDensityType = Quantity<Unit<-2, 1, -1, 0, 0>, T>;
-
-template<typename T>
 using TorqueType = Quantity<Unit<2, 1, -1, 0, 0>, T>;
 
 template<typename T>
 using EnergyType = Quantity<Unit<2, 1, -2, 0, 0>, T>;
 
 template<typename T>
+using MomentumDensityType = Quantity<Unit<-2, 1, -1, 0, 0>, T>;
+
+template<typename T>
 using EnergyDensityType = Quantity<Unit<-1, 1, -2, 0, 0>, T>;
+
+template<typename T>
+using EnergyFluxType = Quantity<Unit<0, 1, -3, 0, 0>, T>;
 
 template<typename T>
 using SpecificEnergyType = Quantity<Unit<2, 0, -2, 0, 0>, T>;
@@ -66,13 +69,13 @@ template<typename T>
 using PowerType = Quantity<Unit<2, 1, -3, 0, 0>, T>;
 
 template<typename T>
-using EnergyFluxType = Quantity<Unit<0, 1, -3, 0, 0>, T>;
-
-template<typename T>
 using EntropyType = Quantity<Unit<2, 1, -2, -1, 0>, T>;
 
 template<typename T>
 using EntropyDensityType = Quantity<Unit<-1, 1, -2, -1, 0>, T>;
+
+template<typename T>
+using EntropyFluxType = Quantity<Unit<0, 1, -3, -1, 0>, T>;
 
 template<typename T>
 using MassDensityType = Quantity<Unit<-3, 1, 0, 0, 0>, T>;
@@ -94,6 +97,9 @@ using VolumeType = Quantity<Unit<3, 0, 0, 0, 0>, T>;
 
 template<typename T>
 using SpecificVolumeType = Quantity<Unit<3, 0, -1, 0, 0>, T>;
+
+template<typename T>
+using GravityConstantType = Quantity<Unit<3, -2, -1, 0, 0>, T>;
 
 template<typename T>
 using MoleType = Quantity<Unit<0, 0, 0, 0, 1>, T>;

@@ -8,6 +8,7 @@
 
 #include "autodiff.hpp"
 #include "constants.hpp"
+#include "operators.hpp"
 #include "eos.hpp"
 #include "forward.hpp"
 #include "math.hpp"
@@ -29,11 +30,20 @@ private:
 };
 
 template<typename Type, int dimensionCount>
-struct GasConserved {
+class GasConserved {
+	MassDensityType<Type> D;
+	EnergyDensityType<Type> τ;
+	EntropyDensityType<Type> K;
+	Vector<MomentumDensityType<Type>, dimensionCount> S;
+	static constexpr PhysicalConstants<Type> pc { };
+	static constexpr Type tiny = sqrt(std::numeric_limits < Type > ::min());
+	static constexpr Type eps = std::numeric_limits < Type > ::epsilon();
+	static constexpr Type toler = 2 * eps;
+public:
+	static constexpr int fieldCount = 3 + dimensionCount; //
+	DEFINE_VECTOR_OPERATORS(GasConserved, Type, a.D, a.τ, a.K, a.S)
 	GasPrimitive<Type, dimensionCount> toPrimitive(EquationOfState<Type> const &eos) const {
-		using namespace Constants;
 		static constexpr FwdAutoDiff<DimensionlessType<Type>, 2, std::tuple<DimensionlessType<Type>>> one(DimensionlessType<Type>(1.0));
-		static constexpr double toler = 2 * eps;
 		static constexpr DimensionlessType<Type> Φo(1e-3);
 		static constexpr int maxIter = 100;
 		using std::abs;
@@ -49,7 +59,7 @@ struct GasConserved {
 		auto const S2 = S.dot(S);
 		auto const D2 = sqr(D);
 		auto const S1 = sqrt(S2);
-		auto const τo = c * (sqrt(c2 * D2 + S2) - c * D);
+		auto const τo = pc.c * (sqrt(sqr(pc.c) * D2 + S2) - pc.c * D);
 		if (S2.value() < tiny) {
 			auto const iρ = 1 / D;
 			ρ = D;
@@ -66,9 +76,9 @@ struct GasConserved {
 			AutoSpecificEnergy ε_;
 			AutoDimensionless ϰ_;
 			Function const fEnergy = [this, eos, S1, S2, τo, &W, &ϰ_, &ε_, &ρ_](AutoDimensionless β) {
-				auto const p = (AutoEnergyDensity(c * S1) / β - AutoEnergyDensity(c2 * D + max(τ, τo)));
+				auto const p = (AutoEnergyDensity(pc.c * S1) / β - AutoEnergyDensity(sqr(pc.c) * D + max(τ, τo)));
 				AutoDimensionless const β2 = β * β;
-				W = AutoEnergyDensity(c2 * D + max(τ, τo)) + p;
+				W = AutoEnergyDensity(sqr(pc.c) * D + max(τ, τo)) + p;
 				auto const iγ2 = one - β2;
 				auto const γ2 = one / iγ2;
 				auto const γ = sqrt(γ2);
@@ -76,7 +86,7 @@ struct GasConserved {
 				ρ_ = AutoMassDensity(D) * iγ;
 				auto const iρ = one / ρ_;
 				auto const h = W * iγ2 * iρ;
-				ε_ = h - c2 - p * iρ;
+				ε_ = h - sqr(pc.c) - p * iρ;
 				AutoEnergyDensity const peos = eos.energy2pressure(ρ_, ε_);
 				return AutoDimensionless((p - peos) / W);
 			};
@@ -90,15 +100,15 @@ struct GasConserved {
 				auto const e = eos.temperature2energy(ρ, Tg);
 				auto const ε = AutoSpecificEnergy(e);
 				auto const p = eos.energy2pressure(ρ, ε);
-				auto const h = c2 + ε + p / ρ;
+				auto const h = sqr(pc.c) + ε + p / ρ;
 				auto const h2 = h * h;
 				auto const γ2 = γ * γ;
-				return AutoDimensionless(γ2 - (c2 * S2) / (D2 * h2) - one);
+				return AutoDimensionless(γ2 - (sqr(pc.c) * S2) / (D2 * h2) - one);
 			};
 			bool useEntropy = false;
 			REDO_PRIMITIVE: double β1, βmin, βmax, f;
 			Function F;
-			β1 = tanh(double(c * S1 / (τo + c2 * D)));
+			β1 = tanh(double(pc.c * S1 / (τo + sqr(pc.c) * D)));
 			βmin = β1 * eps;
 			βmax = 0.9;
 			β1 = min(β1, βmax);
@@ -129,7 +139,7 @@ struct GasConserved {
 				}
 			}
 			ρ = MassDensityType<Type>(ρ_);
-			v = c2 * S / EnergyDensityType<Type>(W);
+			v = sqr(pc.c) * S / EnergyDensityType<Type>(W);
 			ε = SpecificEnergyType<Type>(ε_);
 			if (!useEntropy) {
 				if (prim.dualEnergySwitch(eos) < Φo) {
@@ -142,10 +152,18 @@ struct GasConserved {
 	}
 	friend GasPrimitive<Type, dimensionCount> ;
 	friend RadConserved<Type, dimensionCount> ;
-private:
-	MassDensityType<Type> D;
-	EnergyDensityType<Type> τ;
-	EntropyDensityType<Type> K;
-	Vector<MomentumDensityType<Type>, dimensionCount> S;
+	template<typename T, int D>
+	friend auto hllc(GasConserved<T, D> const&, GasConserved<T, D> const&, EquationOfState<T> const&, int);
 };
+
+
+template<typename Type, int dimensionCount>
+struct GasFlux {
+	MomentumDensityType<Type> D;
+	EnergyDensityType<Type> S;
+	EnergyFluxType<Type> τ;
+	EntropyFluxType<Type> K;
+	DEFINE_VECTOR_OPERATORS(GasFlux, Type, a.D, a.τ, a.K, a.S);
+};
+
 

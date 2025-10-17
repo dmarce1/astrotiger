@@ -37,7 +37,6 @@ set(astrotiger_header
 	include/cgs.hpp
 	include/conserved.hpp
 	include/constants.hpp
-	include/eigen.hpp
 	include/eos.hpp
 	include/forward.hpp
 	include/fpe.hpp

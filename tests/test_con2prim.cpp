@@ -8,6 +8,7 @@
 #include "radiation.hpp"
 
 constexpr int ndim = 3;
+static constexpr PhysicalConstants<double> pc {};
 
 EquationOfState<double> makeEquationOfState(double μ) {
 	return EquationOfState<double>(MolarMassType<double>(μ));
@@ -26,96 +27,88 @@ static void roundTripCheck(GasPrimitive<double, ndim> const &primIn, EquationOfS
 }
 
 TEST_CASE("Ultra-relativistic γ~100", "[con2prim]") {
-	using namespace Constants;
 	GasPrimitive<double, ndim> prim;
 	auto const eos = makeEquationOfState(1);
 
 	prim.setMassDensity(MassDensityType(1.0));
-	prim.setVelocity({ c * DimensionlessType(0.99995), c * DimensionlessType(0.0), c * DimensionlessType(0.0) });
-	prim.setSpecificEnergy(0.00001 * c2);
+	prim.setVelocity({ pc.c * DimensionlessType(0.99995), pc.c * DimensionlessType(0.0), pc.c * DimensionlessType(0.0) });
+	prim.setSpecificEnergy(0.00001 * sqr(pc.c));
 
 	roundTripCheck(prim, eos, 1e-6);
 }
 
 TEST_CASE("Normal gas", "[con2prim]") {
-	using namespace Constants;
 	GasPrimitive<double, ndim> prim;
 	auto const eos = makeEquationOfState(1);
 
 	prim.setMassDensity(MassDensityType(1.0));
-	prim.setVelocity({ c * DimensionlessType(0.01), c * DimensionlessType(0.0), c * DimensionlessType(0.0) });
-	prim.setSpecificEnergy(0.1 * c2);
+	prim.setVelocity({ pc.c * DimensionlessType(0.01), pc.c * DimensionlessType(0.0), pc.c * DimensionlessType(0.0) });
+	prim.setSpecificEnergy(0.1 * sqr(pc.c));
 
 	roundTripCheck(prim, eos, 1e-5);
 }
 
 TEST_CASE("Cold gas near rest", "[con2prim]") {
-	using namespace Constants;
 	GasPrimitive<double, ndim> prim;
 	auto const eos = makeEquationOfState(1);
 
 	prim.setMassDensity(MassDensityType(1.0));
-	prim.setVelocity({ c * DimensionlessType(0.0), c * DimensionlessType(0.0), c * DimensionlessType(0.0) });
+	prim.setVelocity({ pc.c * DimensionlessType(0.0), pc.c * DimensionlessType(0.0), pc.c * DimensionlessType(0.0) });
 	prim.setSpecificEnergy(1e-6);
 
 	roundTripCheck(prim, eos);
 }
 
 TEST_CASE("Mildly relativistic γ~2", "[con2prim]") {
-	using namespace Constants;
 	GasPrimitive<double, ndim> prim;
 	auto const eos = makeEquationOfState(1);
 
 	prim.setMassDensity(MassDensityType(1.0));
-	prim.setVelocity({ c * DimensionlessType(0.866), c * DimensionlessType(0.0), c * DimensionlessType(0.0) }); // γ ≈ 2
-	prim.setSpecificEnergy(0.1 * c2);
+	prim.setVelocity({ pc.c * DimensionlessType(0.866), pc.c * DimensionlessType(0.0), pc.c * DimensionlessType(0.0) }); // γ ≈ 2
+	prim.setSpecificEnergy(0.1 * sqr(pc.c));
 
 	roundTripCheck(prim, eos, 1e-8);
 }
 
 TEST_CASE("Ultra-relativistic γ~1000", "[con2prim]") {
-	using namespace Constants;
 	GasPrimitive<double, ndim> prim;
 	auto const eos = makeEquationOfState(1);
 
 	prim.setMassDensity(MassDensityType(1.0));
-	prim.setVelocity({ c * DimensionlessType(0.9999995), c * DimensionlessType(0.0), c * DimensionlessType(0.0) });
-	prim.setSpecificEnergy(0.5 * c2);
+	prim.setVelocity({ pc.c * DimensionlessType(0.9999995), pc.c * DimensionlessType(0.0), pc.c * DimensionlessType(0.0) });
+	prim.setSpecificEnergy(0.5 * sqr(pc.c));
 
 	roundTripCheck(prim, eos, 1e-6);
 }
 
 TEST_CASE("Ultra-relativistic γ~10", "[con2prim]") {
-	using namespace Constants;
 	GasPrimitive<double, ndim> prim;
 	auto const eos = makeEquationOfState(1);
 
 	prim.setMassDensity(MassDensityType(1.0));
-	prim.setVelocity({ c * DimensionlessType(0.995), c * DimensionlessType(0.0), c * DimensionlessType(0.0) }); // γ ≈ 10
-	prim.setSpecificEnergy(0.5 * c2);
+	prim.setVelocity({ pc.c * DimensionlessType(0.995), pc.c * DimensionlessType(0.0), pc.c * DimensionlessType(0.0) }); // γ ≈ 10
+	prim.setSpecificEnergy(0.5 * sqr(pc.c));
 
 	roundTripCheck(prim, eos, 1e-6);
 }
 
 TEST_CASE("Hot gas (ε >> c²)", "[con2prim]") {
-	using namespace Constants;
 	GasPrimitive<double, ndim> prim;
 	auto const eos = makeEquationOfState(1);
 
 	prim.setMassDensity(MassDensityType(1.0));
-	prim.setVelocity({ c * DimensionlessType(0.2), c * DimensionlessType(0.1), c * DimensionlessType(0.0) });
-	prim.setSpecificEnergy(50.0 * c2);
+	prim.setVelocity({ pc.c * DimensionlessType(0.2), pc.c * DimensionlessType(0.1), pc.c * DimensionlessType(0.0) });
+	prim.setSpecificEnergy(50.0 * sqr(pc.c));
 
 	roundTripCheck(prim, eos, 1e-5);
 }
 
 TEST_CASE("Low-density / vacuum-like", "[con2prim]") {
-	using namespace Constants;
 	GasPrimitive<double, ndim> prim;
 	auto const eos = makeEquationOfState(1);
 
 	prim.setMassDensity(MassDensityType(1e-12));
-	prim.setVelocity({ c * DimensionlessType(0.0), c * DimensionlessType(0.0), c * DimensionlessType(0.0) });
+	prim.setVelocity({ pc.c * DimensionlessType(0.0), pc.c * DimensionlessType(0.0), pc.c * DimensionlessType(0.0) });
 	prim.setSpecificEnergy(1.0);
 
 	roundTripCheck(prim, eos, 1e-6);

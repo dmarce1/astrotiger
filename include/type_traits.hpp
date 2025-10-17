@@ -6,8 +6,8 @@
 template<typename T>
 struct Unwrap;
 
-template<template<typename> class Q, typename U>
-struct Unwrap<Q<U>> {
+template<template<typename, typename> class Q, typename U, typename T>
+struct Unwrap<Q<U, T>> {
     using type = U;
 };
 

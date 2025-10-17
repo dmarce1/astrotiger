@@ -255,20 +255,16 @@ private:
 	std::array<Type, size()> C_;
 };
 
-
-
-
-
-
 template<typename DependentUnitType, int order, typename IndependentVariableTypes>
-class FwdAutoDiff<Quantity<DependentUnitType>, order, IndependentVariableTypes> {
-	static constexpr size_t D = std::tuple_size<IndependentVariableTypes>::value;
-	using index_type = typename FwdAutoDiff<double, order, std::array<double, D>>::index_type;
-	using DependentVariableType = Quantity<DependentUnitType>;
+class FwdAutoDiff<Quantity<DependentUnitType, typename std::tuple_element_t<0, IndependentVariableTypes>::value_type>, order, IndependentVariableTypes> {
+	static constexpr size_t dimensionCount = std::tuple_size<IndependentVariableTypes>::value;
+	using Real = typename std::tuple_element_t<0, IndependentVariableTypes>::value_type;
+	using index_type = typename FwdAutoDiff<Real, order, std::array<Real, dimensionCount>>::index_type;
+	using DependentVariableType = Quantity<DependentUnitType, Real>;
 	using IndependentUnitTypes = typename UnwrapTuple<IndependentVariableTypes>::type;
 	static constexpr auto nextLower(index_type α) {
 		size_t dim = -1;
-		for (size_t d = 0; d < D; d++) {
+		for (size_t d = 0; d < dimensionCount; d++) {
 			if (α[d]) {
 				dim = d;
 				α[d]--;
@@ -305,7 +301,7 @@ public:
 	template<size_t dim = 0>
 	static constexpr auto independent(DependentVariableType const &qty) {
 		FwdAutoDiff<DependentVariableType, order, IndependentVariableTypes> var;
-		var.autodiff_ = FwdAutoDiff<double, order, std::array<double, D>>::independent(qty.value(), dim);
+		var.autodiff_ = FwdAutoDiff<Real, order, std::array<Real, dimensionCount>>::independent(qty.value(), dim);
 		return var;
 	}
 	auto operator+() const {
@@ -344,26 +340,26 @@ public:
 		return *this;
 	}
 	template<typename OtherDependentUnitType>
-	auto operator*(FwdAutoDiff<Quantity<OtherDependentUnitType>, order, IndependentVariableTypes> const &A) const {
-		using ReturnDependentType = Quantity<typename UnitProduct<DependentUnitType, OtherDependentUnitType>::type>;
+	auto operator*(FwdAutoDiff<Quantity<OtherDependentUnitType, Real>, order, IndependentVariableTypes> const &A) const {
+		using ReturnDependentType = Quantity<typename UnitProduct<DependentUnitType, OtherDependentUnitType>::type, Real>;
 		FwdAutoDiff<ReturnDependentType, order, IndependentVariableTypes> B;
 		B.autodiff_ = autodiff_ * A.autodiff_;
 		return B;
 	}
 	template<typename OtherDependentUnitType>
-	auto operator*(Quantity<OtherDependentUnitType, double> const &a) const {
-		using ReturnDependentType = Quantity<typename UnitProduct<DependentUnitType, OtherDependentUnitType>::type>;
+	auto operator*(Quantity<OtherDependentUnitType, Real> const &a) const {
+		using ReturnDependentType = Quantity<typename UnitProduct<DependentUnitType, OtherDependentUnitType>::type, Real>;
 		FwdAutoDiff<ReturnDependentType, order, IndependentVariableTypes> B;
 		B.autodiff_ = autodiff_ * a.value();
 		return B;
 	}
-	auto operator*(double a) const {
+	auto operator*(Real a) const {
 		FwdAutoDiff<DependentVariableType, order, IndependentVariableTypes> B;
 		B.autodiff_ = autodiff_ * a;
 		return B;
 	}
 	template<typename OtherDependentType>
-	friend auto operator*(Quantity<OtherDependentType, double> b, FwdAutoDiff A) {
+	friend auto operator*(Quantity<OtherDependentType, Real> b, FwdAutoDiff A) {
 		return A * b;
 	}
 	FwdAutoDiff& operator/=(FwdAutoDiff const &A) {
@@ -376,29 +372,29 @@ public:
 		return *this;
 	}
 	template<typename OtherDependentUnitType>
-	auto operator/(FwdAutoDiff<Quantity<OtherDependentUnitType>, order, IndependentVariableTypes> const &A) const {
-		using ReturnDependentType = Quantity<typename UnitQuotient<DependentUnitType, OtherDependentUnitType>::type>;
+	auto operator/(FwdAutoDiff<Quantity<OtherDependentUnitType, Real>, order, IndependentVariableTypes> const &A) const {
+		using ReturnDependentType = Quantity<typename UnitQuotient<DependentUnitType, OtherDependentUnitType>::type, Real>;
 		FwdAutoDiff<ReturnDependentType, order, IndependentVariableTypes> B;
 		B.autodiff_ = autodiff_ / A.autodiff_;
 		return B;
 	}
 	template<typename OtherDependentUnitType>
-	auto operator/(Quantity<OtherDependentUnitType, double> const &a) const {
-		using ReturnDependentType = Quantity<typename UnitQuotient<DependentUnitType, OtherDependentUnitType>::type>;
+	auto operator/(Quantity<OtherDependentUnitType, Real> const &a) const {
+		using ReturnDependentType = Quantity<typename UnitQuotient<DependentUnitType, OtherDependentUnitType>::type, Real>;
 		FwdAutoDiff<ReturnDependentType, order, IndependentVariableTypes> B;
 		B.autodiff_ = autodiff_ / a.value();
 		return B;
 	}
-	auto operator/(double a) const {
+	auto operator/(Real a) const {
 		FwdAutoDiff<DependentVariableType, order, IndependentVariableTypes> B;
 		B.autodiff_ = autodiff_ / a;
 		return B;
 	}
 	template<typename OtherDependentType>
-	friend auto operator/(Quantity<OtherDependentType, double> b, FwdAutoDiff A) {
+	friend auto operator/(Quantity<OtherDependentType, Real> b, FwdAutoDiff A) {
 		return b.value() / A;
 	}
-	friend auto operator/(double b, FwdAutoDiff A) {
+	friend auto operator/(Real b, FwdAutoDiff A) {
 		return A / b;
 	}
 	friend auto exp(FwdAutoDiff x) {
@@ -413,13 +409,13 @@ public:
 	}
 	template<Rational power>
 	friend auto pow(FwdAutoDiff const &x) {
-		using OtherDependentType = Quantity<typename UnitPower<DependentUnitType, power>::type>;
+		using OtherDependentType = Quantity<typename UnitPower<DependentUnitType, power>::type, Real>;
 		FwdAutoDiff<OtherDependentType, order, IndependentVariableTypes> B;
 		B.autodiff_ = pow<power>(x.autodiff_);
 		return B;
 	}
 	friend auto sqrt(FwdAutoDiff const &x) {
-		using OtherDependentType = Quantity<typename UnitPower<DependentUnitType, Rational(1, 2)>::type>;
+		using OtherDependentType = Quantity<typename UnitPower<DependentUnitType, Rational(1, 2)>::type, Real>;
 		FwdAutoDiff<OtherDependentType, order, IndependentVariableTypes> B;
 		B.autodiff_ = sqrt(x.autodiff_);
 		return B;
@@ -430,12 +426,12 @@ public:
 		B.autodiff_ = cbrt(x.autodiff_);
 		return B;
 	}
-	template<std::array<int, D> α>
+	template<std::array<int, dimensionCount> α>
 	auto get() const {
 		using R = typename UnitQuotient<DependentVariableType, decltype(typeHelper<α>())>::type;
-		return Quantity<R, double>(autodiff_[α]);
+		return Quantity<R, Real>(autodiff_[α]);
 	}
-	template<std::array<int, D> α>
+	template<std::array<int, dimensionCount> α>
 	constexpr auto typeHelper() const {
 		constexpr auto rc = nextLower(α);
 		constexpr auto β = rc.second;
@@ -453,21 +449,28 @@ public:
 	}
 	template<int a>
 	auto get() const {
-		static_assert(D == 1);
-		constexpr index_type α(std::array<int, D>( { a }));
+		static_assert(dimensionCount == 1);
+		constexpr index_type α(std::array<int, dimensionCount>( { a }));
 		using IndependentUnitType = typename std::tuple_element<0, IndependentUnitTypes>::type;
-		using R = typename UnitQuotient<DependentUnitType, IndependentUnitType>::type;
-		return Quantity<R, double>(autodiff_[α]);
+		using ReturnType = typename UnitQuotient<DependentUnitType, IndependentUnitType>::type;
+		return Quantity<ReturnType, Real>(autodiff_[α]);
 	}
+	template<int a>
+	auto gradient() const {
+		constexpr index_type α = index_type::template unit<a>();
+		using ReturnType = typename UnitQuotient<DependentUnitType, typename std::tuple_element<a, IndependentUnitTypes>::type>::type;
+		return Quantity<ReturnType, Real>(autodiff_[α]);
+	}
+
 	static constexpr size_t size() {
-		return pow<order>(D);
+		return pow<order>(dimensionCount);
 	}
 	constexpr operator DependentVariableType() const {
-		return DependentVariableType(double(autodiff_));
+		return DependentVariableType(Real(autodiff_));
 	}
 	template<typename, int, typename >
 	friend struct FwdAutoDiff;
 private:
-	FwdAutoDiff<double, order, std::array<double, D>> autodiff_;
+	FwdAutoDiff<Real, order, std::array<Real, dimensionCount>> autodiff_;
 };
 
