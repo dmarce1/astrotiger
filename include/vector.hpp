@@ -8,21 +8,12 @@
 #include <initializer_list>
 #include <type_traits>
 
-template<typename, int>
-struct Vector;
+#include "matrix_fwd.hpp"
 
-template<typename >
-struct IsVector {
-	static constexpr bool value = false;
-};
-
-template<typename Type, int size>
-struct IsVector<Vector<Type, size>> {
-	static constexpr bool value = true;
-};
 
 template<typename Type, int Size>
 struct Vector {
+	using value_type = Type;
 	constexpr Vector() = default;
 	constexpr Vector(Vector const&) = default;
 	constexpr Vector(Vector&&) = default;
@@ -99,7 +90,7 @@ struct Vector {
 		}
 		return a;
 	}
-	template<typename OtherType, typename = std::enable_if_t<!IsVector<OtherType>::value>>
+	template<typename OtherType, typename = std::enable_if_t<!IsVector<OtherType>::value && !IsMatrix<OtherType>::value>>
 	friend constexpr auto operator*(Vector const &b, OtherType const &c) {
 		using ReturnType = decltype(Type() * OtherType());
 		Vector<ReturnType, Size> a;
@@ -108,17 +99,16 @@ struct Vector {
 		}
 		return a;
 	}
-	template<typename OtherType, typename = std::enable_if_t<!IsVector<OtherType>::value>>
+	template<typename OtherType, typename = std::enable_if_t<!IsVector<OtherType>::value && !IsMatrix<OtherType>::value>>
 	friend constexpr auto operator*(OtherType const &c, Vector const &b) {
 		return b * c;
 	}
 	template<typename OtherType, typename = std::enable_if_t<!IsVector<OtherType>::value>>
 	friend constexpr auto operator/(Vector const &b, OtherType const &c) {
 		using ReturnType = decltype(Type() / OtherType());
-		auto const ic = 1 / c;
 		Vector<ReturnType, Size> a;
 		for (int n = 0; n < Size; n++) {
-			a[n] = b[n] * ic;
+			a[n] = b[n] / c;
 		}
 		return a;
 	}
@@ -134,8 +124,48 @@ struct Vector {
 	static constexpr size_t size() {
 		return Size;
 	}
+	constexpr Type& front() {
+		return ν_.front();
+	}
+	constexpr Type& back() {
+		return ν_.back();
+	}
+	constexpr auto begin() {
+		return ν_.begin();
+	}
+	constexpr auto end() {
+		return ν_.end();
+	}
+	constexpr Type front() const {
+		return ν_.front();
+	}
+	constexpr Type back() const {
+		return ν_.back();
+	}
+	constexpr auto begin() const {
+		return ν_.begin();
+	}
+	constexpr auto end() const {
+		return ν_.cend();
+	}
 private:
 	std::array<Type, Size> ν_;
 
 };
+
+template<typename Type, int Size>
+Type abs(Vector<Type, Size> const &v) {
+	return sqrt(v.dot(v));
+}
+
+template<typename Type, int Size>
+Type normalize(Vector<Type, Size> const &v) {
+	auto const v1 = abs(v);
+	if (v1) {
+		return v / v1;
+	} else {
+		return Type(0);
+	}
+}
+
 

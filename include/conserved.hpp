@@ -32,9 +32,9 @@ private:
 template<typename Type, int dimensionCount>
 class GasConserved {
 	MassDensityType<Type> D;
+	Vector<MomentumDensityType<Type>, dimensionCount> S;
 	EnergyDensityType<Type> τ;
 	EntropyDensityType<Type> K;
-	Vector<MomentumDensityType<Type>, dimensionCount> S;
 	static constexpr PhysicalConstants<Type> pc { };
 	static constexpr Type tiny = sqrt(std::numeric_limits < Type > ::min());
 	static constexpr Type eps = std::numeric_limits < Type > ::epsilon();
@@ -76,8 +76,8 @@ public:
 			AutoSpecificEnergy ε_;
 			AutoDimensionless ϰ_;
 			Function const fEnergy = [this, eos, S1, S2, τo, &W, &ϰ_, &ε_, &ρ_](AutoDimensionless β) {
-				auto const p = (AutoEnergyDensity(pc.c * S1) / β - AutoEnergyDensity(sqr(pc.c) * D + max(τ, τo)));
 				AutoDimensionless const β2 = β * β;
+				auto const p = (AutoEnergyDensity(pc.c * S1) / β - AutoEnergyDensity(sqr(pc.c) * D + max(τ, τo)));
 				W = AutoEnergyDensity(sqr(pc.c) * D + max(τ, τo)) + p;
 				auto const iγ2 = one - β2;
 				auto const γ2 = one / iγ2;
@@ -156,14 +156,12 @@ public:
 	friend auto hllc(GasConserved<T, D> const&, GasConserved<T, D> const&, EquationOfState<T> const&, int);
 };
 
-
 template<typename Type, int dimensionCount>
 struct GasFlux {
 	MomentumDensityType<Type> D;
 	EnergyDensityType<Type> S;
 	EnergyFluxType<Type> τ;
-	EntropyFluxType<Type> K;
-	DEFINE_VECTOR_OPERATORS(GasFlux, Type, a.D, a.τ, a.K, a.S);
+	EntropyFluxType<Type> K;DEFINE_VECTOR_OPERATORS(GasFlux, Type, a.D, a.τ, a.K, a.S)
+	;
 };
-
 

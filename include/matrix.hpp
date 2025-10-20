@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "matrix_fwd.hpp"
+
 #define ASSIGN_BINARY_OP(op)                                            \
    template<typename OtherType>                                         \
    constexpr SignedReference& operator op##= (OtherType const &value) { \
@@ -14,30 +16,10 @@
       return *this;                                                     \
    }
 
-enum class SymmetryType : int {
-	antisymmetric = -1, asymmetric = 0, symmetric = +1
-};
-
 struct MatrixException: public std::runtime_error {
 	explicit MatrixException(std::string const &msg) :
 			std::runtime_error(msg) {
 	}
-};
-
-template<typename Type, int rowCount, int columnCount, SymmetryType symmetry = SymmetryType::asymmetric>
-struct Matrix;
-
-template<typename Type, int count, SymmetryType symmetry = SymmetryType::asymmetric>
-using SquareMatrix = Matrix<Type, count, count, symmetry>;
-
-template<typename >
-struct IsMatrix {
-	static constexpr bool value = false;
-};
-
-template<typename Type, int rowCount, int columnCount, SymmetryType symmetry>
-struct IsMatrix<Matrix<Type, rowCount, columnCount, symmetry>> {
-	static constexpr bool value = true;
 };
 
 template<typename TypeA, typename TypeB, int rowCount, int commonCount, int columnCount, SymmetryType symmetryA, SymmetryType symmetryB>
@@ -145,19 +127,47 @@ struct Matrix {
 	constexpr reference operator()(int n, int m) {
 		return reference(sign(n, m), μ_[flatIndex(n, m)]);
 	}
-	constexpr auto column(int m) const {
+	constexpr auto getColumn(int m) const {
 		Vector<Type, rowCount> c;
 		for (int n = 0; n < rowCount; n++) {
 			c[n] = this->operator()(n, m);
 		}
 		return c;
 	}
-	constexpr auto row(int n) const {
+	constexpr auto getRow(int n) const {
 		Vector<Type, columnCount> c;
 		for (int m = 0; m < columnCount; m++) {
 			c[m] = this->operator()(n, m);
 		}
 		return c;
+	}
+	constexpr Matrix& setColumn(int m, Vector<Type, rowCount> const &c) {
+		for (int n = 0; n < rowCount; n++) {
+			this->operator()(n, m) = c[n];
+		}
+		return *this;
+	}
+	constexpr Matrix& setRow(int n, Vector<Type, columnCount> const &r) {
+		for (int m = 0; m < columnCount; m++) {
+			this->operator()(n, m) = r[n];
+		}
+		return *this;
+	}
+	constexpr Matrix& swapColumns(int nA, int nB) {
+		using std::swap;
+		auto &a = *this;
+		for (int n = 0; n < columnCount; n++) {
+			swap(a(n, nB), a(n, nA));
+		}
+		return *this;
+	}
+	constexpr Matrix& swapRows(int nA, int nB) {
+		using std::swap;
+		auto &a = *this;
+		for (int m = 0; m < rowCount; m++) {
+			swap(a(nA, m), a(nB, m));
+		}
+		return *this;
 	}
 	template<SymmetryType otherSymmetry, std::enable_if_t<(symmetry == SymmetryType::asymmetric) || (symmetry == otherSymmetry), int> = 0>
 	friend constexpr Matrix& operator+=(Matrix<Type, rowCount, columnCount, symmetry> &A, Matrix<Type, rowCount, columnCount, otherSymmetry> const &B) {
@@ -183,14 +193,14 @@ struct Matrix {
 	constexpr bool operator!=(Matrix const &A) const {
 		return !(*this == A);
 	}
-	template<typename OtherType, typename = std::enable_if_t<!IsMatrix<OtherType>::value>>
+	template<typename OtherType, typename = std::enable_if_t<!IsMatrix<OtherType>::value && !IsVector<OtherType>::value>>
 	friend constexpr auto operator*(Matrix const &b, OtherType const &c) {
 		using ReturnType = decltype(Type() * OtherType());
 		Matrix<ReturnType, rowCount, columnCount, symmetry> a;
 		a.μ_ = b.μ_ * c;
 		return a;
 	}
-	template<typename OtherType, typename = std::enable_if_t<!IsMatrix<OtherType>::value>>
+	template<typename OtherType, typename = std::enable_if_t<!IsMatrix<OtherType>::value && !IsVector<OtherType>::value>>
 	friend constexpr auto operator*(OtherType const &c, Matrix const &b) {
 		return b * c;
 	}
@@ -375,7 +385,7 @@ constexpr Type Matrix<Type, rowCount, columnCount, symmetry>::minor(int row, int
 
 template<typename Type, int rowCount, int columnCount, SymmetryType symmetry>
 constexpr Type Matrix<Type, rowCount, columnCount, symmetry>::cofactor(int row, int col) const {
-	return nonepow(row + col) * minor(row, col);
+	return Type(nonepow(row + col)) * minor(row, col);
 }
 
 template<typename Type, int count, SymmetryType symmetry>
@@ -485,6 +495,32 @@ std::string toString(Matrix<Type, rowCount, columnCount> const &M) {
 	return out;
 }
 
+template<typename TypeA, typename TypeB, int rowCount, int columnCount, SymmetryType symmetry>
+constexpr auto operator*(Matrix<TypeA, rowCount, columnCount, symmetry> const &A, Vector<TypeB, columnCount> const &B) {
+	using ReturnType = decltype(TypeA() * TypeB());
+	Vector<ReturnType, rowCount> C;
+	for (int l = 0; l < rowCount; l++) {
+		C[l] = A(l, 0) * B[0];
+		for (int m = 1; m < columnCount; m++) {
+			C[l] += A(l, m) * B[m];
+		}
+	}
+	return C;
+}
+
+template<typename TypeA, typename TypeB, int rowCount, int columnCount, SymmetryType symmetry>
+constexpr auto operator*(Vector<TypeA, rowCount> const &A, Matrix<TypeB, rowCount, columnCount, symmetry> const &B) {
+	using ReturnType = decltype(TypeA() * TypeB());
+	Vector<ReturnType, columnCount> C;
+	for (int l = 0; l < columnCount; l++) {
+		C[l] = A(l, 0) * B[0];
+		for (int m = 1; m < rowCount; m++) {
+			C[l] += A(l, m) * B[m];
+		}
+	}
+	return C;
+}
+
 template<typename TypeA, typename TypeB, int rowCount, int columnCount>
 constexpr auto operator*(Vector<TypeA, rowCount> const &a, Vector<TypeB, columnCount> const &b) {
 	using ReturnType = decltype(TypeA() * TypeB());
@@ -550,6 +586,35 @@ constexpr auto antisymmetric(SquareMatrix<Type, count, symmetry> const &a) {
 		}
 	}
 	return c;
+}
+
+template<typename Type, int count>
+SquareMatrix<Type, count, SymmetryType::symmetric> diagonal(Vector<Type, count> &λ) {
+	auto A = identity<Type, count>();
+	for (int i = 0; i < count; i++) {
+		A(i, i) = λ[i];
+	}
+	return A;
+}
+
+template<typename Type, int R, int C>
+std::string toMathematica(Matrix<Type, R, C> const &M) {
+	using std::to_string;
+	std::string out = "A =: {\n";
+	for (int i = 0; i < R; i++) {
+		out += "\t{";
+		for (int j = 0; j < C; j++) {
+			out += to_string(M(i, j));
+			if (j + 1 < C)
+				out += ",";
+		}
+		out += "}";
+		if (i + 1 < R)
+			out += ",";
+		out += "\n";
+	}
+	out += "}";
+	return out;
 }
 
 #undef ASSIGN_BINARY_OP

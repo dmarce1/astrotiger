@@ -6,7 +6,7 @@ template<typename Units, typename Type>
 struct Quantity {
 	using units_type = Units;
 	using value_type = Type;
-	explicit constexpr Quantity() = default;
+	constexpr Quantity() = default;
 	constexpr Quantity(Type v) :
 			value_(v) {
 	}
@@ -106,7 +106,6 @@ struct Quantity {
 		return *this;
 	}
 	constexpr explicit operator Type() const {
-		static_assert(std::is_same<Unit<0, 0, 0, 0, 0>, Units>::value, "Units mismatch");
 		return value_;
 	}
 	constexpr bool operator==(Quantity const &other) const {

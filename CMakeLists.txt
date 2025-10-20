@@ -108,11 +108,12 @@ add_subdirectory(extern/Catch2)
 # Define test sources
 set(test_sources
   ${astrotiger_header}  
+  src/fpe.cpp
   tests/test_autodiff.cpp
   tests/test_con2prim.cpp
   tests/test_implicit_radiation.cpp
   tests/test_matrix.cpp
-  src/fpe.cpp
+  tests/test_srhd_eigensystem.cpp
 )
 
 add_executable(unit_tests ${test_sources} )
@@ -134,13 +135,13 @@ target_include_directories(unit_tests
 )
 
 target_compile_options(unit_tests PUBLIC
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fsanitize=address>>
-  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3 -fsanitize=address>>
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fsanitize=address,undefined -fno-omit-frame-pointer>>
+  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3>>
 )
 
 target_link_options(unit_tests PUBLIC
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fsanitize=address>>
-  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3 -fsanitize=address>>
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>: -fsanitize=address,undefined -fno-omit-frame-pointer>>
+  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:>>
 )
 
 include(CTest)

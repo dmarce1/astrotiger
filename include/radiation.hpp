@@ -64,10 +64,10 @@ struct RadConserved {
 			using std::min;
 			constexpr Type toler = 16 * eps;
 			constexpr int maxIter = 100;
-			using Dimensionless = FwdAutoDiff<DimensionlessType<Type>, 1, std::tuple<DimensionlessType<Type>>>;
-			using MassDensity = FwdAutoDiff<MassDensityType<Type>, 1, std::tuple<DimensionlessType<Type>>>;
-			using EnergyDensity = FwdAutoDiff<EnergyDensityType<Type>, 1, std::tuple<DimensionlessType<Type>>>;
-			using SpecificEnergy = FwdAutoDiff<SpecificEnergyType<Type>, 1, std::tuple<DimensionlessType<Type>>>;
+			using Dimensionless = FwdAutoDiff<DimensionlessType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
+			using MassDensity = FwdAutoDiff<MassDensityType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
+			using EnergyDensity = FwdAutoDiff<EnergyDensityType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
+			using SpecificEnergy = FwdAutoDiff<SpecificEnergyType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
 			constexpr auto one = Dimensionless(DimensionlessType(1.0));
 			auto const ρ = MassDensity(MassDensityType<Type>(ρ_));
 			auto const Eg0 = EnergyDensity(ρ * ε);

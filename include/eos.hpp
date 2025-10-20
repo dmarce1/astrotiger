@@ -18,17 +18,21 @@ struct EquationOfState {
 			μ(μ_) {
 	}
 	template<typename Tρ, typename Tε>
-	SpecificEnergyType<Type> energy2soundSpeed(Tρ const &ρ, Tε const &ε) const {
-		auto const h = energy2enthalpy(ρ, ε);
-		auto const a = pc.c * sqrt(Γ * (Γ - 1) * ε / h);
-	}
-	template<typename Tρ, typename Tε>
 	SpecificEnergyType<Type> energy2enthalpy(Tρ const &ρ, Tε const &ε) const {
 		return sqr(pc.c) + ε + energy2pressure(ρ, ε) / ρ;
 	}
 	template<typename Tρ, typename Tε>
-	decltype(Tε() * Tρ()) energy2pressure(Tρ const &ρ, Tε const &ε) const {
-		return (ρ * ε) * (Γ - 1);
+	auto energy2pressure(Tρ const &ρ, Tε const &ε) const {
+		return (ρ * ε) * Type(Γ - 1);
+	}
+	template<typename Tρ, typename Tε>
+	auto pressure(Tρ const &ρ, Tε const &ε) const {
+		return std::tuple((Γ - 1) * ρ * ε, (Γ - 1) * ε, (Γ - 1) * ρ);
+	}
+	template<typename Tρ, typename Tε>
+	SpecificEnergyType<Type> energy2soundSpeed(Tρ const &ρ, Tε const &ε) const {
+		auto const h = energy2enthalpy(ρ, ε);
+		return pc.c * sqrt(Γ * (Γ - 1) * ε / h);
 	}
 	template<typename Tρ, typename Tε>
 	auto energy2temperature(Tρ const &ρ, Tε const &ε) const {

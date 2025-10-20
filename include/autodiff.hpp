@@ -7,6 +7,8 @@
 #include "indices.hpp"
 #include "quantity.hpp"
 #include "type_traits.hpp"
+#include "matrix.hpp"
+#include "vector.hpp"
 
 template<typename Type, int order, typename IndependentVariableTypes = std::tuple<Type>>
 struct FwdAutoDiff;
@@ -249,6 +251,19 @@ public:
 	constexpr operator Type() const {
 		return C_[0];
 	}
+	auto gradient() const {
+		std::array<FwdAutoDiff, dimensionCount> grad;
+		for (int k = 0; k < dimensionCount; k++) {
+			grad[k].C_.fill(Type(0));
+			for (auto α = index_type::zero(); α != index_type::end(); α++) {
+				if (α[k]) {
+					const auto β = α - index_type::unit(k);
+					grad[k].C_[β] = C_[α];
+				}
+			}
+		}
+		return grad;
+	}
 	template<typename, int, typename >
 	friend struct FwdAutoDiff;
 private:
@@ -256,10 +271,11 @@ private:
 };
 
 template<typename DependentUnitType, int order, typename IndependentVariableTypes>
-class FwdAutoDiff<Quantity<DependentUnitType, typename std::tuple_element_t<0, IndependentVariableTypes>::value_type>, order, IndependentVariableTypes> {
+struct FwdAutoDiff<Quantity<DependentUnitType, typename std::tuple_element_t<0, IndependentVariableTypes>::value_type>, order, IndependentVariableTypes> {
 	static constexpr size_t dimensionCount = std::tuple_size<IndependentVariableTypes>::value;
 	using Real = typename std::tuple_element_t<0, IndependentVariableTypes>::value_type;
 	using index_type = typename FwdAutoDiff<Real, order, std::array<Real, dimensionCount>>::index_type;
+private:
 	using DependentVariableType = Quantity<DependentUnitType, Real>;
 	using IndependentUnitTypes = typename UnwrapTuple<IndependentVariableTypes>::type;
 	static constexpr auto nextLower(index_type α) {
@@ -272,6 +288,45 @@ class FwdAutoDiff<Quantity<DependentUnitType, typename std::tuple_element_t<0, I
 			}
 		}
 		return std::pair(dim, α);
+	}
+	template<size_t ... I>
+	static auto makeGradientType(std::index_sequence<I...>) {
+		return std::tuple<typename UnitQuotient<DependentUnitType, typename std::tuple_element<I, IndependentUnitTypes>::type>::type...> { };
+	}
+	template<std::array<int, dimensionCount> α>
+	constexpr auto typeHelper() const {
+		constexpr auto rc = nextLower(α);
+		constexpr auto β = rc.second;
+		if constexpr (α != β) {
+			constexpr auto dim = rc.first;
+			using ThisType = typename std::tuple_element<dim, IndependentUnitTypes>::type;
+			using RestType = decltype(typeHelper<β>());
+			using NextType = typename UnitProduct<ThisType, RestType>::type;
+			constexpr NextType rc { };
+			return rc;
+		} else {
+			constexpr NullUnitType rc { };
+			return rc;
+		}
+	}
+	template<size_t I>
+	auto makeGradient() const {
+		if constexpr (I < dimensionCount) {
+			constexpr auto θ = index_type::unit(I);
+			using ThisType = Quantity<typename UnitQuotient<DependentUnitType, typename std::tuple_element<I, IndependentUnitTypes>::type>::type, Real>;
+			std::tuple<ThisType> thisTuple;
+			std::get<0>(thisTuple) = ThisType(autodiff_[θ]);
+			auto const returnTuple = std::tuple_cat(thisTuple, makeGradient<I + 1>());
+			if constexpr (AllSame<IndependentUnitTypes>::value && (I == 0)) {
+				return std::apply([](auto const &... values) {
+					return std::array<ThisType, dimensionCount> { { values... } };
+				}, returnTuple);
+			} else {
+				return returnTuple;
+			}
+		} else {
+			return std::tuple<> { };
+		}
 	}
 public:
 	constexpr FwdAutoDiff() :
@@ -426,42 +481,31 @@ public:
 		B.autodiff_ = cbrt(x.autodiff_);
 		return B;
 	}
-	template<std::array<int, dimensionCount> α>
-	auto get() const {
-		using R = typename UnitQuotient<DependentVariableType, decltype(typeHelper<α>())>::type;
-		return Quantity<R, Real>(autodiff_[α]);
+	template<std::array<int, dimensionCount> a>
+	auto multiGet() const {
+		using RUnitType = typename UnitQuotient<DependentUnitType, decltype(typeHelper<a>())>::type;
+		return Quantity<RUnitType, Real>(autodiff_[a]);
 	}
-	template<std::array<int, dimensionCount> α>
-	constexpr auto typeHelper() const {
-		constexpr auto rc = nextLower(α);
-		constexpr auto β = rc.second;
-		if constexpr (α != β) {
-			constexpr auto dim = rc.first;
-			using ThisType = typename std::tuple_element<dim, IndependentUnitTypes>::type;
-			using RestType = decltype(typeHelper<β>());
-			using NextType = typename UnitProduct<ThisType, RestType>::type;
-			constexpr NextType rc { };
-			return rc;
-		} else {
-			constexpr NullUnitType rc { };
-			return rc;
-		}
-	}
-	template<int a>
+	template<auto a>
 	auto get() const {
-		static_assert(dimensionCount == 1);
 		constexpr index_type α(std::array<int, dimensionCount>( { a }));
 		using IndependentUnitType = typename std::tuple_element<0, IndependentUnitTypes>::type;
 		using ReturnType = typename UnitQuotient<DependentUnitType, IndependentUnitType>::type;
 		return Quantity<ReturnType, Real>(autodiff_[α]);
 	}
-	template<int a>
 	auto gradient() const {
-		constexpr index_type α = index_type::template unit<a>();
-		using ReturnType = typename UnitQuotient<DependentUnitType, typename std::tuple_element<a, IndependentUnitTypes>::type>::type;
-		return Quantity<ReturnType, Real>(autodiff_[α]);
+		std::array<FwdAutoDiff, dimensionCount> grad;
+		for (int k = 0; k < dimensionCount; k++) {
+			grad[k].autodiff_ = DependentVariableType(0);
+			for (auto α = index_type::zero(); α != index_type::end(); α++) {
+				if (α[k]) {
+					const auto β = α - index_type::unit(k);
+					grad[k].autodiff_[β] = autodiff_[α];
+				}
+			}
+		}
+		return grad;
 	}
-
 	static constexpr size_t size() {
 		return pow<order>(dimensionCount);
 	}

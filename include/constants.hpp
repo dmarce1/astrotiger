@@ -12,6 +12,11 @@
 template<typename Type>
 struct PhysicalConstants {
 	static constexpr Type π = acos(-Type(1));
+//	static constexpr PerMoleType<Type> nₐ = 1;
+//	static constexpr VelocityType<Type> c = 1;
+//	static constexpr EntropyType<Type> kB = 1;
+//	static constexpr TorqueType<Type> h = 1;
+//	static constexpr GravityConstantType<Type> G = 1;
 	static constexpr PerMoleType<Type> nₐ = 6.02214076e23;
 	static constexpr VelocityType<Type> c = 2.99792458e10;
 	static constexpr EntropyType<Type> kB = 1.380658e-16;
