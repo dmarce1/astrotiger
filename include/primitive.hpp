@@ -232,7 +232,12 @@ private:
 	static constexpr int τi = 1 + dimensionCount;
 	static constexpr int transverseCount = dimensionCount - 1;
 	static constexpr int fieldCount = 2 + dimensionCount;
-	static constexpr std::array<std::array<int, 2>, 3> transverseIndices { { { 1, 2 }, { 0, 2 }, { 0, 1 } } };
+	// @formatter:off
+	static constexpr auto transverseIndices =
+			(dimensionCount == 1) ? std::array<std::array<int, 2>, 3> {{{-1,-1}, {-1,-1}, {-1,-1}}} :
+		   ((dimensionCount == 2) ? std::array<std::array<int, 2>, 3> {{{ 1,-1}, { 0,-1}, {-1,-1}}} :
+		   /*dimensionCount == 3)*/	std::array<std::array<int, 2>, 3> {{{ 1, 2}, { 0, 2}, { 0, 1}}});
+		// @formatter:on
 	static constexpr PhysicalConstants<Type> pc { };
 	MassDensityType<Type> ρ;
 	SpecificEnergyType<Type> ε;
