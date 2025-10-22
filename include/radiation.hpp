@@ -37,13 +37,13 @@ struct RadFlux {
 	Vector<FluxFluxType<Type>, dimensionCount> F;
 	// @formatter:off
 	DEFINE_VECTOR_OPERATORS(RadFlux, Type, a.E, a.F)
-																																																					// @formatter:on
+																																																								// @formatter:on
 };
 template<typename Type, int dimensionCount>
 struct RadConserved {
 	// @formatter:off
 	DEFINE_VECTOR_OPERATORS(RadConserved, Type, a.E, a.F)
-																																																					// @formatter:on
+																																																								// @formatter:on
 	auto temperature() const {
 		return pow<Rational(1, 4)>(E / pc.aR);
 	}
@@ -59,7 +59,6 @@ struct RadConserved {
 		auto const Ωdif = 0.5 * (1 - ξ);
 		auto const Ωstr = 0.5 * (3 * ξ - 1);
 		auto const P = E * (Ωdif * δ + Ωstr * sqr(n));
-		jacobian(1);
 		return P;
 	}
 	auto stressEnergy() const {
@@ -91,6 +90,7 @@ struct RadConserved {
 		enableFPE();
 		using std::max;
 		using Auto = FwdAutoDiff<Type, 1, std::array<EnergyDensityType<Type>, fieldCount>>;
+		constexpr auto _0 = Auto(Type(0));
 		constexpr auto _1 = Auto(Type(1));
 		constexpr auto _2 = Auto(Type(2));
 		constexpr auto _3 = Auto(Type(3));
@@ -108,7 +108,13 @@ struct RadConserved {
 		for (int k = 0; k < dimensionCount; k++) {
 			F_[k] = Auto::independent(Type(F[k] / c), k);
 		}
-		auto const magF = sqrt(F_.dot(F_));
+		auto const F2 = F_.dot(F_);
+		Auto magF;
+		if (Type(F2)) {
+			magF = sqrt(F2);
+		} else {
+			magF = _0;
+		}
 		auto const f = magF / E_;
 		auto const n = F_ / max(magF, Auto(tiny));
 		auto const f2 = sqr(f);
@@ -376,7 +382,7 @@ struct RadConserved {
 	}
 private:
 	static constexpr auto δ = identity<DimensionlessType<Type>, dimensionCount>();
-	static constexpr Type tiny = sqrt(std::numeric_limits < Type > ::min());
+	static constexpr Type tiny = sqrt(std::numeric_limits<Type>::min());
 	static constexpr Type eps = std::numeric_limits < Type > ::epsilon();
 	static constexpr Type toler = 2 * eps;
 	static constexpr int fieldCount = 1 + dimensionCount;
