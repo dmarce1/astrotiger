@@ -1,9 +1,6 @@
 /******************************************************************************
  Copyright (C) 2024  Dominic C. Marcello
-*******************************************************************************/
-
-
-
+ *******************************************************************************/
 
 /******************************************************************************
  *  Catch2 Unit Tests for Matrix.hpp
@@ -23,7 +20,7 @@ using Catch::Matchers::WithinRel;
 
 TEST_CASE("Matrix basic construction and indexing", "[matrix]") {
 	using M2 = Matrix<double, 2, 2>;
-	M2 A{1.0, 2.0, 3.0, 4.0};
+	M2 A { 1.0, 2.0, 3.0, 4.0 };
 
 	REQUIRE(A(0, 0) == 1.0);
 	REQUIRE(A(0, 1) == 2.0);
@@ -62,8 +59,8 @@ TEST_CASE("Matrix antisymmetric indexing", "[matrix]") {
 
 TEST_CASE("Matrix addition and subtraction", "[matrix]") {
 	using M2 = Matrix<double, 2, 2>;
-	M2 A{1, 2, 3, 4};
-	M2 B{5, 6, 7, 8};
+	M2 A { 1, 2, 3, 4 };
+	M2 B { 5, 6, 7, 8 };
 
 	auto C = A + B;
 	REQUIRE(C(0, 0) == 6.0);
@@ -81,7 +78,7 @@ TEST_CASE("Matrix addition and subtraction", "[matrix]") {
 
 TEST_CASE("Matrix scalar arithmetic", "[matrix]") {
 	using M2 = Matrix<double, 2, 2>;
-	M2 A{1, 2, 3, 4};
+	M2 A { 1, 2, 3, 4 };
 
 	auto B = A * 2.0;
 	REQUIRE(B(1, 1) == 8.0);
@@ -98,8 +95,7 @@ TEST_CASE("Matrix scalar arithmetic", "[matrix]") {
 
 TEST_CASE("Matrix transpose", "[matrix]") {
 	using M2 = Matrix<double, 2, 3>;
-	M2 A{1, 2, 3,
-		 4, 5, 6};
+	M2 A { 1, 2, 3, 4, 5, 6 };
 //	M2 A{1, 4,
 //		 2, 5,
 //		 3, 6};
@@ -113,29 +109,28 @@ TEST_CASE("Matrix transpose", "[matrix]") {
 
 TEST_CASE("Matrix trace", "[matrix]") {
 	using M2 = SquareMatrix<double, 2>;
-	M2 A{1, 2, 3, 4};
+	M2 A { 1, 2, 3, 4 };
 	double tr = trace(A);
 	REQUIRE(tr == Approx(5.0));
 }
 
 TEST_CASE("Matrix determinant 2x2", "[matrix]") {
 	using M2 = SquareMatrix<double, 2>;
-	M2 A{1, 2, 3, 4};
+	M2 A { 1, 2, 3, 4 };
 	double det = determinant(A);
 	REQUIRE(det == Approx(-2.0));
 }
 
 TEST_CASE("Matrix determinant 3x3", "[matrix]") {
 	using M3 = SquareMatrix<double, 3>;
-	M3 A{6, 1, 1, 4, -2, 5, 2, 8, 7};
+	M3 A { 6, 1, 1, 4, -2, 5, 2, 8, 7 };
 	double det = determinant(A);
 	REQUIRE(det == Approx(-306.0));
 }
 
 TEST_CASE("Matrix comatrix and adjoint", "[matrix]") {
 	using M2 = SquareMatrix<double, 2>;
-	M2 A{1, 2,
-		 3, 4};
+	M2 A { 1, 2, 3, 4 };
 //	M2 A{4, -2,
 //		 -3, 1};
 	auto coA = comatrix(A);
@@ -149,7 +144,7 @@ TEST_CASE("Matrix comatrix and adjoint", "[matrix]") {
 
 TEST_CASE("Matrix inverse", "[matrix]") {
 	using M2 = SquareMatrix<double, 2>;
-	M2 A{1, 2, 3, 4};
+	M2 A { 1, 2, 3, 4 };
 	auto invA = inverse(A);
 	auto I = A * invA;
 
@@ -161,7 +156,7 @@ TEST_CASE("Matrix inverse", "[matrix]") {
 
 TEST_CASE("Matrix inversion failure throws", "[matrix][exception]") {
 	using M2 = SquareMatrix<double, 2>;
-	M2 A{1, 2, 2, 4}; // singular
+	M2 A { 1, 2, 2, 4 }; // singular
 
 	REQUIRE_THROWS_AS(inverse(A), MatrixException);
 }
@@ -176,8 +171,8 @@ TEST_CASE("Identity matrix creation", "[matrix]") {
 }
 
 TEST_CASE("Vector outer product", "[matrix]") {
-	Vector<double, 2> a{1.0, 2.0};
-	Vector<double, 3> b{3.0, 4.0, 5.0};
+	Vector<double, 2> a { 1.0, 2.0 };
+	Vector<double, 3> b { 3.0, 4.0, 5.0 };
 	auto M = a * b;
 
 	REQUIRE(M(0, 0) == 3.0);
@@ -185,7 +180,7 @@ TEST_CASE("Vector outer product", "[matrix]") {
 }
 
 TEST_CASE("sqr(Vector) produces symmetric matrix", "[matrix]") {
-	Vector<double, 3> a{1.0, 2.0, 3.0};
+	Vector<double, 3> a { 1.0, 2.0, 3.0 };
 	auto M = sqr(a);
 
 	REQUIRE(M(0, 0) == 1.0);
@@ -195,7 +190,7 @@ TEST_CASE("sqr(Vector) produces symmetric matrix", "[matrix]") {
 
 TEST_CASE("Symmetric and antisymmetric decomposition", "[matrix]") {
 	using M3 = SquareMatrix<double, 3>;
-	M3 A{0, 1, 2, 3, 4, 5, 6, 7, 8};
+	M3 A { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
 
 	auto symA = symmetric(A);
 	auto antiA = antisymmetric(A);
@@ -206,8 +201,10 @@ TEST_CASE("Symmetric and antisymmetric decomposition", "[matrix]") {
 
 TEST_CASE("toString produces formatted output", "[matrix]") {
 	using M2 = Matrix<double, 2, 2>;
-	M2 A{1.0, 2.0, 3.0, 4.0};
-	std::string s = toString(A);
+	M2 A { 1.0, 2.0, 3.0, 4.0 };
+	std::ostringstream os;
+	os << A;
+	std::string s = os.str();
 
 	REQUIRE(s.find("1.000e+00") != std::string::npos);
 	REQUIRE(s.find("4.000e+00") != std::string::npos);
@@ -230,8 +227,8 @@ TEST_CASE("SignedReference assignment and arithmetic", "[signedref]") {
 }
 
 TEST_CASE("multSymmetry combinations", "[symmetry]") {
-	using enum SymmetryType;
-	REQUIRE(multSymmetry(symmetric, symmetric) == symmetric);
+using enum SymmetryType;
+		REQUIRE(multSymmetry(symmetric, symmetric) == symmetric);
 	REQUIRE(multSymmetry(symmetric, antisymmetric) == antisymmetric);
 	REQUIRE(multSymmetry(antisymmetric, antisymmetric) == symmetric);
 	REQUIRE(multSymmetry(asymmetric, symmetric) == asymmetric);

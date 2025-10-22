@@ -9,7 +9,7 @@ private:
 	static void fpeHandler(int, siginfo_t*, void*) noexcept;
 	struct sigaction savedSignalAction_;
 	sigset_t savedSignalSet_;
-
+	static thread_local bool enabled;
 };
 
 

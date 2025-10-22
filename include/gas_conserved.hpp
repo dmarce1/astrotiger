@@ -10,11 +10,10 @@
 #include "constants.hpp"
 #include "operators.hpp"
 #include "eos.hpp"
-#include "forward.hpp"
+#include "gas.hpp"
 #include "math.hpp"
 #include "matrix.hpp"
 #include "tensor.hpp"
-#include "vector.hpp"
 
 struct PrimitiveRecoveryFailure: public std::runtime_error {
 	explicit PrimitiveRecoveryFailure(std::string const &msg, double Dval, double tauVal, double S2val, double fval, double betaVal, int iter) :
@@ -41,7 +40,9 @@ class GasConserved {
 	static constexpr Type toler = 2 * eps;
 public:
 	static constexpr int fieldCount = 3 + dimensionCount; //
+	// @formatter:on
 	DEFINE_VECTOR_OPERATORS(GasConserved, Type, a.D, a.τ, a.K, a.S)
+	// @formatter:off
 	GasPrimitive<Type, dimensionCount> toPrimitive(EquationOfState<Type> const &eos) const {
 		static constexpr FwdAutoDiff<DimensionlessType<Type>, 2, std::tuple<DimensionlessType<Type>>> one(DimensionlessType<Type>(1.0));
 		static constexpr DimensionlessType<Type> Φo(1e-3);
@@ -151,17 +152,9 @@ public:
 		return prim;
 	}
 	friend GasPrimitive<Type, dimensionCount> ;
-	friend RadConserved<Type, dimensionCount> ;
+	template<typename, int>
+	friend struct RadConserved;
 	template<typename T, int D>
 	friend auto hllc(GasConserved<T, D> const&, GasConserved<T, D> const&, EquationOfState<T> const&, int);
-};
-
-template<typename Type, int dimensionCount>
-struct GasFlux {
-	MomentumDensityType<Type> D;
-	EnergyDensityType<Type> S;
-	EnergyFluxType<Type> τ;
-	EntropyFluxType<Type> K;DEFINE_VECTOR_OPERATORS(GasFlux, Type, a.D, a.τ, a.K, a.S)
-	;
 };
 

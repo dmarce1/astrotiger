@@ -72,4 +72,3 @@ inline constexpr auto sqr(T r) {
 }
 
 
-

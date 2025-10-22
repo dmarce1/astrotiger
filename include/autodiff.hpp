@@ -28,7 +28,7 @@ private:
 		}, x);
 	}
 	template<class Function>
-	friend auto compose(Function const &f, FwdAutoDiff const &g) {
+	friend constexpr auto compose(Function const &f, FwdAutoDiff const &g) {
 		FwdAutoDiff h;
 		Type const g0 = g[0];
 		constexpr int Nmax = dimensionCount * order;
@@ -56,7 +56,7 @@ public:
 				if (d + 1 < dimensionCount)
 					os << ",";
 			}
-			os << ") -> " << a.C_[int(α)] << "\n";
+			os << ") -> " << Type(a.C_[int(α)]) << "\n";
 			α++;
 		}
 		os << "}";
@@ -103,32 +103,32 @@ public:
 		diff.C_[int(indices)] = 1.0;
 		return diff;
 	}
-	auto operator[](int a) const {
+	constexpr auto operator[](int a) const {
 		return C_[a];
 	}
-	auto operator[](index_type α) const {
+	constexpr auto operator[](index_type α) const {
 		return operator[](int(α));
 	}
-	auto operator+() const {
+	constexpr auto operator+() const {
 		return *this;
 	}
-	auto operator-() const {
+	constexpr auto operator-() const {
 		auto A = *this;
 		for (size_t i = 0; i < size(); i++) {
 			A.C_[i] = -this->C_[i];
 		}
 		return A;
 	}
-	auto operator+(FwdAutoDiff A) const {
+	constexpr auto operator+(FwdAutoDiff A) const {
 		for (size_t i = 0; i < size(); i++) {
 			A.C_[i] += this->C_[i];
 		}
 		return A;
 	}
-	auto operator-(FwdAutoDiff A) const {
+	constexpr auto operator-(FwdAutoDiff A) const {
 		return *this + (-A);
 	}
-	auto operator*(FwdAutoDiff const &B) const {
+	constexpr auto operator*(FwdAutoDiff const &B) const {
 		auto const &A = *this;
 		FwdAutoDiff C;
 		C.C_.fill(0.0);
@@ -143,50 +143,50 @@ public:
 		}
 		return C;
 	}
-	auto operator/(FwdAutoDiff const &B) const {
+	constexpr auto operator/(FwdAutoDiff const &B) const {
 		return operator*(inverse(B));
 	}
-	auto operator*(Type b) const {
+	constexpr auto operator*(Type b) const {
 		auto A = *this;
 		for (size_t i = 0; i < size(); i++) {
 			A.C_[i] *= b;
 		}
 		return A;
 	}
-	auto operator/(Type b) const {
+	constexpr auto operator/(Type b) const {
 		return operator*(1.0 / b);
 	}
-	FwdAutoDiff& operator*=(Type a) {
+	constexpr FwdAutoDiff& operator*=(Type a) {
 		*this = *this * a;
 		return *this;
 	}
-	FwdAutoDiff& operator/=(Type a) {
+	constexpr FwdAutoDiff& operator/=(Type a) {
 		*this = *this / a;
 		return *this;
 	}
-	FwdAutoDiff& operator+=(FwdAutoDiff const &A) {
+	constexpr FwdAutoDiff& operator+=(FwdAutoDiff const &A) {
 		*this = *this + A;
 		return *this;
 	}
-	FwdAutoDiff& operator-=(FwdAutoDiff const &A) {
+	constexpr FwdAutoDiff& operator-=(FwdAutoDiff const &A) {
 		*this = *this - A;
 		return *this;
 	}
-	FwdAutoDiff& operator*=(FwdAutoDiff const &A) {
+	constexpr FwdAutoDiff& operator*=(FwdAutoDiff const &A) {
 		*this = *this * A;
 		return *this;
 	}
-	FwdAutoDiff& operator/=(FwdAutoDiff const &A) {
+	constexpr FwdAutoDiff& operator/=(FwdAutoDiff const &A) {
 		*this = *this / A;
 		return *this;
 	}
-	friend auto operator*(Type b, FwdAutoDiff A) {
+	friend constexpr auto operator*(Type b, FwdAutoDiff A) {
 		return A * b;
 	}
-	friend auto operator/(Type b, FwdAutoDiff A) {
+	friend constexpr auto operator/(Type b, FwdAutoDiff A) {
 		return b * inverse(A);
 	}
-	friend auto sqrt(FwdAutoDiff const &x) {
+	friend constexpr auto sqrt(FwdAutoDiff const &x) {
 		constexpr Rational half(1, 2);
 		return compose([](Type x0, size_t n) {
 			using std::pow;
@@ -198,7 +198,7 @@ public:
 		}, x);
 	}
 
-	friend auto cbrt(FwdAutoDiff const &x) {
+	friend constexpr auto cbrt(FwdAutoDiff const &x) {
 		constexpr Rational third(1, 3);
 		return compose([](Type x0, size_t n) {
 			using std::pow;
@@ -210,7 +210,7 @@ public:
 		}, x);
 	}
 	template<Rational power>
-	friend auto pow(FwdAutoDiff const &x) {
+	friend constexpr auto pow(FwdAutoDiff const &x) {
 		if constexpr (power.denominator() == 1) {
 			if constexpr (power.numerator() < 0) {
 				constexpr int m = -power.numerator();
@@ -231,14 +231,14 @@ public:
 			}, x);
 		}
 	}
-	friend auto exp(FwdAutoDiff const &x) {
+	friend constexpr auto exp(FwdAutoDiff const &x) {
 		using std::exp;
 		auto const f = compose([](Type x, size_t) {
 			return exp(x);
 		}, x);
 		return f;
 	}
-	friend auto log(FwdAutoDiff const &x) {
+	friend constexpr auto log(FwdAutoDiff const &x) {
 		using std::log;
 		return compose([](Type x, size_t n) {
 			if (n == 0) {
@@ -251,7 +251,7 @@ public:
 	constexpr operator Type() const {
 		return C_[0];
 	}
-	auto gradient() const {
+	auto constexpr gradient() const {
 		std::array<FwdAutoDiff, dimensionCount> grad;
 		for (int k = 0; k < dimensionCount; k++) {
 			grad[k].C_.fill(Type(0));

@@ -35,18 +35,22 @@ set(astrotiger_src
 set(astrotiger_header
 	include/autodiff.hpp
 	include/cgs.hpp
-	include/conserved.hpp
 	include/constants.hpp
 	include/eos.hpp
-	include/forward.hpp
 	include/fpe.hpp
+	include/gas.hpp
+	include/gas_conserved.hpp
+	include/gas_flux.hpp
+	include/gas_primitive.hpp
+	include/hllc.hpp
 	include/Indent.hpp
 	include/indices.hpp
 	include/io.hpp
 	include/math.hpp
+	include/matrix_fwd.hpp
 	include/matrix.hpp
 	include/opacity.hpp
-	include/primitive.hpp
+	include/operators.hpp
 	include/quantity.hpp
 	include/radiation.hpp
 	include/rational.hpp

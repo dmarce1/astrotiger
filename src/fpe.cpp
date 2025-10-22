@@ -39,28 +39,35 @@ void FpeEnabler::fpeHandler(int, siginfo_t *info, void*) noexcept {
 
 FpeEnabler::FpeEnabler() noexcept :
 		savedSignalAction_(), savedSignalSet_() {
-	sigset_t signalSet;
-	struct sigaction signalAction;
-	sigemptyset(&signalSet);
-	sigaddset(&signalSet, SIGFPE);
-	pthread_sigmask(SIG_UNBLOCK, &signalSet, &savedSignalSet_);
-	signalAction.sa_flags = SA_SIGINFO;
-	signalAction.sa_sigaction = &FpeEnabler::fpeHandler;
-	sigemptyset(&signalAction.sa_mask);
-	feclearexcept(FE_ALL_EXCEPT);
-	feenableexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW);
-	if (sigaction(SIGFPE, &signalAction, &savedSignalAction_) != 0) {
-		perror("FpeEnabler failed to install");
-		exit(1);
+	if (!enabled) {
+		sigset_t signalSet;
+		struct sigaction signalAction;
+		sigemptyset(&signalSet);
+		sigaddset(&signalSet, SIGFPE);
+		pthread_sigmask(SIG_UNBLOCK, &signalSet, &savedSignalSet_);
+		signalAction.sa_flags = SA_SIGINFO;
+		signalAction.sa_sigaction = &FpeEnabler::fpeHandler;
+		sigemptyset(&signalAction.sa_mask);
+		feclearexcept(FE_ALL_EXCEPT);
+		feenableexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW);
+		if (sigaction(SIGFPE, &signalAction, &savedSignalAction_) != 0) {
+			perror("FpeEnabler failed to install");
+			exit(1);
+		}
+		enabled = true;
 	}
 }
 
 FpeEnabler::~FpeEnabler() noexcept {
-	fedisableexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW);
-	pthread_sigmask(SIG_UNBLOCK, &savedSignalSet_, nullptr);
-	if (sigaction(SIGFPE, &savedSignalAction_, nullptr)) {
-		perror("FpeEnabler failed to install");
-		exit(1);
+	if (enabled) {
+		fedisableexcept(FE_INVALID | FE_DIVBYZERO | FE_OVERFLOW);
+		pthread_sigmask(SIG_UNBLOCK, &savedSignalSet_, nullptr);
+		if (sigaction(SIGFPE, &savedSignalAction_, nullptr)) {
+			perror("FpeEnabler failed to install");
+			exit(1);
+		}
+		enabled = false;
 	}
 }
 
+bool thread_local FpeEnabler::enabled = false;

@@ -4,9 +4,9 @@
 
 #pragma once
 
-#include "conserved.hpp"
-#include "primitive.hpp"
 #include "eos.hpp"
+#include "gas_conserved.hpp"
+#include "gas_primitive.hpp"
 
 template<typename Type, int dimensionCount>
 auto hllc(GasConserved<Type, dimensionCount> const &UL, GasConserved<Type, dimensionCount> const &UR, EquationOfState<Type> const &eos, int direction) {

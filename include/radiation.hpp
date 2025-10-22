@@ -5,8 +5,6 @@
 #pragma once
 #include "constants.hpp"
 #include "opacity.hpp"
-#include "conserved.hpp"
-#include "primitive.hpp"
 #include "eos.hpp"
 #include "fpe.hpp"
 
@@ -15,6 +13,8 @@
 #include <functional>
 #include <tuple>
 #include "autodiff.hpp"
+#include "gas_conserved.hpp"
+#include "gas_primitive.hpp"
 #include "tensor.hpp"
 
 template<typename Type>
@@ -32,7 +32,18 @@ private:
 };
 
 template<typename Type, int dimensionCount>
+struct RadFlux {
+	EnergyFluxType<Type> E;
+	Vector<FluxFluxType<Type>, dimensionCount> F;
+	// @formatter:off
+	DEFINE_VECTOR_OPERATORS(RadFlux, Type, a.E, a.F)
+																																																					// @formatter:on
+};
+template<typename Type, int dimensionCount>
 struct RadConserved {
+	// @formatter:off
+	DEFINE_VECTOR_OPERATORS(RadConserved, Type, a.E, a.F)
+																																																					// @formatter:on
 	auto temperature() const {
 		return pow<Rational(1, 4)>(E / pc.aR);
 	}
@@ -48,12 +59,172 @@ struct RadConserved {
 		auto const Ωdif = 0.5 * (1 - ξ);
 		auto const Ωstr = 0.5 * (3 * ξ - 1);
 		auto const P = E * (Ωdif * δ + Ωstr * sqr(n));
+		jacobian(1);
 		return P;
 	}
 	auto stressEnergy() const {
 		return space2spaceTime<EnergyDensityType<Type>, dimensionCount>(E, F / pc.c, pressure());
 	}
+	auto flux(int ni) const {
+		enableFPE();
+		using std::max;
+		constexpr auto c2 = sqr(pc.c);
+		RadFlux<Type, dimensionCount> flux;
+		auto const un = unitVector<Type, dimensionCount>(ni);
+		auto const magF = sqrt(F.dot(F));
+		auto const imagF = 1 / max(magF, EnergyFluxType<Type>(tiny));
+		auto const iE = 1 / E;
+		auto const f = magF * iE / pc.c;
+		auto const N = F * imagF;
+		auto const f2 = sqr(f);
+		auto const ξ = (3 + 4 * f2) / (5 + 2 * sqrt(4 - 3 * f2));
+		auto const Ωdif = 0.5 * (1 - ξ);
+		auto const Ωstr = 0.5 * (3 * ξ - 1);
+		auto const P = E * (Ωstr * N * N[ni] + Ωdif * un);
+		flux.E = F[ni];
+		for (int k = 0; k < dimensionCount; k++) {
+			flux.F = c2 * P[ni][k];
+		}
+		return flux;
+	}
+	auto jacobian(int ni) const {
+		enableFPE();
+		using std::max;
+		using Auto = FwdAutoDiff<Type, 1, std::array<EnergyDensityType<Type>, fieldCount>>;
+		constexpr auto _1 = Auto(Type(1));
+		constexpr auto _2 = Auto(Type(2));
+		constexpr auto _3 = Auto(Type(3));
+		constexpr auto _4 = Auto(Type(4));
+		constexpr auto _5 = Auto(Type(5));
+		constexpr auto half = _1 / _2;
+		constexpr auto δ = identity<Auto, dimensionCount>();
+		constexpr int ti = dimensionCount;
+		constexpr auto c = pc.c;
+		SquareMatrix<Type, fieldCount> J;
+		Vector<Auto, fieldCount> flux;
+		Vector<Auto, dimensionCount> F_;
+		auto const un = unitVector<Auto, dimensionCount>(ni);
+		auto E_ = Auto::independent(Type(E), ti);
+		for (int k = 0; k < dimensionCount; k++) {
+			F_[k] = Auto::independent(Type(F[k] / c), k);
+		}
+		auto const magF = sqrt(F_.dot(F_));
+		auto const f = magF / E_;
+		auto const n = F_ / max(magF, Auto(tiny));
+		auto const f2 = sqr(f);
+		auto const χ = (_3 + _4 * f2) / (_5 + _2 * sqrt(_4 - _3 * f2));
+		auto const P = half * E_ * ((_1 - χ) * δ + (_3 * χ - _1) * n * n);
+		auto const fluxF = P * un;
+		flux[ti] = Type(c) * F_[ni];
+		for (int k = 0; k < dimensionCount; k++) {
+			flux[k] = Type(c) * fluxF[k];
+		}
+		for (int n = 0; n < fieldCount; n++) {
+			auto const dFdU = flux[n].gradient();
+			for (int k = 0; k < fieldCount; k++) {
+				J(n, k) = dFdU[k];
+			}
+		}
+		return J;
+	}
+	auto eigenSystem(int ni) const {
+		enableFPE();
+		using std::max;
+		constexpr auto c = pc.c;
+		auto const tj = transverseIndices[ni];
+		constexpr auto fi = 0;
+		constexpr auto li = fieldCount - 1;
+		constexpr auto ei = dimensionCount;
+		auto const ti = transverseIndices[ni];
+		SquareMatrix<Type, fieldCount> R;
+		Vector<Type, fieldCount> λ;
+		Vector<EnergyFluxType<Type>, fieldCount> flux;
+		Vector<DimensionlessType<Type>, transverseCount> βᵗ, nᵗ;
+		auto const magF = sqrt(F.dot(F));
+		auto const f = magF / (c * E);
+		auto const f2 = sqr(f);
+		auto const ξ = (3 + 4 * f2) / (5 + 2 * sqrt(4 - 3 * f2));
+		auto const H = E * (3 - ξ) / 2;
+		auto const β = F / (c * H);
+		auto const βˣ = β[ni];
+		for (int j = 0; j < transverseCount; j++) {
+			nᵗ[j] = βᵗ[j] = β[ti[j]];
+		}
+		auto const βᵗβᵗ = βᵗ.dot(βᵗ);
+		auto const βᵗ1 = sqrt(βᵗβᵗ);
+		if (βᵗ1 > Type(0)) {
+			nᵗ /= βᵗ1;
+		}
+		auto const βˣβˣ = sqr(βˣ);
+		auto const β2 = βᵗβᵗ + βˣβˣ;
+		auto const Vᵗ = sqrt(H);
+		auto const V = Vᵗ * β;
+		auto const Vˣ = V[ni];
+		auto const V2 = V.dot(V);
+		for (int dim = 0; dim < dimensionCount; dim++) {
+			if (ni != dim) {
+				flux[dim] = c * V[dim] * Vˣ;
+			} else {
+				flux[dim] = c * (Type(0.25) * (sqr(Vᵗ) - V2) + sqr(Vˣ));
+			}
+		}
+		auto const λ1 = 2 * βˣ / (3 - β2);
+		auto const λ2 = sqrt((1 - β2) * (3 - β2 - 2 * βˣβˣ)) / (3 - β2);
+		auto const λm = λ1 - λ2;
+		auto const λo = βˣ;
+		auto const λp = λ1 + λ2;
+		auto const λp2 = sqr(λp);
+		auto const λm2 = sqr(λm);
+		R(ei, li) = Type(1 - 2 * βˣ * λp + λp2);
+		R(ni, li) = Type(2 * λp - (1 + λp2) * βˣ);
+		for (int j = 0; j < transverseCount; ++j) {
+			R(tj[j], li) = Type((1 - λp2) * βᵗ[j]);
+		}
+		R(ei, fi) = Type(1 - 2 * βˣ * λm + λm2);
+		R(ni, fi) = Type(2 * λm - (1 + λm2) * βˣ);
+		for (int j = 0; j < transverseCount; ++j) {
+			R(tj[j], fi) = Type((1 - λm2) * βᵗ[j]);
+		}
+		if constexpr (dimensionCount >= 2) {
+			R(ni, 1) = Type(βˣ * βᵗ1);
+			R(ei, 1) = Type(βᵗ1);
+			if (βᵗ1 > Type(0)) {
+				for (int j = 0; j < transverseCount; ++j) {
+					R(tj[j], 1) = Type((1 - βˣβˣ) * nᵗ[j]);
+				}
+			} else {
+				for (int j = 0; j < transverseCount; ++j) {
+					R(tj[j], 1) = Type(j == 0);
+				}
+			}
 
+			if constexpr (dimensionCount == 3) {
+				R(ni, 2) = Type(0);
+				R(ei, 2) = Type(0);
+				if (βᵗ1 > Type(0)) {
+					R(tj[0], 2) = Type(+nᵗ[1]);
+					R(tj[1], 2) = Type(-nᵗ[0]);
+				} else {
+					R(tj[0], 2) = Type(0);
+					R(tj[1], 2) = Type(1);
+				}
+			}
+		}
+		SquareMatrix<Type, fieldCount> A(Type(0));
+		for (int j = 0; j < dimensionCount; ++j) {
+			A(j, j) = Type(Vᵗ);      // ∂U_j/∂V_j = Vt
+			A(j, ei) = Type(V[j]);     // ∂U_j/∂Vt = V_j
+			A(ei, j) = Type(V[j] / 2); // ∂U_t/∂V_j = V_j/2
+		}
+		A(ei, ei) = Type(3 * Vᵗ / 2);    // ∂U_t/∂Vt = 3/2 Vt
+		R = A * R;
+		λ.front() = Type(c * λm);
+		λ.back() = Type(c * λp);
+		for (int k = 1; k < fieldCount - 1; k++) {
+			λ[k] = Type(c * λo);
+		}
+		return std::tuple(λ, R);
+	}
 	RadConserved<Type, dimensionCount> implicitRadiationSolve(GasConserved<Type, dimensionCount> &gasCon, Opacity<Type> const &opac,
 			EquationOfState<Type> const &eos, TimeType<Type> const &dt) const {
 		auto const implicitEnergySolve = [](SpecificEnergyType<Type> &ε, EnergyDensityType<Type> &E, MassDensityType<Type> const &ρ_,
@@ -203,35 +374,20 @@ struct RadConserved {
 	EnergyFluxType<Type> getFlux(int k) const {
 		return F[k];
 	}
-	auto eigenvalues(EquationOfState<Type> const &eos, int dim) const {
-		constexpr int fieldCount = 1 + dimensionCount;
-		Vector<VelocityType<Type>, fieldCount> λ;
-		auto const F2 = F.dot(F);
-		auto const F1 = sqrt(F2);
-		auto const f = F1 / (pc.c * E);
-		auto const invf = 1 / max(f, DimensionlessType<Type>(tiny));
-		auto const f2 = f * f;
-		auto const φ2 = 4 - 3 * f2;
-		auto const φ = sqrt(φ2);
-		auto const iφ = 1 / φ;
-		auto const μ = F[dim] / max(F1, EnergyFluxType<Type>(tiny));
-		auto const μ2 = μ * μ;
-		auto const λ1 = μ * f * iφ;
-		auto const λ2 = (-sqrt((Type(2) / Type(3)) * (φ2 - φ) + 2 * μ2 * (2 - f2 - φ))) * iφ;
-		λ.back() = λ1 - λ2;
-		for (int k = 1; k < dimensionCount; k++) {
-			λ[k] = μ * invf * (2 - φ);
-		}
-		λ.front() = λ1 + λ2;
-		return λ;
-	}
-	DEFINE_VECTOR_OPERATORS(RadConserved, Type, a.E, a.F)
 private:
 	static constexpr auto δ = identity<DimensionlessType<Type>, dimensionCount>();
-	static constexpr Type tiny = sqrt(std::numeric_limits<Type>::min());
-	static constexpr Type eps = std::numeric_limits<Type>::epsilon();
+	static constexpr Type tiny = sqrt(std::numeric_limits < Type > ::min());
+	static constexpr Type eps = std::numeric_limits < Type > ::epsilon();
 	static constexpr Type toler = 2 * eps;
+	static constexpr int fieldCount = 1 + dimensionCount;
+	static constexpr int transverseCount = dimensionCount - 1;
 	static constexpr PhysicalConstants<Type> pc {};
+	// @formatter:off
+	static constexpr auto transverseIndices =
+	(dimensionCount == 1) ? std::array<std::array<int, 2>, 3> { { {-1,-1}, {-1,-1}, {-1,-1}}}:
+	((dimensionCount == 2) ? std::array<std::array<int, 2>, 3> { { {1,-1}, {0,-1}, {-1,-1}}}:
+			/*dimensionCount == 3)*/std::array<std::array<int, 2>, 3> { { {1, 2}, {0, 2}, {0, 1}}});
+	// @formatter:on
 	EnergyDensityType<Type> E;
 	Vector<EnergyFluxType<Type>, dimensionCount> F;
 };

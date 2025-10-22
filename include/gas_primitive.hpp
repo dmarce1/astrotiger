@@ -6,8 +6,8 @@
 
 #include "fpe.hpp"
 #include "autodiff.hpp"
-#include "conserved.hpp"
 #include "eos.hpp"
+#include "gas_conserved.hpp"
 #include "tensor.hpp"
 
 template<typename Type, int dimensionCount>
@@ -224,20 +224,21 @@ struct GasPrimitive {
 		return v[k];
 	}
 	friend GasConserved<Type, dimensionCount> ;
-	friend RadConserved<Type, dimensionCount> ;
+	template<typename, int>
+	friend struct RadConserved;
 	template<typename T, int D>
 	friend auto hllc(GasConserved<T, D> const&, GasConserved<T, D> const&, EquationOfState<T> const&, int);
 private:
-	static constexpr int Di = 0;
-	static constexpr int τi = 1 + dimensionCount;
-	static constexpr int transverseCount = dimensionCount - 1;
-	static constexpr int fieldCount = 2 + dimensionCount;
 	// @formatter:off
 	static constexpr auto transverseIndices =
 			(dimensionCount == 1) ? std::array<std::array<int, 2>, 3> {{{-1,-1}, {-1,-1}, {-1,-1}}} :
 		   ((dimensionCount == 2) ? std::array<std::array<int, 2>, 3> {{{ 1,-1}, { 0,-1}, {-1,-1}}} :
 		   /*dimensionCount == 3)*/	std::array<std::array<int, 2>, 3> {{{ 1, 2}, { 0, 2}, { 0, 1}}});
-		// @formatter:on
+			// @formatter:on
+	static constexpr int Di = 0;
+	static constexpr int τi = 1 + dimensionCount;
+	static constexpr int transverseCount = dimensionCount - 1;
+	static constexpr int fieldCount = 2 + dimensionCount;
 	static constexpr PhysicalConstants<Type> pc { };
 	MassDensityType<Type> ρ;
 	SpecificEnergyType<Type> ε;

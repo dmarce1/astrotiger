@@ -5,6 +5,7 @@
 
 #include <iomanip>
 #include <stdexcept>
+#include <ostream>
 #include <string>
 
 #include "matrix_fwd.hpp"
@@ -48,9 +49,6 @@ constexpr auto inverse(SquareMatrix<Type, count, symmetry> const &a);
 
 template<typename, int>
 constexpr auto identity();
-
-template<typename Type, int rowCount, int columnCount>
-std::string toString(Matrix<Type, rowCount, columnCount> const &M);
 
 template<typename TypeA, typename TypeB, int rowCount, int columnCount>
 constexpr auto operator*(Vector<TypeA, rowCount> const&, Vector<TypeB, columnCount> const&);
@@ -464,37 +462,6 @@ constexpr auto identity() {
 	return I;
 }
 
-template<typename Type, int rowCount, int columnCount>
-std::string toString(Matrix<Type, rowCount, columnCount> const &M) {
-	using std::max;
-	auto formatEntry = [](Type const &value) {
-		std::ostringstream oss;
-		oss << std::scientific << std::setprecision(3) << value;
-		return oss.str();
-	};
-	size_t maxLen = 0;
-	for (int i = 0; i < rowCount; ++i) {
-		for (int j = 0; j < columnCount; ++j) {
-			std::string const entry = formatEntry(M(i, j));
-			maxLen = max(maxLen, entry.size());
-		}
-	}
-	std::string line((columnCount * (maxLen + 3) + 1), '-');
-	line += "\n";
-	std::string out = line;
-	for (int i = 0; i < rowCount; ++i) {
-		for (int j = 0; j < columnCount; ++j) {
-			std::string cellStr = formatEntry(M(i, j));
-			while (cellStr.size() < maxLen) {
-				cellStr = " " + cellStr;
-			}
-			out += "| " + cellStr + " ";
-		}
-		out += "|\n" + line;
-	}
-	return out;
-}
-
 template<typename TypeA, typename TypeB, int rowCount, int columnCount, SymmetryType symmetry>
 constexpr auto operator*(Matrix<TypeA, rowCount, columnCount, symmetry> const &A, Vector<TypeB, columnCount> const &B) {
 	using ReturnType = decltype(TypeA() * TypeB());
@@ -615,6 +582,40 @@ std::string toMathematica(Matrix<Type, R, C> const &M) {
 	}
 	out += "}";
 	return out;
+}
+
+
+
+template<typename Type, int rowCount, int columnCount, SymmetryType symmetry>
+std::ostream& operator<<(std::ostream& os, Matrix<Type, rowCount, columnCount, symmetry> const &M) {
+	using std::max;
+	auto formatEntry = [](Type const &value) {
+		std::ostringstream oss;
+		oss << std::scientific << std::setprecision(3) << value;
+		return oss.str();
+	};
+	size_t maxLen = 0;
+	for (int i = 0; i < rowCount; ++i) {
+		for (int j = 0; j < columnCount; ++j) {
+			std::string const entry = formatEntry(M(i, j));
+			maxLen = max(maxLen, entry.size());
+		}
+	}
+	std::string line((columnCount * (maxLen + 3) + 1), '-');
+	line += "\n";
+	std::string out = line;
+	for (int i = 0; i < rowCount; ++i) {
+		for (int j = 0; j < columnCount; ++j) {
+			std::string cellStr = formatEntry(M(i, j));
+			while (cellStr.size() < maxLen) {
+				cellStr = " " + cellStr;
+			}
+			out += "| " + cellStr + " ";
+		}
+		out += "|\n" + line;
+	}
+	os << out;
+	return os;
 }
 
 #undef ASSIGN_BINARY_OP

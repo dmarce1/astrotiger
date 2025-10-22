@@ -63,6 +63,9 @@ template<typename T>
 using EnergyFluxType = Quantity<Unit<0, 1, -3, 0, 0>, T>;
 
 template<typename T>
+using FluxFluxType = Quantity<Unit<1, 1, -4, 0, 0>, T>;
+
+template<typename T>
 using SpecificEnergyType = Quantity<Unit<2, 0, -2, 0, 0>, T>;
 
 template<typename T>

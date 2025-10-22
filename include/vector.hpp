@@ -10,7 +10,6 @@
 
 #include "matrix_fwd.hpp"
 
-
 template<typename Type, int Size>
 struct Vector {
 	using value_type = Type;
@@ -168,4 +167,24 @@ Type normalize(Vector<Type, Size> const &v) {
 	}
 }
 
+template<typename Type, int Size>
+static constexpr Vector<Type, Size> unitVector(int i) {
+	Vector<Type, Size> ζ;
+	for (int j = 0; j < Size; j++) {
+		ζ[j] = Type(i == j);
+	}
+	return ζ;
+}
 
+template<typename Type, int Size>
+std::ostream& operator<<(std::ostream& os, Vector<Type, Size> const& v) {
+	os << '[';
+	for (int i = 0; i < Size; i++) {
+		if (i > 0) {
+			os << ", ";
+		}
+		os << v[i];
+	}
+	os << ']';
+	return os;
+}

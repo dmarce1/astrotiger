@@ -1,5 +1,5 @@
+#include "gas_primitive.hpp"
 #include "catch2/catch_test_macros.hpp"
-#include "primitive.hpp"
 #include "eos.hpp"
 #include "matrix.hpp"
 #include "vector.hpp"
