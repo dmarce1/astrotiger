@@ -248,7 +248,7 @@ public:
 			}
 		}, x);
 	}
-	constexpr operator Type() const {
+	constexpr explicit operator Type() const {
 		return C_[0];
 	}
 	auto constexpr gradient() const {
@@ -269,6 +269,9 @@ public:
 private:
 	std::array<Type, size()> C_;
 };
+
+
+
 
 template<typename DependentUnitType, int order, typename IndependentVariableTypes>
 struct FwdAutoDiff<Quantity<DependentUnitType, typename std::tuple_element_t<0, IndependentVariableTypes>::value_type>, order, IndependentVariableTypes> {

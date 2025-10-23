@@ -4,6 +4,9 @@
 #ifndef INCLUDE_SRHD_PRIMITIVE_HPP_
 #define INCLUDE_SRHD_PRIMITIVE_HPP_
 
+#include <cassert>
+#include <iostream>
+
 #include "fpe.hpp"
 #include "autodiff.hpp"
 #include "eos.hpp"
@@ -82,25 +85,28 @@ struct GasPrimitive {
 		return flux;
 	}
 	auto jacobian(EquationOfState<Type> const &eos, int ni) const {
+		using std::abs;
 		enableFPE();
 		using Auto1 = FwdAutoDiff<Type, 1, std::array<Type, fieldCount>>;
-		constexpr Auto1 c = PhysicalConstants<Type>::c.value();
-		constexpr Auto1 c2 = sqr(c);
-		Vector<Auto1, dimensionCount> ρcv, β;
-		Auto1 const ρc2 = Auto1::independent(Type(ρ * c2), Di);
-		auto const v = fourVelocity2CoordVelocity(u);
+		constexpr Type c = PhysicalConstants<Type>::c.value();
+		constexpr Type c2 = sqr(c);
+		constexpr Auto1 half(0.5);
+		constexpr Auto1 one(1);
+		Vector<Auto1, dimensionCount> ρcu;
+		auto const ρc2 = Auto1::independent(Type(ρ * c2), Di);
 		for (int d = 0; d < dimensionCount; d++) {
-			ρcv[d] = Auto1::independent(Type(ρ * c * v[d]), 1 + d);
+			ρcu[d] = Auto1::independent(Type(ρ * c * u[d]), 1 + d);
 		}
-		Auto1 const ρε = Auto1::independent(Type(ρ * ε), τi);
-		β = ρcv / ρc2;
-		Auto1 const β2 = β.dot(β);
-		Auto1 const γ2 = Auto1(1) / (Auto1(1) - β2);
-		Auto1 const γ = sqrt(γ2);
-		Auto1 const p = eos.energy2pressure(ρc2 / c2, ρε / ρc2 * c2);
-		Auto1 const W = ρc2 * γ2 * (1 + (ρε + p) / ρc2);
+		auto const ρε = Auto1::independent(Type(ρ * ε), τi);
+		auto const u2 = ρcu.dot(ρcu) / sqr(ρc2);
+		auto const γ2 = one + u2;
+		auto const γ = sqrt(γ2);
+		auto const ρcv = ρcu / γ;
+		auto const β = ρcv / ρc2;
+		auto const p = eos.energy2pressure(ρc2 / c2, ρε * c2 / ρc2);
+		auto const W = γ2 * (ρc2 + ρε + p);
 		Vector<Auto1, fieldCount> U;
-		U[Di] = (ρc2 * γ);
+		U[Di] = ρc2 * γ;
 		U[τi] = W - p - ρc2 * γ;
 		for (int d = 0; d < dimensionCount; d++) {
 			U[1 + d] = W * β[d];
@@ -165,18 +171,18 @@ struct GasPrimitive {
 			i++;
 		}
 		R(Di, Di) = 1;
-		R(τi, Di) = Type(h * γ * Am - 1);
 		R(ni, Di) = Type(h * γ * Am * λm);
-		R(Di, τi) = 1;
-		R(τi, τi) = Type(h * γ * Ap - 1);
-		R(ni, τi) = Type(h * γ * Ap * λp);
+		R(τi, Di) = Type(h * γ * Am - 1);
 		R(Di, ni) = Type(Ƙ / (h * γ));
 		R(ni, ni) = Type(βx);
 		R(τi, ni) = Type(1 - Ƙ / (h * γ));
+		R(Di, τi) = 1;
+		R(ni, τi) = Type(h * γ * Ap * λp);
+		R(τi, τi) = Type(h * γ * Ap - 1);
 		for (int k = 0; k < transverseCount; k++) {
 			R(ti[k], Di) = Type(h * γ * βt[k]);
-			R(ti[k], τi) = Type(h * γ * βt[k]);
 			R(ti[k], ni) = Type(βt[k]);
+			R(ti[k], τi) = Type(h * γ * βt[k]);
 			R(Di, ti[k]) = Type(γ * βt[k]);
 			R(τi, ti[k]) = Type(2 * h * γ2 * βt[k] - γ * βt[k]);
 			R(ni, ti[k]) = Type(2 * h * γ2 * βt[k] * βx);
@@ -191,6 +197,7 @@ struct GasPrimitive {
 			λ[ti[k]] = Type(c * λo);
 		}
 		return std::tuple(λ, R);
+
 	}
 	void setMassDensity(MassDensityType<Type> const &ρ_) {
 		ρ = ρ_;
@@ -229,7 +236,7 @@ private:
 			(dimensionCount == 1) ? std::array<std::array<int, 2>, 3> {{{-1,-1}, {-1,-1}, {-1,-1}}} :
 		   ((dimensionCount == 2) ? std::array<std::array<int, 2>, 3> {{{ 1,-1}, { 0,-1}, {-1,-1}}} :
 		   /*dimensionCount == 3)*/	std::array<std::array<int, 2>, 3> {{{ 1, 2}, { 0, 2}, { 0, 1}}});
-									// @formatter:on
+												// @formatter:on
 	static constexpr int Di = 0;
 	static constexpr int τi = 1 + dimensionCount;
 	static constexpr int transverseCount = dimensionCount - 1;

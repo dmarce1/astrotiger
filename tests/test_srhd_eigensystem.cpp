@@ -6,11 +6,10 @@
 #include <cmath>
 #include <iostream>
 
-
 TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][jacobian]") {
 	using std::abs;
 	using Type = double;
-	constexpr Type tol = 8 * sqrt(std::numeric_limits<Type>::epsilon());
+	constexpr Type tol = 8 * sqrt(std::numeric_limits < Type > ::epsilon());
 	constexpr int dimensionCount = 3;
 	constexpr int fieldCount = 2 + dimensionCount;
 	static constexpr PhysicalConstants<Type> pc { };
@@ -22,11 +21,11 @@ TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][
 	// --- Step 1: Build primitive state using setters ---
 	GasPrimitive<Type, dimensionCount> prim;
 	prim.setMassDensity(MassDensityType<Type>(1.0));
-	prim.setSpecificEnergy(SpecificEnergyType<Type>(1.0e-3 * c * c));
-	prim.setVelocity(Vector<VelocityType<Type>, dimensionCount> { 0.0 * c, -0.01 * c, 0.01 * c });
-
+	prim.setSpecificEnergy(SpecificEnergyType<Type>(5.0e-1 * c * c));
+	prim.setVelocity( { 0.00 * c, 0. * c, 0.00 * c });
+//	prim.setVelocity(Vector<VelocityType<Type>, dimensionCount> { 0.01 * c, -0.01 * c, 0.01 * c });
 	// --- Step 2: Loop over each spatial direction ---
-	for (int dim = 0; dim < 1; dim++) {
+	for (int dim = 1; dim < 2; dim++) {
 		SquareMatrix<Type, fieldCount> J = prim.jacobian(eos, dim);
 		auto [λ, R] = prim.eigenSystem(eos, dim);
 
@@ -37,6 +36,8 @@ TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][
 				Λ(i, j) = ((i == j) ? Type(λ[i]) : Type(0.0));
 			}
 		}
+		SquareMatrix<Type, fieldCount> err = J * R - R * Λ;
+		SquareMatrix<Type, fieldCount> norm = J * R - R * Λ;
 		std::cout << "Λ = \n";
 		std::cout << (Λ);
 		std::cout << "R = \n";

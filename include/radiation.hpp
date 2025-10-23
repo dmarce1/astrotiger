@@ -48,7 +48,7 @@ struct RadConserved {
 	auto pressure() const {
 		using std::max;
 		auto const magF = sqrt(F.dot(F));
-		auto const imagF = 1 / max(magF, EnergyFluxType<Type>(tiny));
+		auto const imagF = 1 / max(magF, EnergyFluxType<Type>(t1));
 		auto const iE = 1 / E;
 		auto const f = magF * iE / pc.c;
 		auto const n = F * imagF;
@@ -69,7 +69,7 @@ struct RadConserved {
 		RadFlux<Type, dimensionCount> flux;
 		auto const un = unitVector<Type, dimensionCount>(ni);
 		auto const magF = sqrt(F.dot(F));
-		auto const imagF = 1 / max(magF, EnergyFluxType<Type>(tiny));
+		auto const imagF = 1 / max(magF, EnergyFluxType<Type>(t1));
 		auto const iE = 1 / E;
 		auto const f = magF * iE / pc.c;
 		auto const N = F * imagF;
@@ -88,7 +88,6 @@ struct RadConserved {
 		enableFPE();
 		using std::max;
 		using Auto = FwdAutoDiff<Type, 1, std::array<EnergyDensityType<Type>, fieldCount>>;
-		constexpr auto _0 = Auto(Type(0));
 		constexpr auto _1 = Auto(Type(1));
 		constexpr auto _2 = Auto(Type(2));
 		constexpr auto _3 = Auto(Type(3));
@@ -107,17 +106,11 @@ struct RadConserved {
 			F_[k] = Auto::independent(Type(F[k] / c), k);
 		}
 		auto const F2 = F_.dot(F_);
-		Auto magF;
-		if (Type(F2)) {
-			magF = sqrt(F2);
-		} else {
-			magF = _0;
-		}
-		auto const f = magF / E_;
-		auto const n = F_ / max(magF, Auto(tiny));
-		auto const f2 = sqr(f);
+		auto const E2 = sqr(E_);
+		auto const f2 = F2 / E2;
+		auto const nn = F_ * F_ / (F2 + t2);
 		auto const χ = (_3 + _4 * f2) / (_5 + _2 * sqrt(_4 - _3 * f2));
-		auto const P = half * E_ * ((_1 - χ) * δ + (_3 * χ - _1) * n * n);
+		auto const P = half * E_ * ((_1 - χ) * δ + (_3 * χ - _1) * nn);
 		auto const fluxF = P * un;
 		flux[ti] = Type(c) * F_[ni];
 		for (int k = 0; k < dimensionCount; k++) {
@@ -126,7 +119,7 @@ struct RadConserved {
 		for (int n = 0; n < fieldCount; n++) {
 			auto const dFdU = flux[n].gradient();
 			for (int k = 0; k < fieldCount; k++) {
-				J(n, k) = dFdU[k];
+				J(n, k) = Type(dFdU[k]);
 			}
 		}
 		return J;
@@ -288,7 +281,7 @@ struct RadConserved {
 				}
 				auto const den = Type(max(sqr(dfde), 2 * sqr(dfde) - f * d2fde2));
 				auto const num = -2 * f * dfde;
-				auto const de = num / (den + copysign(tiny, den));
+				auto const de = num / (den + copysign(t1, den));
 				if (!std::isfinite(de)) {
 					throw ImplicitEnergyFailure("Non-finite update step in implicitEnergySolve", ρ_.value(), ε.value(), E.value(), f, dfde, de, iter);
 				}
@@ -383,7 +376,8 @@ struct RadConserved {
 	}
 private:
 	static constexpr auto δ = identity<DimensionlessType<Type>, dimensionCount>();
-	static constexpr Type tiny = sqrt(std::numeric_limits<Type>::min());
+	static constexpr Type t2 = std::numeric_limits<Type>::min();
+	static constexpr Type t1 = sqrt(t2);
 	static constexpr Type eps = std::numeric_limits < Type > ::epsilon();
 	static constexpr Type toler = 2 * eps;
 	static constexpr int fieldCount = 1 + dimensionCount;
