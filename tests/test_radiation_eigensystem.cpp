@@ -1,28 +1,26 @@
-#include "gas_primitive.hpp"
+#include "radiation.hpp"
 #include "catch2/catch_test_macros.hpp"
-#include "eos.hpp"
 #include "matrix.hpp"
 #include "vector.hpp"
 #include <cmath>
 #include <iostream>
 
-TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][jacobian]") {
+TEST_CASE("M1 eigenSystem consistent with Jacobian", "[srhd][eigen][jacobian]") {
 	using std::abs;
 	using Type = double;
-	constexpr Type tol = 4 * std::numeric_limits < Type > ::epsilon();
+	constexpr Type tol = 4 * (std::numeric_limits < Type > ::epsilon());
 	constexpr int dimensionCount = 3;
-	constexpr int fieldCount = 2 + dimensionCount;
+	constexpr int fieldCount = 1 + dimensionCount;
 	static constexpr PhysicalConstants<Type> pc { };
-	constexpr auto c = pc.c;
-
-	EquationOfState<Type> eos(Type(5.0 / 3.0));
-	GasPrimitive<Type, dimensionCount> prim;
-	prim.setMassDensity(MassDensityType<Type>(1.0));
-	prim.setSpecificEnergy(SpecificEnergyType<Type>(1.0e-1 * c * c));
-	prim.setVelocity( { 7e-1 * c, 1e-1 * c, -1e-2 * c });
+	constexpr auto c = pc.c.value();
+	RadConserved<Type, dimensionCount> rad;
+	rad.setEnergy(1.0);
+	rad.setFlux(0, c * 0.49);
+	rad.setFlux(1, c * 0.09);
+	rad.setFlux(2, -c * 0.04);
 	for (int dim = 0; dim < dimensionCount; dim++) {
-		SquareMatrix<Type, fieldCount> J = prim.jacobian(eos, dim);
-		auto [λ, R] = prim.eigenSystem(eos, dim);
+		SquareMatrix<Type, fieldCount> J = rad.jacobian(dim);
+		auto [λ, R] = rad.eigenSystem(dim);
 		SquareMatrix<Type, fieldCount> Λ;
 		for (int i = 0; i < fieldCount; i++) {
 			for (int j = 0; j < fieldCount; j++) {
@@ -40,12 +38,12 @@ TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][
 //		std::cout << "R * Λ = \n";
 //		std::cout << (R * Λ);
 //		std::cout << "J.R - R * Λ = \n";
+//		std::cout << (J * R - R * Λ);
 		auto JR = J * R;
 		auto RL = R * Λ;
-//		std::cout << (JR - RL) / frobeniusNorm(RL);
 		for (int i = 0; i < fieldCount; i++) {
 			for (int j = 0; j < fieldCount; j++) {
-				CHECK((abs((JR(i, j) - RL(i, j)))) < tol);
+				CHECK((abs((JR(i, j) - RL(i, j))) / c) < tol);
 			}
 		}
 		for (int i = 0; i < fieldCount; i++) {
@@ -53,10 +51,11 @@ TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][
 			auto JRi = J * Ri;
 			auto λRi = Ri * λ[i];
 			for (int k = 0; k < fieldCount; k++) {
-				CHECK((abs((JRi[k] - λRi[k]))) < tol);
+				CHECK((abs((JRi[k] - λRi[k])) / c) < tol);
 			}
 		}
 		Type detR = determinant(R);
 		CHECK(abs(detR) > 1e-10);
+		printf("\n");
 	}
 }

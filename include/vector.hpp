@@ -120,6 +120,22 @@ struct Vector {
 		}
 		return sum;
 	}
+	template<typename OtherType, typename ReturnType = decltype(Type() * OtherType())>
+	auto cross(Vector<OtherType, Size> const &b) {
+		Vector const &a = *this;
+		if constexpr (Size == 2) {
+			return ReturnType(a[0] * b[1] - a[1] * b[0]);
+		} else if constexpr (Size == 3) {
+			Vector<ReturnType, Size> c;
+			c[0] = +a[1] * b[2] - a[2] * b[1];
+			c[1] = -a[0] * b[2] + a[2] * b[0];
+			c[2] = +a[0] * b[1] + a[1] * b[0];
+			return c;
+		} else {
+			static_assert(false);
+		}
+
+	}
 	static constexpr size_t size() {
 		return Size;
 	}
@@ -158,7 +174,7 @@ Type abs(Vector<Type, Size> const &v) {
 }
 
 template<typename Type, int Size>
-Type normalize(Vector<Type, Size> const &v) {
+Vector<Type, Size> normalize(Vector<Type, Size> const &v) {
 	auto const v1 = abs(v);
 	if (v1) {
 		return v / v1;
@@ -177,7 +193,7 @@ static constexpr Vector<Type, Size> unitVector(int i) {
 }
 
 template<typename Type, int Size>
-std::ostream& operator<<(std::ostream& os, Vector<Type, Size> const& v) {
+std::ostream& operator<<(std::ostream &os, Vector<Type, Size> const &v) {
 	os << '[';
 	for (int i = 0; i < Size; i++) {
 		if (i > 0) {

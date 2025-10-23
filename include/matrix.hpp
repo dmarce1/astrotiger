@@ -26,8 +26,8 @@ struct MatrixException: public std::runtime_error {
 template<typename TypeA, typename TypeB, int rowCount, int commonCount, int columnCount, SymmetryType symmetryA, SymmetryType symmetryB>
 constexpr auto operator*(Matrix<TypeA, rowCount, commonCount, symmetryA> const &a, Matrix<TypeB, commonCount, columnCount, symmetryB> const &b);
 
-template<typename TypeA, typename TypeB, int count, SymmetryType symmetryA, SymmetryType symmetryB>
-constexpr auto symmetrize(Matrix<TypeA, count, count, symmetryA> const &a, Matrix<TypeB, count, count, symmetryB> const &b);
+template<typename TypeA, int count, SymmetryType symmetryA>
+constexpr auto symmetrize(Matrix<TypeA, count, count, symmetryA> const &a);
 
 template<typename Type, int count, SymmetryType symmetry>
 inline Type trace(SquareMatrix<Type, count, symmetry> const &a);
@@ -513,7 +513,7 @@ constexpr auto sqr(Vector<Type, count> const &a) {
 }
 
 template<typename Type, int count, SymmetryType symmetry>
-constexpr auto symmetric(SquareMatrix<Type, count, symmetry> const &a) {
+constexpr auto symmetrize(SquareMatrix<Type, count, symmetry> const &a) {
 	constexpr auto zero = Type(0);
 	constexpr auto one = Type(1);
 	constexpr auto two = Type(2);
@@ -535,7 +535,7 @@ constexpr auto symmetric(SquareMatrix<Type, count, symmetry> const &a) {
 }
 
 template<typename Type, int count, SymmetryType symmetry>
-constexpr auto antisymmetric(SquareMatrix<Type, count, symmetry> const &a) {
+constexpr auto antisymmetrize(SquareMatrix<Type, count, symmetry> const &a) {
 	constexpr auto zero = Type(0);
 	constexpr auto one = Type(1);
 	constexpr auto two = Type(2);
@@ -553,6 +553,17 @@ constexpr auto antisymmetric(SquareMatrix<Type, count, symmetry> const &a) {
 		}
 	}
 	return c;
+}
+
+template<typename Type, int count, SymmetryType symmetry>
+constexpr auto frobeniusNorm(SquareMatrix<Type, count, symmetry> const &a) {
+	Type n2 = Type(0);
+	for (int j = 0; j < count; j++) {
+		for (int k = 0; k < count; k++) {
+			n2 += sqr(a(j, k));
+		}
+	}
+	return sqrt(n2);
 }
 
 template<typename Type, int count>
@@ -584,10 +595,8 @@ std::string toMathematica(Matrix<Type, R, C> const &M) {
 	return out;
 }
 
-
-
 template<typename Type, int rowCount, int columnCount, SymmetryType symmetry>
-std::ostream& operator<<(std::ostream& os, Matrix<Type, rowCount, columnCount, symmetry> const &M) {
+std::ostream& operator<<(std::ostream &os, Matrix<Type, rowCount, columnCount, symmetry> const &M) {
 	using std::max;
 	auto formatEntry = [](Type const &value) {
 		std::ostringstream oss;

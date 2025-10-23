@@ -336,13 +336,13 @@ struct RadConserved {
 			auto const Λ = space2spaceTime<DimensionlessType<Type>>(γ, γ * v / c, δ + (sqr(γ) / (γ + 1)) * sqr(v / c));
 			auto const iΛ = space2spaceTime<DimensionlessType<Type>>(γ, -γ * v / c, δ + (sqr(γ) / (γ + 1)) * sqr(v / c));
 			auto const λ = ρ * c * (opac.κₐ + opac.κₛ) * dt0;
-			auto R = symmetric(Λ * R0 * Λ);
+			auto R = symmetrize(Λ * R0 * Λ);
 			E = spaceTime2Tensor0(R);
 			F = c * spaceTime2Tensor1(R);
 			implicitEnergySolve(ε, E, ρ, opac.κₛ, eos, dt0);
 			F = F / (1 + λ);
 			R = radCon.stressEnergy();
-			R = symmetric(iΛ * R * iΛ);
+			R = symmetrize(iΛ * R * iΛ);
 			E = spaceTime2Tensor0(R);
 			F = c * spaceTime2Tensor1(R);
 			S = S0 + (F - F0) / c2;

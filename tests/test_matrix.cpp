@@ -192,8 +192,8 @@ TEST_CASE("Symmetric and antisymmetric decomposition", "[matrix]") {
 	using M3 = SquareMatrix<double, 3>;
 	M3 A { 0, 1, 2, 3, 4, 5, 6, 7, 8 };
 
-	auto symA = symmetric(A);
-	auto antiA = antisymmetric(A);
+	auto symA = symmetrize(A);
+	auto antiA = antisymmetrize(A);
 
 	REQUIRE(symA(1, 2) == Approx((A(1, 2) + A(2, 1)) / 2));
 	REQUIRE(antiA(1, 2) == Approx((A(1, 2) - A(2, 1)) / 2));

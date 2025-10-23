@@ -93,7 +93,7 @@ public:
 			};
 			Function const fEntropy = [this, eos, S2, D2](AutoDimensionless β) {
 				AutoDimensionless const one(DimensionlessType(1.0));
-				auto const β2 = β;
+				auto const β2 = β * β;
 				auto const γ = one / sqrt(one - β2);
 				auto const ρ = AutoMassDensity(D) / γ;
 				auto const ϰ(K / D);

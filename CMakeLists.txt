@@ -38,12 +38,11 @@ set(astrotiger_header
 	include/constants.hpp
 	include/eos.hpp
 	include/fpe.hpp
-	include/gas.hpp
 	include/gas_conserved.hpp
 	include/gas_flux.hpp
+	include/gas.hpp
 	include/gas_primitive.hpp
 	include/hllc.hpp
-	include/Indent.hpp
 	include/indices.hpp
 	include/io.hpp
 	include/math.hpp
@@ -58,6 +57,7 @@ set(astrotiger_header
 	include/type_traits.hpp
 	include/units.hpp
 	include/vector.hpp
+	include/velocity.hpp
 )
 
 
@@ -117,6 +117,7 @@ set(test_sources
   tests/test_con2prim.cpp
   tests/test_implicit_radiation.cpp
   tests/test_matrix.cpp
+  tests/test_radiation_eigensystem.cpp
   tests/test_srhd_eigensystem.cpp
 )
 

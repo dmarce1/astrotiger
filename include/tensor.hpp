@@ -64,3 +64,10 @@ inline auto spaceTime2Tensor2(Tensor2<Type, dimensionCount> const &τ) {
 	return t;
 }
 
+template<typename T, int D>
+constexpr auto minkowski(){
+	auto η = identity<T, 1 + D>();
+	η(D, D) = -η(D, D);
+	return η;
+}
+

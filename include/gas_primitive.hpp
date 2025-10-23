@@ -44,26 +44,6 @@ struct GasPrimitive {
 	auto temperature(EquationOfState<Type> const &eos) const {
 		return eos.energy2temperature(ρ, ε);
 	}
-	auto eigenvalues(EquationOfState<Type> const &eos, int dim) const {
-		constexpr int fieldCount = 2 + dimensionCount;
-		Vector<VelocityType<Type>, fieldCount> λ;
-		auto const a = eos.energy2soundSpeed(ρ, ε);
-		auto const α = a * ic;
-		auto const v = fourVelocity2CoordVelocity(u);
-		auto const β = v * ic;
-		auto const βˣ = β[dim];
-		auto const β2 = β.dot(β);
-		auto const α2 = sqr(α);
-		auto const α2β2 = α2 * β2;
-		auto const a_eff = c * α * (sqrt((1 - β2) * (1 - α2β2 - (1 - α2) * sqr(βˣ)))) / (1 - α2β2);
-		auto const v_eff = c * βˣ / (1 - α2β2);
-		λ.front() = v_eff - a_eff;
-		for (int k = 1; k + 1 < fieldCount; k++) {
-			λ[k] = c * βˣ;
-		}
-		λ.back() = v_eff + a_eff;
-		return λ;
-	}
 	auto flux(EquationOfState<Type> const &eos, int direction) const {
 		constexpr auto δ = identity<DimensionlessType<Type>, dimensionCount>();
 		constexpr auto c2 = c * c;
@@ -92,36 +72,35 @@ struct GasPrimitive {
 		constexpr Type c2 = sqr(c);
 		constexpr Auto1 half(0.5);
 		constexpr Auto1 one(1);
+		constexpr int ti = dimensionCount;
 		Vector<Auto1, dimensionCount> ρcu;
-		auto const ρc2 = Auto1::independent(Type(ρ * c2), Di);
+		Auto1 const ρc2 = Auto1::independent(Type(ρ * c2), Di);
 		for (int d = 0; d < dimensionCount; d++) {
 			ρcu[d] = Auto1::independent(Type(ρ * c * u[d]), 1 + d);
 		}
-		auto const ρε = Auto1::independent(Type(ρ * ε), τi);
-		auto const u2 = ρcu.dot(ρcu) / sqr(ρc2);
-		auto const γ2 = one + u2;
-		auto const γ = sqrt(γ2);
-		auto const ρcv = ρcu / γ;
-		auto const β = ρcv / ρc2;
-		auto const p = eos.energy2pressure(ρc2 / c2, ρε * c2 / ρc2);
-		auto const W = γ2 * (ρc2 + ρε + p);
-		Vector<Auto1, fieldCount> U;
-		U[Di] = ρc2 * γ;
-		U[τi] = W - p - ρc2 * γ;
-		for (int d = 0; d < dimensionCount; d++) {
-			U[1 + d] = W * β[d];
+		Auto1 const ρε = Auto1::independent(Type(ρ * ε), τi);
+		auto const u0 = ρcu / ρc2;
+		Vector<Auto1, dimensionCount + 1> Uᵛ;
+		for (int k = 0; k < dimensionCount; k++) {
+			Uᵛ[k] = u0[k];
 		}
-		auto F = U * c * β[ni];
-		F[1 + ni] += c * p;
-		F[τi] += c * β[ni] * p;
+		Uᵛ[ti] = sqrt(one + u0.dot(u0));
+		Tensor2<Auto1, dimensionCount + 1> const UᵛUᵛ = symmetrize(Uᵛ * Uᵛ);
+		Auto1 const p = eos.energy2pressure(ρc2 / c2, ρε * c2 / ρc2);
+		Auto1 const ρh = ρc2 + ρε + p;
+		auto const T = ρh * UᵛUᵛ + η * p;
 		SquareMatrix<Type, fieldCount> dUdV;
 		SquareMatrix<Type, fieldCount> dFdV;
-		for (int n = 0; n < fieldCount; n++) {
-			for (int m = 0; m < fieldCount; m++) {
-				auto const μ = Auto1::index_type::unit(m);
-				dUdV(n, m) = U[n][μ];
-				dFdV(n, m) = F[n][μ];
+		for (int m = 0; m < fieldCount; m++) {
+			auto const μ = Auto1::index_type::unit(m);
+			dUdV(0, m) = (ρc2 * Uᵛ[ti])[μ];
+			dFdV(0, m) = (ρc2 * Uᵛ[ni])[μ];
+			for (int n = 0; n <= dimensionCount; n++) {
+				dUdV(n + 1, m) = T(n, ti)[μ];
+				dFdV(n + 1, m) = T(n, ni)[μ];
 			}
+			dUdV(τi, m) -= dUdV(0, m);
+			dFdV(τi, m) -= dFdV(0, m);
 		}
 		auto dFdU = dFdV * inverse(dUdV);
 		return dFdU;
@@ -131,7 +110,7 @@ struct GasPrimitive {
 		using AutoMassDensity = FwdAutoDiff<MassDensityType<Type>, 1, std::tuple<MassDensityType<Type>, SpecificEnergyType<Type>>>;
 		using AutoSpecificEnergy = FwdAutoDiff<SpecificEnergyType<Type>, 1, std::tuple<MassDensityType<Type>, SpecificEnergyType<Type>>>;
 		using index_type = typename AutoMassDensity::index_type;
-		std::array<DimensionlessType<Type>, transverseCount> βt;
+		Vector<DimensionlessType<Type>, transverseCount> βt;
 		auto ti = transverseIndices[ni];
 		auto const ϱ = AutoMassDensity::template independent<0>(ρ);
 		auto const ϵ = AutoSpecificEnergy::template independent<1>(ε);
@@ -150,10 +129,10 @@ struct GasPrimitive {
 			βt[k] = β[ti[k]];
 		}
 		auto const βxβx = sqr(βx);
-		auto const βtβt = β2 - βxβx;
+		auto const βtβt = βt.dot(βt);
 		auto const β2α2 = β2 * α2;
 		auto const id = 1 / (1 - β2α2);
-		auto const n1 = βx * (1 - α2) * id;
+		auto const n1 = βx * (1 - α2);
 		auto const n2 = α * sqrt((1 - β2) * (1 - βxβx - βtβt * α2));
 		auto const λp = (n1 + n2) * id;
 		auto const λm = (n1 - n2) * id;
@@ -161,9 +140,8 @@ struct GasPrimitive {
 		auto const Ƙ = κ / (κ - α2);
 		auto const Ap = (1 - βxβx) / (1 - βx * λp);
 		auto const Am = (1 - βxβx) / (1 - βx * λm);
-		auto const iγ2 = 1 - β2;
-		auto const γ2 = 1 / iγ2;
-		auto const γ = sqrt(γ2);
+		auto const γ = u[dimensionCount] / c;
+		auto const γ2 = sqr(γ);
 		SquareMatrix<Type, fieldCount> R;
 		Vector<Type, fieldCount> λ;
 		ni++;
@@ -184,17 +162,20 @@ struct GasPrimitive {
 			R(ti[k], ni) = Type(βt[k]);
 			R(ti[k], τi) = Type(h * γ * βt[k]);
 			R(Di, ti[k]) = Type(γ * βt[k]);
-			R(τi, ti[k]) = Type(2 * h * γ2 * βt[k] - γ * βt[k]);
+			R(τi, ti[k]) = Type((2 * h * γ - 1) * γ * βt[k]);
 			R(ni, ti[k]) = Type(2 * h * γ2 * βt[k] * βx);
 			for (int j = 0; j < transverseCount; j++) {
 				R(ti[j], ti[k]) = Type(h * (2 * γ2 * βt[j] * βt[k] + Type(j == k)));
 			}
 		}
-		λ[Di] = Type(c * λm);
-		λ[τi] = Type(c * λp);
-		λ[ni] = Type(c * λo);
+		for (int k = 0; k < fieldCount; k++) {
+			R.setColumn(k, normalize(R.getColumn(k)));
+		}
+		λ[Di] = Type(λm);
+		λ[τi] = Type(λp);
+		λ[ni] = Type(λo);
 		for (int k = 0; k < transverseCount; k++) {
-			λ[ti[k]] = Type(c * λo);
+			λ[ti[k]] = Type(λo);
 		}
 		return std::tuple(λ, R);
 
@@ -236,11 +217,12 @@ private:
 			(dimensionCount == 1) ? std::array<std::array<int, 2>, 3> {{{-1,-1}, {-1,-1}, {-1,-1}}} :
 		   ((dimensionCount == 2) ? std::array<std::array<int, 2>, 3> {{{ 1,-1}, { 0,-1}, {-1,-1}}} :
 		   /*dimensionCount == 3)*/	std::array<std::array<int, 2>, 3> {{{ 1, 2}, { 0, 2}, { 0, 1}}});
-												// @formatter:on
+																			// @formatter:on
 	static constexpr int Di = 0;
 	static constexpr int τi = 1 + dimensionCount;
 	static constexpr int transverseCount = dimensionCount - 1;
 	static constexpr int fieldCount = 2 + dimensionCount;
+	static constexpr auto η = minkowski<Type, dimensionCount>();
 	static constexpr auto c = PhysicalConstants<Type>::c;
 	static constexpr auto ic = 1 / c;
 	static constexpr auto c2 = sqr(c);
