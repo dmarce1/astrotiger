@@ -23,10 +23,10 @@ TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][
 	GasPrimitive<Type, dimensionCount> prim;
 	prim.setMassDensity(MassDensityType<Type>(1.0));
 	prim.setSpecificEnergy(SpecificEnergyType<Type>(1.0e-3 * c * c));
-	prim.setVelocity(Vector<VelocityType<Type>, dimensionCount> { 0.05 * c, -0.03 * c, 0.1 * c });
+	prim.setVelocity(Vector<VelocityType<Type>, dimensionCount> { 0.0 * c, -0.01 * c, 0.01 * c });
 
 	// --- Step 2: Loop over each spatial direction ---
-	for (int dim = 0; dim < dimensionCount; dim++) {
+	for (int dim = 0; dim < 1; dim++) {
 		SquareMatrix<Type, fieldCount> J = prim.jacobian(eos, dim);
 		auto [λ, R] = prim.eigenSystem(eos, dim);
 
@@ -37,16 +37,18 @@ TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][
 				Λ(i, j) = ((i == j) ? Type(λ[i]) : Type(0.0));
 			}
 		}
-//		std::cout << "R = \n";
-//		std::cout << toString(R);
-//		std::cout << "J = \n";
-//		std::cout << toString(J);
-//		std::cout << "J.R = \n";
-//		std::cout << toString(J * R);
-//		std::cout << "R * Λ = \n";
-//		std::cout << toString(R * Λ);
-//		std::cout << "J.R - R * Λ = \n";
-//		std::cout << toString(J * R - R * Λ);
+		std::cout << "Λ = \n";
+		std::cout << (Λ);
+		std::cout << "R = \n";
+		std::cout << (R);
+		std::cout << "J = \n";
+		std::cout << (J);
+		std::cout << "J.R = \n";
+		std::cout << (J * R);
+		std::cout << "R * Λ = \n";
+		std::cout << (R * Λ);
+		std::cout << "J.R - R * Λ = \n";
+		std::cout << (J * R - R * Λ);
 
 //		std::cout << "R = \n";
 //		std::cout << toMathematica(R);

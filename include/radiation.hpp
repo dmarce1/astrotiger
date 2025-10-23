@@ -37,13 +37,11 @@ struct RadFlux {
 	Vector<FluxFluxType<Type>, dimensionCount> F;
 	// @formatter:off
 	DEFINE_VECTOR_OPERATORS(RadFlux, Type, a.E, a.F)
-																																																								// @formatter:on
 };
 template<typename Type, int dimensionCount>
 struct RadConserved {
 	// @formatter:off
 	DEFINE_VECTOR_OPERATORS(RadConserved, Type, a.E, a.F)
-																																																								// @formatter:on
 	auto temperature() const {
 		return pow<Rational(1, 4)>(E / pc.aR);
 	}
@@ -233,6 +231,7 @@ struct RadConserved {
 	}
 	RadConserved<Type, dimensionCount> implicitRadiationSolve(GasConserved<Type, dimensionCount> &gasCon, Opacity<Type> const &opac,
 			EquationOfState<Type> const &eos, TimeType<Type> const &dt) const {
+		enableFPE();
 		auto const implicitEnergySolve = [](SpecificEnergyType<Type> &ε, EnergyDensityType<Type> &E, MassDensityType<Type> const &ρ_,
 				SpecificAreaType<Type> const &κₐ, EquationOfState<Type> const &eos, TimeType<Type> const &dt) {
 			using std::abs;
@@ -314,19 +313,20 @@ struct RadConserved {
 		using std::max;
 		using std::min;
 		constexpr Type toler = 4 * eps;
-		enableFPE();
+		constexpr auto c = pc.c;
+		constexpr auto c2 = c * c;
 		auto radCon = *this;
 		GasPrimitive<Type, dimensionCount> gasPrim;
-		EnergyDensityType<Type> &τ = gasCon.τ;
-		EnergyDensityType<Type> &E = radCon.E;
-		EntropyDensityType<Type> &K = gasCon.K;
-		MassDensityType<Type> &D = gasCon.D;
-		MassDensityType<Type> &ρ = gasPrim.ρ;
-		SpecificEnergyType<Type> &ε = gasPrim.ε;
-		Vector<VelocityType<Type>, dimensionCount> &v = gasPrim.v;
-		Vector<EnergyFluxType<Type>, dimensionCount> &F = radCon.F;
-		Vector<MomentumDensityType<Type>, dimensionCount> &S = gasCon.S;
-		auto const norm = sqrt(sqr(sqrt(F.dot(F))) / sqr(pc.c) + sqr(E) + sqr(pc.c) * sqr(sqrt(S.dot(S))) + sqr(τ)).value();
+		auto &τ = gasCon.τ;
+		auto &E = radCon.E;
+		auto &K = gasCon.K;
+		auto &D = gasCon.D;
+		auto &ρ = gasPrim.ρ;
+		auto &ε = gasPrim.ε;
+		auto &u = gasPrim.u;
+		auto &F = radCon.F;
+		auto &S = gasCon.S;
+		auto const norm = sqrt(F.dot(F) / c2 + sqr(E) + c2 * sqr(sqrt(S.dot(S))) + sqr(τ)).value();
 		Type error = 1.0;
 		auto const F0 = F;
 		auto const E0 = E;
@@ -337,22 +337,23 @@ struct RadConserved {
 			auto const F1 = F;
 			auto const E1 = E;
 			gasPrim = gasCon.toPrimitive(eos);
-			auto const γ = gasPrim.lorentzFactor();
+			auto const γ = fourVelocity2LorentzFactor(u);
+			auto const v = fourVelocity2CoordVelocity(u);
 			auto const dt0 = dt / γ;
-			auto const Λ = space2spaceTime<DimensionlessType<Type>>(γ, γ * v / pc.c, δ + (sqr(γ) / (γ + 1)) * sqr(v / pc.c));
-			auto const iΛ = space2spaceTime<DimensionlessType<Type>>(γ, -γ * v / pc.c, δ + (sqr(γ) / (γ + 1)) * sqr(v / pc.c));
-			auto const λ = ρ * pc.c * (opac.κₐ + opac.κₛ) * dt0;
+			auto const Λ = space2spaceTime<DimensionlessType<Type>>(γ, γ * v / c, δ + (sqr(γ) / (γ + 1)) * sqr(v / c));
+			auto const iΛ = space2spaceTime<DimensionlessType<Type>>(γ, -γ * v / c, δ + (sqr(γ) / (γ + 1)) * sqr(v / c));
+			auto const λ = ρ * c * (opac.κₐ + opac.κₛ) * dt0;
 			auto R = symmetric(Λ * R0 * Λ);
 			E = spaceTime2Tensor0(R);
-			F = pc.c * spaceTime2Tensor1(R);
+			F = c * spaceTime2Tensor1(R);
 			implicitEnergySolve(ε, E, ρ, opac.κₛ, eos, dt0);
 			F = F / (1 + λ);
 			R = radCon.stressEnergy();
 			R = symmetric(iΛ * R * iΛ);
 			E = spaceTime2Tensor0(R);
-			F = pc.c * spaceTime2Tensor1(R);
-			S = S0 + (F - F0) / sqr(pc.c);
-			auto const τo = sqr(pc.c) * (γ - 1.0) * D;
+			F = c * spaceTime2Tensor1(R);
+			S = S0 + (F - F0) / c2;
+			auto const τo = c2 * (γ - 1.0) * D;
 			auto const τmin = 0.5 * (τo + τ);
 			τ = τ0 + E0 - E;
 			τ = max(τmin, τ);
@@ -387,13 +388,13 @@ private:
 	static constexpr Type toler = 2 * eps;
 	static constexpr int fieldCount = 1 + dimensionCount;
 	static constexpr int transverseCount = dimensionCount - 1;
-	static constexpr PhysicalConstants<Type> pc {};
+	static constexpr PhysicalConstants<Type> pc { };
 	// @formatter:off
 	static constexpr auto transverseIndices =
 	(dimensionCount == 1) ? std::array<std::array<int, 2>, 3> { { {-1,-1}, {-1,-1}, {-1,-1}}}:
 	((dimensionCount == 2) ? std::array<std::array<int, 2>, 3> { { {1,-1}, {0,-1}, {-1,-1}}}:
 			/*dimensionCount == 3)*/std::array<std::array<int, 2>, 3> { { {1, 2}, {0, 2}, {0, 1}}});
-	// @formatter:on
+			// @formatter:on
 	EnergyDensityType<Type> E;
 	Vector<EnergyFluxType<Type>, dimensionCount> F;
 };

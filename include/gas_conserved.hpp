@@ -54,18 +54,18 @@ public:
 		using std::min;
 		using std::tanh;
 		GasPrimitive<Type, dimensionCount> prim;
-		MassDensityType<Type> &ρ = prim.ρ;
-		SpecificEnergyType<Type> &ε = prim.ε;
-		Vector<VelocityType<Type>, dimensionCount> &v = prim.v;
+		auto &ρ = prim.ρ;
+		auto &ε = prim.ε;
+		auto &u = prim.u;
 		auto const S2 = S.dot(S);
 		auto const D2 = sqr(D);
 		auto const S1 = sqrt(S2);
 		auto const τo = pc.c * (sqrt(sqr(pc.c) * D2 + S2) - pc.c * D);
 		if (S2.value() < tiny) {
-			auto const iρ = 1 / D;
 			ρ = D;
+			auto const iρ = 1 / ρ;
 			ε = max(τ, τo) * iρ;
-			v = S * iρ;
+			u = coordVelocity2FourVelocity(S * iρ);
 		} else {
 			using AutoEnergyDensity = FwdAutoDiff<EnergyDensityType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
 			using AutoMassDensity = FwdAutoDiff<MassDensityType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
@@ -140,7 +140,7 @@ public:
 				}
 			}
 			ρ = MassDensityType<Type>(ρ_);
-			v = sqr(pc.c) * S / EnergyDensityType<Type>(W);
+			u = coordVelocity2FourVelocity(sqr(pc.c) * S / EnergyDensityType<Type>(W));
 			ε = SpecificEnergyType<Type>(ε_);
 			if (!useEntropy) {
 				if (prim.dualEnergySwitch(eos) < Φo) {

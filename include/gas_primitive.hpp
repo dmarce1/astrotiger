@@ -9,18 +9,14 @@
 #include "eos.hpp"
 #include "gas_conserved.hpp"
 #include "tensor.hpp"
+#include "velocity.hpp"
 
 template<typename Type, int dimensionCount>
 struct GasPrimitive {
 	auto dualEnergySwitch(EquationOfState<Type> const &eos) const {
 		auto const h = eos.energy2enthalpy(ρ, ε);
-		auto const γ = lorentzFactor();
-		auto const num = ρ * ε;
-		auto const den = ρ * γ * (γ * h - sqr(pc.c));
-		return num / den;
-	}
-	DimensionlessType<Type> lorentzFactor() const {
-		return sqrt(1 / (1 - v.dot(v) / sqr(pc.c)));
+		auto const γ = fourVelocity2LorentzFactor(u);
+		return ε / (γ * (γ * h - c2));
 	}
 	GasConserved<Type, dimensionCount> toConserved(EquationOfState<Type> const &eos) const {
 		GasConserved<Type, dimensionCount> con;
@@ -28,15 +24,15 @@ struct GasPrimitive {
 		EnergyDensityType<Type> &τ = con.τ;
 		EntropyDensityType<Type> &K = con.K;
 		Vector<MomentumDensityType<Type>, dimensionCount> &S = con.S;
-		constexpr auto c2 = sqr(pc.c);
-		auto const γ = lorentzFactor();
+		auto const γ = fourVelocity2LorentzFactor(u);
+		auto const v = fourVelocity2CoordVelocity(u);
 		auto const γ2 = sqr(γ);
 		auto const p = eos.energy2pressure(ρ, ε);
 		auto const T = eos.energy2temperature(ρ, ε);
 		auto const ϰ = eos.temperature2entropy(ρ, T);
 		auto const h = c2 + ε + p / ρ;
 		auto const W = ρ * γ2 * h;
-		S = W * v / sqr(pc.c);
+		S = W * v * ic2;
 		D = ρ * γ;
 		τ = ρ * γ2 * ε + (γ2 - 1) * p + c2 * D * (γ - 1);
 		K = D * ϰ;
@@ -48,10 +44,10 @@ struct GasPrimitive {
 	auto eigenvalues(EquationOfState<Type> const &eos, int dim) const {
 		constexpr int fieldCount = 2 + dimensionCount;
 		Vector<VelocityType<Type>, fieldCount> λ;
-		constexpr auto c = pc.c;
 		auto const a = eos.energy2soundSpeed(ρ, ε);
-		auto const α = a / c;
-		auto const β = v / c;
+		auto const α = a * ic;
+		auto const v = fourVelocity2CoordVelocity(u);
+		auto const β = v * ic;
 		auto const βˣ = β[dim];
 		auto const β2 = β.dot(β);
 		auto const α2 = sqr(α);
@@ -67,44 +63,42 @@ struct GasPrimitive {
 	}
 	auto flux(EquationOfState<Type> const &eos, int direction) const {
 		constexpr auto δ = identity<DimensionlessType<Type>, dimensionCount>();
-		constexpr auto c = pc.c;
 		constexpr auto c2 = c * c;
 		GasFlux<Type, dimensionCount> flux;
-		auto const γ = lorentzFactor();
+		auto const γ = fourVelocity2LorentzFactor(u);
+		auto const v = fourVelocity2CoordVelocity(u);
 		auto const γ2 = sqr(γ);
-		auto const u = v[direction];
+		auto const vˣ = v[direction];
 		auto const T = eos.energy2temperture(ρ, ε);
 		auto const κ = eos.temperture2entropy(ρ, T);
 		auto const p = eos.energy2pressure(ρ, ε);
 		auto const h = c2 + ε + p / ρ;
 		auto const W = ρ * γ2 * h;
-		flux.D = γ * ρ * u;
-		flux.K = γ * κ * u;
-		flux.S = W * v * u;
-		flux.τ = (W - p - c2 * ρ * γ) * u;
+		flux.D = γ * ρ * vˣ;
+		flux.K = γ * κ * vˣ;
+		flux.S = W * v * vˣ;
+		flux.τ = (W - p - c2 * ρ * γ) * vˣ;
 		flux.S[direction] += p;
 		return flux;
 	}
 	auto jacobian(EquationOfState<Type> const &eos, int ni) const {
 		enableFPE();
 		using Auto1 = FwdAutoDiff<Type, 1, std::array<Type, fieldCount>>;
-		constexpr Auto1 one(1.0);
-		constexpr Auto1 c(Type(pc.c));
-		Auto1 const ic = one / c;
-		Auto1 const c2 = sqr(c);
-		Auto1 const ic2 = sqr(ic);
+		constexpr Auto1 c = PhysicalConstants<Type>::c.value();
+		constexpr Auto1 c2 = sqr(c);
 		Vector<Auto1, dimensionCount> ρcv, β;
 		Auto1 const ρc2 = Auto1::independent(Type(ρ * c2), Di);
+		auto const v = fourVelocity2CoordVelocity(u);
 		for (int d = 0; d < dimensionCount; d++) {
 			ρcv[d] = Auto1::independent(Type(ρ * c * v[d]), 1 + d);
 		}
 		Auto1 const ρε = Auto1::independent(Type(ρ * ε), τi);
 		β = ρcv / ρc2;
 		Auto1 const β2 = β.dot(β);
-		Auto1 const γ2 = one / (one - β2);
+		Auto1 const γ2 = Auto1(1) / (Auto1(1) - β2);
 		Auto1 const γ = sqrt(γ2);
-		Auto1 const p = eos.energy2pressure(Auto1(ρc2 * ic2), Auto1(ρε * c2 / ρc2));
-		Auto1 const W = ρc2 * γ2 * (one + (ρε + p) / ρc2);
+		Auto1 const p = eos.energy2pressure(ρc2 / c2, ρε / ρc2 * c2);
+		Auto1 const W = ρc2 * γ2 * (1 + (ρε + p) / ρc2);
 		Vector<Auto1, fieldCount> U;
 		U[Di] = (ρc2 * γ);
 		U[τi] = W - p - ρc2 * γ;
@@ -128,8 +122,6 @@ struct GasPrimitive {
 	}
 	auto eigenSystem(EquationOfState<Type> const &eos, int ni) const {
 		enableFPE();
-		constexpr auto c = pc.c;
-		constexpr auto c2 = sqr(c);
 		using AutoMassDensity = FwdAutoDiff<MassDensityType<Type>, 1, std::tuple<MassDensityType<Type>, SpecificEnergyType<Type>>>;
 		using AutoSpecificEnergy = FwdAutoDiff<SpecificEnergyType<Type>, 1, std::tuple<MassDensityType<Type>, SpecificEnergyType<Type>>>;
 		using index_type = typename AutoMassDensity::index_type;
@@ -144,6 +136,7 @@ struct GasPrimitive {
 		auto const h = 1 + ε / c2 + p / (ρ * c2);
 		auto const α2 = (χ + (p / ρ) * κ) / (c2 * h);
 		auto const α = sqrt(α2);
+		auto const v = fourVelocity2CoordVelocity(u);
 		auto const β = v / c;
 		auto const β2 = β.dot(β);
 		auto const βx = β[ni];
@@ -205,11 +198,13 @@ struct GasPrimitive {
 	void setSpecificEnergy(SpecificEnergyType<Type> const &ε_) {
 		ε = ε_;
 	}
-	void setVelocity(Vector<VelocityType<Type>, dimensionCount> const &v_) {
-		v = v_;
+	void setVelocity(Vector<VelocityType<Type>, dimensionCount> const &v) {
+		u = coordVelocity2FourVelocity(v);
 	}
-	void setVelocity(int k, VelocityType<Type> const &v_) {
-		v[k] = v_;
+	void setVelocity(int k, VelocityType<Type> const &vk) {
+		auto v = fourVelocity2CoordVelocity(u);
+		v[k] = vk;
+		u = coordVelocity2FourVelocity(v);
 	}
 	MassDensityType<Type> getMassDensity() const {
 		return ρ;
@@ -218,10 +213,10 @@ struct GasPrimitive {
 		return ε;
 	}
 	Vector<VelocityType<Type>, dimensionCount> getVelocity() const {
-		return v;
+		return fourVelocity2CoordVelocity(u);
 	}
 	VelocityType<Type> getVelocity(int k) const {
-		return v[k];
+		return fourVelocity2CoordVelocity(u)[k];
 	}
 	friend GasConserved<Type, dimensionCount> ;
 	template<typename, int>
@@ -234,15 +229,18 @@ private:
 			(dimensionCount == 1) ? std::array<std::array<int, 2>, 3> {{{-1,-1}, {-1,-1}, {-1,-1}}} :
 		   ((dimensionCount == 2) ? std::array<std::array<int, 2>, 3> {{{ 1,-1}, { 0,-1}, {-1,-1}}} :
 		   /*dimensionCount == 3)*/	std::array<std::array<int, 2>, 3> {{{ 1, 2}, { 0, 2}, { 0, 1}}});
-			// @formatter:on
+									// @formatter:on
 	static constexpr int Di = 0;
 	static constexpr int τi = 1 + dimensionCount;
 	static constexpr int transverseCount = dimensionCount - 1;
 	static constexpr int fieldCount = 2 + dimensionCount;
-	static constexpr PhysicalConstants<Type> pc { };
+	static constexpr auto c = PhysicalConstants<Type>::c;
+	static constexpr auto ic = 1 / c;
+	static constexpr auto c2 = sqr(c);
+	static constexpr auto ic2 = sqr(ic);
 	MassDensityType<Type> ρ;
 	SpecificEnergyType<Type> ε;
-	Vector<VelocityType<Type>, dimensionCount> v;
+	Vector<VelocityType<Type>, dimensionCount + 1> u;
 };
 
 #endif /* INCLUDE_SRHD_PRIMITIVE_HPP_ */
