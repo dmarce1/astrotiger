@@ -4,9 +4,6 @@
 
 #pragma once
 
-#include <array>
-#include <initializer_list>
-#include <type_traits>
 
 #include "matrix_fwd.hpp"
 

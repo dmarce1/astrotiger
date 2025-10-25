@@ -3,19 +3,9 @@
  *******************************************************************************/
 
 #pragma once
-#include "constants.hpp"
-#include "opacity.hpp"
-#include "eos.hpp"
-#include "fpe.hpp"
 
-#include <iostream>
-#include <climits>
-#include <functional>
-#include <tuple>
-#include "autodiff.hpp"
-#include "gas_conserved.hpp"
+#include "opacity.hpp"
 #include "gas_primitive.hpp"
-#include "tensor.hpp"
 
 template<typename Type>
 struct ImplicitEnergyFailure: public std::runtime_error {
@@ -31,13 +21,6 @@ private:
 	}
 };
 
-template<typename Type, int dimensionCount>
-struct RadFlux {
-	EnergyFluxType<Type> E;
-	Vector<FluxFluxType<Type>, dimensionCount> F;
-	// @formatter:off
-	DEFINE_VECTOR_OPERATORS(RadFlux, Type, a.E, a.F)
-};
 template<typename Type, int dimensionCount>
 struct RadConserved {
 	// @formatter:off
@@ -61,28 +44,6 @@ struct RadConserved {
 	}
 	auto stressEnergy() const {
 		return space2spaceTime<EnergyDensityType<Type>, dimensionCount>(E, F / pc.c, pressure());
-	}
-	auto flux(int ni) const {
-		enableFPE();
-		using std::max;
-		constexpr auto c2 = sqr(pc.c);
-		RadFlux<Type, dimensionCount> flux;
-		auto const un = unitVector<Type, dimensionCount>(ni);
-		auto const magF = sqrt(F.dot(F));
-		auto const imagF = 1 / max(magF, EnergyFluxType<Type>(t1));
-		auto const iE = 1 / E;
-		auto const f = magF * iE / pc.c;
-		auto const N = F * imagF;
-		auto const f2 = sqr(f);
-		auto const ξ = (3 + 4 * f2) / (5 + 2 * sqrt(4 - 3 * f2));
-		auto const Ωdif = 0.5 * (1 - ξ);
-		auto const Ωstr = 0.5 * (3 * ξ - 1);
-		auto const P = E * (Ωstr * N * N[ni] + Ωdif * un);
-		flux.E = F[ni];
-		for (int k = 0; k < dimensionCount; k++) {
-			flux.F = c2 * P[ni][k];
-		}
-		return flux;
 	}
 	auto jacobian(int ni) const {
 		enableFPE();
@@ -316,7 +277,7 @@ struct RadConserved {
 		auto &D = gasCon.D;
 		auto &ρ = gasPrim.ρ;
 		auto &ε = gasPrim.ε;
-		auto &u = gasPrim.u;
+		auto &v = gasPrim.v;
 		auto &F = radCon.F;
 		auto &S = gasCon.S;
 		auto const norm = sqrt(F.dot(F) / c2 + sqr(E) + c2 * sqr(sqrt(S.dot(S))) + sqr(τ)).value();
@@ -330,8 +291,7 @@ struct RadConserved {
 			auto const F1 = F;
 			auto const E1 = E;
 			gasPrim = gasCon.toPrimitive(eos);
-			auto const γ = fourVelocity2LorentzFactor(u);
-			auto const v = fourVelocity2CoordVelocity(u);
+			auto const γ = sqrt(c2/(c2-v.dot(v)));
 			auto const dt0 = dt / γ;
 			auto const Λ = space2spaceTime<DimensionlessType<Type>>(γ, γ * v / c, δ + (sqr(γ) / (γ + 1)) * sqr(v / c));
 			auto const iΛ = space2spaceTime<DimensionlessType<Type>>(γ, -γ * v / c, δ + (sqr(γ) / (γ + 1)) * sqr(v / c));
@@ -374,6 +334,8 @@ struct RadConserved {
 	EnergyFluxType<Type> getFlux(int k) const {
 		return F[k];
 	}
+	template<typename T, int D>
+	friend auto riemannHLLC(RadConserved<T, D> const &, RadConserved<T, D> const &, int ) ;
 private:
 	static constexpr auto δ = identity<DimensionlessType<Type>, dimensionCount>();
 	static constexpr Type t2 = std::numeric_limits<Type>::min();
@@ -388,7 +350,7 @@ private:
 	(dimensionCount == 1) ? std::array<std::array<int, 2>, 3> { { {-1,-1}, {-1,-1}, {-1,-1}}}:
 	((dimensionCount == 2) ? std::array<std::array<int, 2>, 3> { { {1,-1}, {0,-1}, {-1,-1}}}:
 			/*dimensionCount == 3)*/std::array<std::array<int, 2>, 3> { { {1, 2}, {0, 2}, {0, 1}}});
-			// @formatter:on
+					// @formatter:on
 	EnergyDensityType<Type> E;
 	Vector<EnergyFluxType<Type>, dimensionCount> F;
 };

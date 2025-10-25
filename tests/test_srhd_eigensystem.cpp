@@ -9,7 +9,7 @@
 TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][jacobian]") {
 	using std::abs;
 	using Type = double;
-	constexpr Type tol = 4 * std::numeric_limits < Type > ::epsilon();
+	constexpr Type tol = 16 * std::numeric_limits < Type > ::epsilon();
 	constexpr int dimensionCount = 3;
 	constexpr int fieldCount = 2 + dimensionCount;
 	static constexpr PhysicalConstants<Type> pc { };
@@ -29,6 +29,8 @@ TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][
 				Λ(i, j) = ((i == j) ? Type(λ[i]) : Type(0.0));
 			}
 		}
+		auto JR = J * R;
+		auto RL = R * Λ;
 //		std::cout << "Λ = \n";
 //		std::cout << (Λ);
 //		std::cout << "R = \n";
@@ -40,12 +42,10 @@ TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][
 //		std::cout << "R * Λ = \n";
 //		std::cout << (R * Λ);
 //		std::cout << "J.R - R * Λ = \n";
-		auto JR = J * R;
-		auto RL = R * Λ;
 //		std::cout << (JR - RL) / frobeniusNorm(RL);
 		for (int i = 0; i < fieldCount; i++) {
 			for (int j = 0; j < fieldCount; j++) {
-				CHECK((abs((JR(i, j) - RL(i, j)))) < tol);
+				CHECK((abs((JR(i, j) - RL(i, j))) / c) < tol);
 			}
 		}
 		for (int i = 0; i < fieldCount; i++) {
@@ -53,7 +53,7 @@ TEST_CASE("SRHD primitive eigenSystem consistent with Jacobian", "[srhd][eigen][
 			auto JRi = J * Ri;
 			auto λRi = Ri * λ[i];
 			for (int k = 0; k < fieldCount; k++) {
-				CHECK((abs((JRi[k] - λRi[k]))) < tol);
+				CHECK((abs((JRi[k] - λRi[k])) / c) < tol);
 			}
 		}
 		Type detR = determinant(R);

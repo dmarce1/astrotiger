@@ -15,6 +15,7 @@ endif()
 set(ALL_FLAGS -std=c++23 -Wall -Wno-comma-subscript -I${PROJECT_SOURCE_DIR}/include)
 set(CXX_FLAGS  ${ALL_FLAGS} -fext-numeric-literals -march=native)
 set(CUDA_FLAGS ${ALL_FLAGS} -Xcompiler -march=native)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # ------------------------------------------------------------------------------
 # DEPENDENCIES
@@ -22,6 +23,22 @@ set(CUDA_FLAGS ${ALL_FLAGS} -Xcompiler -march=native)
 find_package(HDF5 REQUIRED COMPONENTS C CXX)
 find_package(HPX  REQUIRED)
 
+# ------------------------------------------------------------------------------
+# IWYU CONFIGURATION
+# ------------------------------------------------------------------------------
+option(ENABLE_IWYU "Run Include-What-You-Use automatically" OFF)
+
+if(ENABLE_IWYU)
+    find_program(IWYU_PATH NAMES include-what-you-use iwyu)
+    if(IWYU_PATH)
+        message(STATUS "Found IWYU: ${IWYU_PATH}")
+        # Default IWYU mapping/behavior
+        set(IWYU_ARGS "-Xiwyu;--no_default_mappings")
+        set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE "${IWYU_PATH};${IWYU_ARGS}")
+    else()
+        message(WARNING "IWYU not found — skipping automatic include analysis")
+    endif()
+endif()
 
 # ------------------------------------------------------------------------------
 # SOURCES
@@ -42,25 +59,23 @@ set(astrotiger_header
 	include/gas_flux.hpp
 	include/gas.hpp
 	include/gas_primitive.hpp
-	include/hllc.hpp
 	include/indices.hpp
 	include/io.hpp
+	include/left_right_state.hpp
 	include/math.hpp
 	include/matrix_fwd.hpp
 	include/matrix.hpp
 	include/opacity.hpp
 	include/operators.hpp
 	include/quantity.hpp
-	include/radiation.hpp
+	include/rad_conserved.hpp
+	include/rad_flux.hpp
 	include/rational.hpp
 	include/tensor.hpp
 	include/type_traits.hpp
 	include/units.hpp
 	include/vector.hpp
-	include/velocity.hpp
 )
-
-
 
 # ------------------------------------------------------------------------------
 # ASTROTIGER EXECUTABLE
@@ -79,7 +94,6 @@ add_hpx_executable(
   HEADERS
     ${astrotiger_header}
 )
-
 
 target_include_directories(astrotiger
   PUBLIC
@@ -106,10 +120,8 @@ target_link_options(astrotiger PUBLIC
 # ------------------------------------------------------------------------------
 # TESTS
 # ------------------------------------------------------------------------------
-# Add Catch2
 add_subdirectory(extern/Catch2)
 
-# Define test sources
 set(test_sources
   ${astrotiger_header}  
   src/fpe.cpp
@@ -121,7 +133,7 @@ set(test_sources
   tests/test_srhd_eigensystem.cpp
 )
 
-add_executable(unit_tests ${test_sources} )
+add_executable(unit_tests ${test_sources})
 
 target_link_libraries(unit_tests
   PRIVATE

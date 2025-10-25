@@ -165,12 +165,20 @@ constexpr auto sqrt(Quantity<U, T> const &q) {
 
 template<typename T>
 constexpr auto log(Quantity<NullUnitType, T> const &q) {
+	using std::log;
 	return log(q.value());
 }
 
 template<typename T>
 constexpr auto exp(Quantity<NullUnitType, T> const &q) {
+	using std::exp;
 	return exp(q.value());
+}
+
+template<typename U, typename T>
+constexpr auto abs(Quantity<U, T> const &q) {
+	using std::abs;
+	return Quantity<U, T>(abs(q.value()));
 }
 
 template<typename T>

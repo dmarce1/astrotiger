@@ -1,12 +1,6 @@
 #pragma once
 
-#include "math.hpp"
-#include "vector.hpp"
-
 #include <iomanip>
-#include <stdexcept>
-#include <ostream>
-#include <string>
 
 #include "matrix_fwd.hpp"
 

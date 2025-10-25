@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include "type_traits.hpp"
-#include "matrix.hpp"
 
 template<typename Type, int dimensionCount>
 using Tensor2 = SquareMatrix<Type, dimensionCount, SymmetryType::symmetric>;

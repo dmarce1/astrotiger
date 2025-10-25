@@ -7,12 +7,9 @@
 #include <functional>
 
 #include "autodiff.hpp"
-#include "constants.hpp"
-#include "operators.hpp"
 #include "eos.hpp"
 #include "gas.hpp"
-#include "math.hpp"
-#include "matrix.hpp"
+#include "operators.hpp"
 #include "tensor.hpp"
 
 struct PrimitiveRecoveryFailure: public std::runtime_error {
@@ -56,7 +53,7 @@ public:
 		GasPrimitive<Type, dimensionCount> prim;
 		auto &ρ = prim.ρ;
 		auto &ε = prim.ε;
-		auto &u = prim.u;
+		auto &v = prim.v;
 		auto const S2 = S.dot(S);
 		auto const D2 = sqr(D);
 		auto const S1 = sqrt(S2);
@@ -65,7 +62,7 @@ public:
 			ρ = D;
 			auto const iρ = 1 / ρ;
 			ε = max(τ, τo) * iρ;
-			u = coordVelocity2FourVelocity(S * iρ);
+			v = S * iρ;
 		} else {
 			using AutoEnergyDensity = FwdAutoDiff<EnergyDensityType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
 			using AutoMassDensity = FwdAutoDiff<MassDensityType<Type>, 2, std::tuple<DimensionlessType<Type>>>;
@@ -140,7 +137,7 @@ public:
 				}
 			}
 			ρ = MassDensityType<Type>(ρ_);
-			u = coordVelocity2FourVelocity(sqr(pc.c) * S / EnergyDensityType<Type>(W));
+			v = sqr(pc.c) * S / EnergyDensityType<Type>(W);
 			ε = SpecificEnergyType<Type>(ε_);
 			if (!useEntropy) {
 				if (prim.dualEnergySwitch(eos) < Φo) {
