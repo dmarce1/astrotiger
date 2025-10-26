@@ -148,4 +148,7 @@ struct LeftRightState {
 	Type R;
 };
 
+template<typename T>
+using LRS = LeftRightState<T>;
+
 

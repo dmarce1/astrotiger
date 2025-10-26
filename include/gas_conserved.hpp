@@ -12,6 +12,9 @@
 #include "operators.hpp"
 #include "tensor.hpp"
 
+template<typename T, int D>
+auto riemannHLLC(GasConserved<T, D> const&, GasConserved<T, D> const&, EquationOfState<T> const&, int);
+
 struct PrimitiveRecoveryFailure: public std::runtime_error {
 	explicit PrimitiveRecoveryFailure(std::string const &msg, double Dval, double tauVal, double S2val, double fval, double betaVal, int iter) :
 			std::runtime_error(makeMessage(msg, Dval, tauVal, S2val, fval, betaVal, iter)) {
@@ -85,7 +88,7 @@ public:
 				auto const iρ = one / ρ_;
 				auto const h = W * iγ2 * iρ;
 				ε_ = h - sqr(pc.c) - p * iρ;
-				AutoEnergyDensity const peos = eos.energy2pressure(ρ_, ε_);
+				AutoEnergyDensity const peos = eos.ε2p(ρ_, ε_);
 				return AutoDimensionless((p - peos) / W);
 			};
 			Function const fEntropy = [this, eos, S2, D2](AutoDimensionless β) {
@@ -94,10 +97,10 @@ public:
 				auto const γ = one / sqrt(one - β2);
 				auto const ρ = AutoMassDensity(D) / γ;
 				auto const ϰ(K / D);
-				auto const Tg(eos.entropy2temperature(ρ, ϰ));
-				auto const e = eos.temperature2energy(ρ, Tg);
+				auto const Tg(eos.s2T(ρ, ϰ));
+				auto const e = eos.T2ε(ρ, Tg);
 				auto const ε = AutoSpecificEnergy(e);
-				auto const p = eos.energy2pressure(ρ, ε);
+				auto const p = eos.ε2p(ρ, ε);
 				auto const h = sqr(pc.c) + ε + p / ρ;
 				auto const h2 = h * h;
 				auto const γ2 = γ * γ;
@@ -151,7 +154,7 @@ public:
 	friend GasPrimitive<Type, dimensionCount> ;
 	template<typename, int>
 	friend struct RadConserved;
-	template<typename T, int D>
-	friend auto hllc(GasConserved<T, D> const&, GasConserved<T, D> const&, EquationOfState<T> const&, int);
+	friend auto riemannHLLC<Type, dimensionCount>(GasConserved const&, GasConserved const&, EquationOfState<Type> const&,
+			int);
 };
 

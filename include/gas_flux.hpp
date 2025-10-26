@@ -12,103 +12,102 @@
 template<typename Type, int dimensionCount>
 struct GasFlux {
 	MomentumDensityType<Type> D;
-	EnergyDensityType<Type> S;
+	Vector<EnergyDensityType<Type>, dimensionCount> S;
 	EnergyFluxType<Type> τ;
 	EntropyFluxType<Type> K;
-	// @formatter:on
-	DEFINE_VECTOR_OPERATORS(GasFlux, Type, a.D, a.τ, a.K, a.S);
 	// @formatter:off
+	DEFINE_VECTOR_OPERATORS(GasFlux, Type, a.D, a.τ, a.K, a.S);
+						// @formatter:on
 };
 
-
 template<typename Type, int dimensionCount>
-auto flux(GasPrimitive<Type, dimensionCount> const& prim, EquationOfState<Type> const &eos, int direction) {
-	constexpr auto δ = identity<DimensionlessType<Type>, dimensionCount>();
-	constexpr auto c2 = c * c;
+auto flux(GasPrimitive<Type, dimensionCount> const &prim, EquationOfState<Type> const &eos, int n) {
+	constexpr PhysicalConstants<Type> pc { };
+	constexpr auto c = pc.c;
+	constexpr auto c2 = sqr(c);
 	GasFlux<Type, dimensionCount> flux;
-	auto const& ρ = prim.ρ;
-	auto const& ε = prim.ε;
-	auto const& v = prim.v;
+	auto const &ρ = prim.ρ;
+	auto const &ε = prim.ε;
+	auto const &v = prim.v;
 	auto const β = v / c;
 	auto const β2 = β.dot(β);
 	auto const γ = sqrt(1 / (1 - β2));
 	auto const γ2 = sqr(γ);
-	auto const vˣ = v[direction];
-	auto const T = eos.energy2temperture(ρ, ε);
-	auto const κ = eos.temperture2entropy(ρ, T);
-	auto const p = eos.energy2pressure(ρ, ε);
+	auto const vˣ = v[n];
+	auto const T = eos.ε2T(ρ, ε);
+	auto const κ = eos.T2s(ρ, T);
+	auto const p = eos.ε2p(ρ, ε);
 	auto const h = c2 + ε + p / ρ;
 	auto const W = ρ * γ2 * h;
 	flux.D = γ * ρ * vˣ;
-	flux.K = γ * κ * vˣ;
-	flux.S = W * v * vˣ;
+	flux.K = γ * ρ * κ * vˣ;
+	flux.S = W * v * vˣ / c2;
 	flux.τ = (γ2 * (ρ * ε + β2 * (c2 * ρ * γ / (γ + 1) + p))) * vˣ;
-	flux.S[direction] += p;
+	flux.S[n] += p;
 	return flux;
 }
 
-
-
-
 template<typename Type, int dimensionCount>
-auto riemannHLLC(GasConserved<Type, dimensionCount> const &UL, GasConserved<Type, dimensionCount> const &UR, EquationOfState<Type> const &eos, int direction) {
+auto riemannHLLC(GasConserved<Type, dimensionCount> const &UL, GasConserved<Type, dimensionCount> const &UR, EquationOfState<Type> const &eos, int n) {
 	using std::max;
 	using std::min;
+	using PrimType = GasPrimitive<Type, dimensionCount>;
+	using ConsType = GasConserved<Type, dimensionCount>;
 	constexpr VelocityType<Type> zero(Type(0.0));
 	constexpr PhysicalConstants<Type> pc { };
-	constexpr Type c = pc.c;
-	constexpr Type c2 = sqr(c);
-	GasFlux<Type, dimensionCount> F;
-	GasConserved<Type, dimensionCount> U0;
-	auto const primL = UL.toPrimitive(eos);
-	auto const primR = UR.toPrimitive(eos);
-	auto const ρL = primL.ρ;
-	auto const ρR = primR.ρ;
-	auto const uL = primL.v;
-	auto const uR = primR.v;
-	auto const εL = primL.ε;
-	auto const εR = primR.ε;
-	auto const γL = primL.lorentzFactor();
-	auto const γR = primR.lorentzFactor();
-	auto const λL = primL.eigenvalues(eos, direction);
-	auto const λR = primR.eigenvalues(eos, direction);
-	auto const hL = eos.energy2enthalpy(ρL, εL);
-	auto const hR = eos.energy2enthalpy(ρR, εR);
-	auto const wL = ρL * sqr(γL) * hL;
-	auto const wR = ρR * sqr(γR) * hR;
-	auto const pL = eos.energy2pressure(ρL, εL);
-	auto const pR = eos.energy2pressure(ρR, εR);
-	auto const aL = eos.energy2soundSpeed(ρL, εL);
-	auto const aR = eos.energy2soundSpeed(ρR, εR);
-	auto const vL = uL[direction];
-	auto const vR = uR[direction];
-	auto const sL = min(zero, min(λL.front(), λR.front()));
-	auto const sR = max(zero, max(λL.back(), λR.back()));
-	auto const s0num = pR - pL + sL * wL * uL - sR * wR * uR;
-	auto const s0den = wL * (sL - uL) - wR * (sR - uR);
-	auto const s0 = s0num / s0den;
-	auto const p0 = pL + wL * (sL - uL) * (s0 - uL) / (1 - uL * sL);
-	if (zero >= s0) {
-		F = primL.flux(direction);
-		if (zero > sL) {
-			U0.D = UL.D * (sL - uL) / (sL - s0);
-			U0.K = UL.K * (U0.D / UL.D);
-			U0.S = UL.S * (U0.D / UL.D);
-			U0.τ = U0.D * hL - p0 - U0.D;
-			U0.S[direction] = U0.D * hL * sqr(wL) * s0;
-			F += sL * (U0 - UL);
-		}
-	} else {
-		F = primR.flux(direction);
-		if (zero > sR) {
-			U0.D = UR.D * (sL - uL) / (sL - s0);
-			U0.K = UR.K * (U0.D / UR.D);
-			U0.S = UR.S * (U0.D / UR.D);
-			U0.τ = U0.D * hR - p0 - U0.D;
-			U0.S[direction] = U0.D * hR * sqr(wR) * s0;
-			F += sR * (U0 - UR);
-		}
-	}
-	return F;
+	constexpr LRS<DimensionlessType<Type>> one(Type(1.0));
+	constexpr LRS<DimensionlessType<Type>> two(Type(2.0));
+	constexpr LRS<DimensionlessType<Type>> three(Type(3.0));
+	constexpr LRS<DimensionlessType<Type>> four(Type(4.0));
+	constexpr LRS<DimensionlessType<Type>> five(Type(5.0));
+	constexpr auto c = pc.c;
+	constexpr auto c2 = sqr(c);
+	ConsType U0;
+	PrimType const primL = UL.toPrimitive(eos);
+	PrimType const primR = UR.toPrimitive(eos);
+	auto const U = LRS<ConsType>(UL, UR);
+	auto const V = LRS<PrimType>(primL, primR);
+	auto const D = LRS<MassDensityType<Type>>(U.L.D, U.R.D);
+	auto const S = LRS<Vector<MomentumDensityType<Type>, dimensionCount>>(U.L.S, U.R.S);
+	auto const τ = LRS<EnergyDensityType<Type>>(U.L.τ, U.R.τ);
+	auto const K = LRS<EntropyDensityType<Type>>(U.L.K, U.R.K);
+	auto const ρ = LRS<MassDensityType<Type>>(V.L.ρ, V.R.ρ);
+	auto const v = LRS<Vector<VelocityType<Type>, dimensionCount>>(V.L.v, V.R.v);
+	auto const ε = LRS<SpecificEnergyType<Type>>(V.L.ε, V.R.ε);
+	auto const vx = v[n];
+	auto const p = eos.ε2p(ρ, ε);
+	auto const χ = eos.ε2χ(ρ, ε);
+	auto const κ = eos.ε2κ(ρ, ε);
+	auto const h = one + ε / c2 + p / (ρ * c2);
+	auto const α2 = (χ + (p / ρ) * κ) / (c2 * h);
+	auto const α = sqrt(α2);
+	auto const β = v / c;
+	auto const β2 = β.dot(β);
+	auto const βx = β[n];
+	auto const βxβx = sqr(βx);
+	auto const βtβt = β2 - βxβx;
+	auto const β2α2 = β2 * α2;
+	auto const id = one / (one - β2α2);
+	auto const n1 = βx * (one - α2);
+	auto const n2 = α * sqrt((one - β2) * (one - βxβx - βtβt * α2));
+	auto const λp = c * (n1 + n2) * id;
+	auto const λm = c * (n1 - n2) * id;
+	auto const γ2 = one / (one - β2);
+	auto const γ = sqrt(γ2);
+	auto const W = ρ * sqr(γ) * h;
+	auto const s = LRS<VelocityType<Type>>(min(zero, min(λm.L, λm.R)), max(zero, max(λp.L, λp.R)));
+	auto const s0 = (p.R - p.L + s.L * W.L * vx.L - s.R * W.R * vx.R) / (W.L * (s.L - vx.L) - W.R * (s.R - vx.R));
+	auto const p0 = p.L + c2 * W.L * (s.L - vx.L) * (s0 - vx.L) / (c2 - vx.L * s.L);
+	bool const b = zero > s0;
+	auto const Ξ = (s(b) - vx(b)) / (s(b) - s0);
+	U0.D = D(b) * Ξ;
+	U0.K = K(b) * Ξ;
+	U0.S = S(b) * Ξ;
+	U0.τ = τ(b) * Ξ;
+	U0.S[n] += (p0 - p(b)) / (s(b) - s0);
+	U0.τ += (p0 * s0 - p(b) * vx(b)) / (s(b) - s0);
+	auto F = flux(V(b), eos, n);
+//	F += s(b) * (U0 - U(b));
+//	return F;
 }
 

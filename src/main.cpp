@@ -1,4 +1,5 @@
 #include <hpx/hpx_init.hpp>
+#include "gas_flux.hpp"
 #include "rad_flux.hpp"
 
 #define NDIM 3
@@ -6,9 +7,10 @@
 static constexpr PhysicalConstants<double> pc { };
 
 int hpx_main(int argc, char *argv[]) {
-	RadConserved<double, NDIM> Ul;
-	RadConserved<double, NDIM> Ur;
-	riemannHLLC(Ul, Ur, 1);
+	constexpr EquationOfState<double> eos(1.0);
+	GasConserved<double, NDIM> Ul;
+	GasConserved<double, NDIM> Ur;
+	riemannHLLC(Ul, Ur, eos, 1);
 
 	return hpx::local::finalize();
 }

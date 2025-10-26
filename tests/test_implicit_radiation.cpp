@@ -62,7 +62,7 @@ TEST_CASE("Implicit energy solve conserves total energy in all regimes", "[impli
 		GasPrimitive<double, ndim> gasPrim;
 		RadConserved<double, ndim> radCon;
 		gasPrim.setMassDensity(MassDensityType<double>(tc.rho));
-		auto const ε = eos.temperature2energy(gasPrim.getMassDensity(), TemperatureType<double>(tc.Tg));
+		auto const ε = eos.T2ε(gasPrim.getMassDensity(), TemperatureType<double>(tc.Tg));
 		gasPrim.setSpecificEnergy(ε);
 		gasPrim.setVelocity(
 				{ pc.c * DimensionlessType<double>(tc.beta[0]), pc.c * DimensionlessType<double>(tc.beta[1]), pc.c * DimensionlessType<double>(tc.beta[2]) });

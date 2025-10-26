@@ -206,7 +206,7 @@ struct RadConserved {
 			auto const λ = Dimensionless(ρ * pc.c * κₐ * dt);
 			auto const Fgas = [eos, Etot0, Er0, Eg0, λ, ρ, one](SpecificEnergyType<Type> ε_) {
 				auto const ε = SpecificEnergy::template independent<0>(ε_);
-				auto const T = eos.energy2temperature(ρ, ε);
+				auto const T = eos.ε2T(ρ, ε);
 				auto const T2 = sqr(T);
 				auto const T4 = sqr(T2);
 				auto const B = pc.aR * T4;
@@ -218,7 +218,7 @@ struct RadConserved {
 				auto const E = EnergyDensity::template independent<0>(E_);
 				auto const ρε = Etot0 - E;
 				auto const ε = ρε / ρ;
-				auto const T = eos.energy2temperature(ρ, ε);
+				auto const T = eos.ε2T(ρ, ε);
 				auto const T2 = sqr(T);
 				auto const T4 = sqr(T2);
 				auto const B = pc.aR * T4;
@@ -310,9 +310,9 @@ struct RadConserved {
 			auto const τmin = 0.5 * (τo + τ);
 			τ = τ0 + E0 - E;
 			τ = max(τmin, τ);
-			auto const T = eos.energy2temperature(ρ, ε);
-			K = D * eos.temperature2entropy(ρ, T);
-			error = Type(sqrt(sqr(sqrt((F - F1).dot(F - F1))) / sqr(pc.c) + sqr(E - E1)).value() / norm);
+			auto const T = eos.ε2T(ρ, ε);
+			K = D * eos.T2s(ρ, T);
+			error = Type(sqrt(sqr(sqrt((F - F1).dot(F - F1))) / c2 + sqr(E - E1)).value() / norm);
 		}
 		return radCon;
 	}

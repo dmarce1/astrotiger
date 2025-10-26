@@ -3,14 +3,20 @@
  *******************************************************************************/
 #pragma once
 
-
 #include "fpe.hpp"
 #include "gas_conserved.hpp"
+
+template<typename T, int D>
+auto riemannHLLC(GasConserved<T, D> const&, GasConserved<T, D> const&, EquationOfState<T> const&, int);
+
+template<typename T, int D>
+auto flux(GasPrimitive<T, D> const&, EquationOfState<T> const&, int);
 
 template<typename Type, int dimensionCount>
 struct GasPrimitive {
 	auto dualEnergySwitch(EquationOfState<Type> const &eos) const {
-		auto const h = eos.energy2enthalpy(ρ, ε);
+		auto const p = eos.ε2p(ρ, ε);
+		auto const h = c2 + ε + p / ρ;
 		auto const γ = sqrt(c2 / (c2 - v.dot(v)));
 		return ε / (γ * (γ * h - c2));
 	}
@@ -24,9 +30,9 @@ struct GasPrimitive {
 		auto const β2 = β.dot(β);
 		auto const γ = sqrt(1 / (1 - β2));
 		auto const γ2 = sqr(γ);
-		auto const p = eos.energy2pressure(ρ, ε);
-		auto const T = eos.energy2temperature(ρ, ε);
-		auto const ϰ = eos.temperature2entropy(ρ, T);
+		auto const p = eos.ε2p(ρ, ε);
+		auto const T = eos.ε2T(ρ, ε);
+		auto const ϰ = eos.T2s(ρ, T);
 		auto const h = c2 + ε + p / ρ;
 		auto const W = ρ * γ2 * h;
 		S = W * v * ic2;
@@ -36,7 +42,7 @@ struct GasPrimitive {
 		return con;
 	}
 	auto temperature(EquationOfState<Type> const &eos) const {
-		return eos.energy2temperature(ρ, ε);
+		return eos.ε2T(ρ, ε);
 	}
 	auto jacobian(EquationOfState<Type> const &eos, int ni) const {
 		using std::abs;
@@ -63,7 +69,7 @@ struct GasPrimitive {
 			Uᵛ[k] = Uᵛ[ti] * β[k];
 		}
 		auto const UᵛUᵛ = symmetrize(Uᵛ * Uᵛ);
-		Auto1 const p = eos.energy2pressure(ρc2 / c2, ρε * c2 / ρc2);
+		Auto1 const p = eos.ε2p(ρc2 / c2, ρε * c2 / ρc2);
 		Auto1 const ρh = ρc2 + ρε + p;
 		auto const T = ρh * UᵛUᵛ + η * p;
 		for (int m = 0; m < fieldCount; m++) {
@@ -89,7 +95,7 @@ struct GasPrimitive {
 		auto ti = transverseIndices[ni];
 		auto const ϱ = AutoMassDensity::template independent<0>(ρ);
 		auto const ϵ = AutoSpecificEnergy::template independent<1>(ε);
-		auto const ᵱ = eos.energy2pressure(ϱ, ϵ);
+		auto const ᵱ = eos.ε2p(ϱ, ϵ);
 		auto const p = ᵱ.template multiGet<index_type::zero()>();
 		auto const χ = ᵱ.template multiGet<index_type::unit(0)>();
 		auto const κ = ᵱ.template multiGet<index_type::unit(1)>() / ρ;
@@ -180,15 +186,16 @@ struct GasPrimitive {
 	friend GasConserved<Type, dimensionCount> ;
 	template<typename, int>
 	friend struct RadConserved;
-	template<typename T, int D>
-	friend auto hllc(GasConserved<T, D> const&, GasConserved<T, D> const&, EquationOfState<T> const&, int);
+	friend auto riemannHLLC<Type, dimensionCount>(GasConserved<Type, dimensionCount> const&, GasConserved<Type, dimensionCount> const&,
+			EquationOfState<Type> const&, int);
+	friend auto flux<Type, dimensionCount>(GasPrimitive const&, EquationOfState<Type> const&, int);
 private:
 	// @formatter:off
 	static constexpr auto transverseIndices =
 			(dimensionCount == 1) ? std::array<std::array<int, 2>, 3> {{{-1,-1}, {-1,-1}, {-1,-1}}} :
 		   ((dimensionCount == 2) ? std::array<std::array<int, 2>, 3> {{{ 1,-1}, { 0,-1}, {-1,-1}}} :
 		   /*dimensionCount == 3)*/	std::array<std::array<int, 2>, 3> {{{ 1, 2}, { 0, 2}, { 0, 1}}});
-																											// @formatter:on
+																																// @formatter:on
 	static constexpr int Di = 0;
 	static constexpr int τi = 1 + dimensionCount;
 	static constexpr int transverseCount = dimensionCount - 1;

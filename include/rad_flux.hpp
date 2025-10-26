@@ -49,9 +49,6 @@ auto flux(RadConserved<Type, dimensionCount> const &rad, int ni) {
 	return flux;
 }
 
-template<typename T>
-using LRS = LeftRightState<T>;
-
 template<typename Type, int dimensionCount>
 auto riemannHLLC(RadConserved<Type, dimensionCount> const &Ul, RadConserved<Type, dimensionCount> const &Ur, int n) {
 	using std::abs;
@@ -59,11 +56,11 @@ auto riemannHLLC(RadConserved<Type, dimensionCount> const &Ul, RadConserved<Type
 	using std::max;
 	constexpr PhysicalConstants<Type> pc { };
 	constexpr VelocityType<Type> zero(Type(0.0));
-	constexpr LeftRightState<DimensionlessType<Type>> one(Type(1.0));
-	constexpr LeftRightState<DimensionlessType<Type>> two(Type(2.0));
-	constexpr LeftRightState<DimensionlessType<Type>> three(Type(3.0));
-	constexpr LeftRightState<DimensionlessType<Type>> four(Type(4.0));
-	constexpr LeftRightState<DimensionlessType<Type>> five(Type(5.0));
+	constexpr LRS<DimensionlessType<Type>> one(Type(1.0));
+	constexpr LRS<DimensionlessType<Type>> two(Type(2.0));
+	constexpr LRS<DimensionlessType<Type>> three(Type(3.0));
+	constexpr LRS<DimensionlessType<Type>> four(Type(4.0));
+	constexpr LRS<DimensionlessType<Type>> five(Type(5.0));
 	constexpr auto half = one / two;
 	constexpr auto third = one / three;
 	constexpr auto c = pc.c;
