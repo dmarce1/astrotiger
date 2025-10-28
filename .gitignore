@@ -11,3 +11,4 @@ generated_source/
 include/.cproject
 include/.project
 include/.settings/
+include/dgTransforms.hpp

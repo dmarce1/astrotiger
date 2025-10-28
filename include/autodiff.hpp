@@ -9,6 +9,8 @@
 #include "util.hpp"
 #include "vector.hpp"
 
+
+
 template<typename Type, int order, typename IndependentVariableTypes = std::tuple<Type>>
 struct FwdAutoDiff;
 

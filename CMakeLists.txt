@@ -80,6 +80,48 @@ set(astrotiger_header
 )
 
 # ------------------------------------------------------------------------------
+# CODEGEN: auto-build and run before astrotiger
+# ------------------------------------------------------------------------------
+
+# Assume submodule path is extern/codegen
+add_subdirectory(extern/codegen)
+
+# Location for the generated header
+set(GENERATED_HEADER ${PROJECT_SOURCE_DIR}/include/dgTransforms.hpp)
+
+# Define a custom command that runs codegen to create the header
+add_custom_command(
+    OUTPUT ${GENERATED_HEADER}
+    COMMAND codegen codegen
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/include
+    DEPENDS codegen
+    COMMENT "Generating dgTransforms.hpp with codegen"
+    VERBATIM
+)
+
+# Define a custom target representing the generated header
+add_custom_target(generate_dgTransforms
+    DEPENDS ${GENERATED_HEADER}
+)
+
+# Add the generated header to the sources so IDEs know about it
+set(GENERATED_SOURCES ${GENERATED_HEADER})
+
+
+file(GLOB_RECURSE CODEGEN_INPUTS
+    ${PROJECT_SOURCE_DIR}/extern/codegen/src/*.cpp
+    ${PROJECT_SOURCE_DIR}/extern/codegen/include/*.hpp
+)
+
+add_custom_command(
+    OUTPUT ${GENERATED_HEADER}
+    COMMAND codegen codegen
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/include
+    DEPENDS codegen ${CODEGEN_INPUTS}
+    COMMENT "Regenerating dgTransforms.hpp"
+)
+
+# ------------------------------------------------------------------------------
 # ASTROTIGER EXECUTABLE
 # ------------------------------------------------------------------------------
 add_hpx_executable(
@@ -102,6 +144,10 @@ target_include_directories(astrotiger
     ${PROJECT_SOURCE_DIR}/include
     ${GENERATED_SOURCE_DIR}
 )
+
+# Make astrotiger depend on this generated file
+add_dependencies(astrotiger generate_dgTransforms)
+
 
 set_property(TARGET astrotiger PROPERTY CUDA_ARCHITECTURES native)
 set_property(TARGET astrotiger PROPERTY CUDA_SEPARABLE_COMPILATION ON)
