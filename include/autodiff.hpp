@@ -6,7 +6,7 @@
 
 #include "indices.hpp"
 #include "quantity.hpp"
-#include "type_traits.hpp"
+#include "util.hpp"
 #include "vector.hpp"
 
 template<typename Type, int order, typename IndependentVariableTypes = std::tuple<Type>>

@@ -65,10 +65,18 @@ inline constexpr Rational factorialPower(Rational x, intmax_t n) {
 	}
 }
 
-
 template<typename T>
 inline constexpr auto sqr(T r) {
 	return r * r;
 }
 
+template<auto n, size_t r>
+struct CeilDiv {
+	static constexpr auto value = (((n + r - 1) / r));
+};
+
+template<auto n, size_t r>
+struct CeilRound {
+	static constexpr auto value = r * ceil_div(n, r);
+};
 

@@ -60,11 +60,13 @@ set(astrotiger_header
 	include/gas.hpp
 	include/gas_primitive.hpp
 	include/indices.hpp
+	include/interval.hpp
 	include/io.hpp
 	include/left_right_state.hpp
 	include/math.hpp
 	include/matrix_fwd.hpp
 	include/matrix.hpp
+	include/multi_array.hpp
 	include/opacity.hpp
 	include/operators.hpp
 	include/quantity.hpp
@@ -72,8 +74,8 @@ set(astrotiger_header
 	include/rad_flux.hpp
 	include/rational.hpp
 	include/tensor.hpp
-	include/type_traits.hpp
 	include/units.hpp
+	include/util.hpp
 	include/vector.hpp
 )
 

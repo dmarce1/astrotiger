@@ -1,16 +1,20 @@
 #include <hpx/hpx_init.hpp>
 #include "gas_flux.hpp"
 #include "rad_flux.hpp"
+#include "interval.hpp"
+#include "multi_array.hpp"
 
 #define NDIM 3
 
 static constexpr PhysicalConstants<double> pc { };
 
 int hpx_main(int argc, char *argv[]) {
-	constexpr EquationOfState<double> eos(1.0);
-	GasConserved<double, NDIM> Ul;
-	GasConserved<double, NDIM> Ur;
-	riemannHLLC(Ul, Ur, eos, 1);
+	constexpr std::array<int, 3> dims { { 4, 4, 8 } };
+	MultiArray<double, 3, dims> arr{};
+	constexpr Interval<int, 3> I(1, 8);
+	constexpr auto rng = I.literal();
+	arr.subarray<rng>();
+	auto test = arr.transpose<0, 2>();
 
 	return hpx::local::finalize();
 }

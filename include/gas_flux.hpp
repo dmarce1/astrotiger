@@ -14,10 +14,8 @@ struct GasFlux {
 	MomentumDensityType<Type> D;
 	Vector<EnergyDensityType<Type>, dimensionCount> S;
 	EnergyFluxType<Type> τ;
-	EntropyFluxType<Type> K;
-	// @formatter:off
-	DEFINE_VECTOR_OPERATORS(GasFlux, Type, a.D, a.τ, a.K, a.S);
-						// @formatter:on
+	EntropyFluxType<Type> K; // @formatter:off
+	DEFINE_VECTOR_OPERATORS(GasFlux, Type, a.D, a.τ, a.K, a.S);// @formatter:on
 };
 
 template<typename Type, int dimensionCount>

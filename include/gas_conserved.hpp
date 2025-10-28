@@ -11,6 +11,7 @@
 #include "gas.hpp"
 #include "operators.hpp"
 #include "tensor.hpp"
+#include "util.hpp"
 
 template<typename T, int D>
 auto riemannHLLC(GasConserved<T, D> const&, GasConserved<T, D> const&, EquationOfState<T> const&, int);
@@ -28,21 +29,15 @@ private:
 	}
 };
 
-template<typename Type, int dimensionCount>
+template<typename Type, int dimensionCount_>
 class GasConserved {
-	MassDensityType<Type> D;
-	Vector<MomentumDensityType<Type>, dimensionCount> S;
-	EnergyDensityType<Type> τ;
-	EntropyDensityType<Type> K;
-	static constexpr PhysicalConstants<Type> pc { };
-	static constexpr Type tiny = sqrt(std::numeric_limits < Type > ::min());
-	static constexpr Type eps = std::numeric_limits < Type > ::epsilon();
-	static constexpr Type toler = 2 * eps;
 public:
-	static constexpr int fieldCount = 3 + dimensionCount; //
-	// @formatter:on
-	DEFINE_VECTOR_OPERATORS(GasConserved, Type, a.D, a.τ, a.K, a.S)
+	static constexpr int dimensionCount = dimensionCount_;
+	static constexpr int fieldCount = 3 + dimensionCount;template<int thisDimension>
 	// @formatter:off
+	DEFINE_VECTOR_OPERATORS(GasConserved, Type, a.D, a.τ, a.K, a.S);
+	DEFAULT_MEMBERS( GasConserved );
+		// @formatter:on
 	GasPrimitive<Type, dimensionCount> toPrimitive(EquationOfState<Type> const &eos) const {
 		static constexpr FwdAutoDiff<DimensionlessType<Type>, 2, std::tuple<DimensionlessType<Type>>> one(DimensionlessType<Type>(1.0));
 		static constexpr DimensionlessType<Type> Φo(1e-3);
@@ -154,7 +149,16 @@ public:
 	friend GasPrimitive<Type, dimensionCount> ;
 	template<typename, int>
 	friend struct RadConserved;
-	friend auto riemannHLLC<Type, dimensionCount>(GasConserved const&, GasConserved const&, EquationOfState<Type> const&,
-			int);
+	friend auto riemannHLLC<Type, dimensionCount>(GasConserved const&, GasConserved const&, EquationOfState<Type> const&, int);
+private:
+	MassDensityType<Type> D;
+	Vector<MomentumDensityType<Type>, dimensionCount> S;
+	EnergyDensityType<Type> τ;
+	EntropyDensityType<Type> K;
+	static constexpr PhysicalConstants<Type> pc { };
+	static constexpr Type tiny = sqrt(std::numeric_limits < Type > ::min());
+	static constexpr Type eps = std::numeric_limits < Type > ::epsilon();
+	static constexpr Type toler = 2 * eps;
+
 };
 

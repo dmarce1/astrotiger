@@ -4,7 +4,6 @@
 
 #pragma once
 
-
 #include "matrix_fwd.hpp"
 
 template<typename Type, int Size>
@@ -108,6 +107,9 @@ struct Vector {
 		}
 		return a;
 	}
+	constexpr void fill(Type const &value) {
+		ν_.fill(value);
+	}
 	template<typename OtherType, typename ReturnType = decltype(Type() * OtherType())>
 	constexpr auto dot(Vector<OtherType, Size> const &b) const {
 		Vector const &a = *this;
@@ -159,6 +161,12 @@ struct Vector {
 	}
 	constexpr auto end() const {
 		return ν_.cend();
+	}
+	constexpr operator std::array<Type, Size>() const {
+		return toArray();
+	}
+	constexpr std::array<Type, Size> toArray() const {
+		return ν_;
 	}
 private:
 	std::array<Type, Size> ν_;

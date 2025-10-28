@@ -1,5 +1,32 @@
 #pragma once
 
+#define DEFAULT_COPY_MEMBERS( name )            \
+		name(name const&) = default;            \
+		name& operator=(name const&) = default; \
+
+#define DEFAULT_MOVE_MEMBERS( name )       \
+		name(name&&) = default;            \
+		name& operator=(name&&) = default; \
+
+#define DEFAULT_MEMBERS( name )      \
+		name() = default;            \
+		~name() = default;           \
+        DEFAULT_COPY_MEMBERS( name ) \
+        DEFAULT_MOVE_MEMBERS( name )
+
+#define CONSTEXPR_DEFAULT_COPY_MEMBERS( name )            \
+		constexpr name(name const&) = default;            \
+		constexpr name& operator=(name const&) = default; \
+
+#define CONSTEXPR_DEFAULT_MOVE_MEMBERS( name )       \
+		constexpr name(name&&) = default;            \
+		constexpr name& operator=(name&&) = default; \
+
+#define CONSTEXPR_DEFAULT_MEMBERS( name )      \
+		constexpr name() = default;            \
+		constexpr ~name() = default;           \
+        CONSTEXPR_DEFAULT_COPY_MEMBERS( name ) \
+        CONSTEXPR_DEFAULT_MOVE_MEMBERS( name )
 
 template<typename Tuple>
 struct AllSame;
@@ -11,6 +38,10 @@ template<typename Tuple>
 struct UnwrapTuple;
 
 namespace detail {
+template <typename T, std::size_t N, std::size_t... Is>
+constexpr auto arrayToTupleImpl(std::array<T, N> const& arr, std::index_sequence<Is...>) {
+    return std::make_tuple(arr[Is]...);
+}
 
 // ---------- Repeat a type T, N times, as tuple<T, T, ..., T> (type-only) ----------
 
@@ -57,6 +88,12 @@ struct ConcatTupleTypesHelper<std::tuple<Ts...>, std::tuple<Us...>> {
 template<typename T, std::size_t N>
 using ArrayToTupleType = typename detail::ArrayToTupleType<T, N>;
 
+
+template <typename T, std::size_t N>
+constexpr auto arrayToTuple(std::array<T, N> const& arr) {
+    return detail::arrayToTupleImpl(arr, std::make_index_sequence<N>{});
+}
+
 // Concatenate tuple-like types; if either side is not a tuple, it's wrapped in a 1-elem tuple.
 template<typename T1, typename T2>
 using ConcatTupleTypes =
@@ -80,6 +117,7 @@ struct AllSame<std::tuple<>> : std::true_type { };
 template<typename T>
 struct AllSame<std::tuple<T>> : std::true_type { };
 
+
 template<typename T>
 struct Unwrap { using type = T; };
 
@@ -88,3 +126,4 @@ struct Unwrap<Q<U, T>> { using type = U; };
 
 template<template<typename...> class Tuple, typename... Ts>
 struct UnwrapTuple<Tuple<Ts...>> { using type = Tuple<typename Unwrap<Ts>::type...>; };
+

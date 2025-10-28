@@ -8,7 +8,7 @@
 
 #include "math.hpp"
 
-template<int maxIndex, int dimensionCount, typename Integer, std::enable_if_t<std::is_integral<Integer>::value, int> = 0>
+template<int maxIndex, int dimensionCount, typename Integer = int, std::enable_if_t<std::is_integral<Integer>::value, int> = 0>
 struct Indices {
 	constexpr Indices() = default;
 	constexpr Indices(Indices const&) = default;
