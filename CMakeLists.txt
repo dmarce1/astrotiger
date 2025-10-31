@@ -59,6 +59,7 @@ set(astrotiger_header
 	include/gas_flux.hpp
 	include/gas.hpp
 	include/gas_primitive.hpp
+	include/gauss_legendre.hpp
 	include/indices.hpp
 	include/interval.hpp
 	include/io.hpp
@@ -116,9 +117,10 @@ file(GLOB_RECURSE CODEGEN_INPUTS
 add_custom_command(
     OUTPUT ${GENERATED_HEADER}
     COMMAND codegen codegen
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/include
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     DEPENDS codegen ${CODEGEN_INPUTS}
-    COMMENT "Regenerating dgTransforms.hpp"
+    COMMENT "Generating dgTransforms.hpp using codegen"
+    VERBATIM
 )
 
 # ------------------------------------------------------------------------------
@@ -153,7 +155,7 @@ set_property(TARGET astrotiger PROPERTY CUDA_ARCHITECTURES native)
 set_property(TARGET astrotiger PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 
 target_compile_options(astrotiger PUBLIC
-  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3 -g -fopt-info-vec-optimized >>
+  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3 -g -fopt-info-vec-optimized>>
   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fno-omit-frame-pointer >>
   $<$<CONFIG:Profile>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -g -pg -O2 -DNDEBUG>>
   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS} -G>>
@@ -162,7 +164,7 @@ target_compile_options(astrotiger PUBLIC
 )
 
 target_link_options(astrotiger PUBLIC
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -rdynamic >>
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -rdynamic>>
 )
 
 # ------------------------------------------------------------------------------

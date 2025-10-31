@@ -4,7 +4,7 @@
 
 #include "rational.hpp"
 
-inline constexpr intmax_t binomialCoefficient(intmax_t n, intmax_t k) {
+inline constexpr intmax_t binco(intmax_t n, intmax_t k) {
 	constexpr intmax_t one(1);
 	intmax_t num = one;
 	intmax_t den = one;

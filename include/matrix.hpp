@@ -506,6 +506,7 @@ constexpr auto sqr(Vector<Type, count> const &a) {
 	return b;
 }
 
+
 template<typename Type, int count, SymmetryType symmetry>
 constexpr auto symmetrize(SquareMatrix<Type, count, symmetry> const &a) {
 	constexpr auto zero = Type(0);
