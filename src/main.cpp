@@ -12,30 +12,34 @@ static constexpr PhysicalConstants<double> pc { };
 
 int hpx_main(int argc, char *argv[]) {
 	enableFPE();
-	constexpr int order = 3;
-	constexpr int dimensionCount = 3;
+	constexpr int order = 4;
+	constexpr int dimensionCount = 4;
 	std::array<double, pow(order, dimensionCount)> f;
 	constexpr auto q = gaussLegendrePoints<double, order>();
-	for (int l = 0; l < order; l++) {
-		for (int m = 0; m <= l; m++) {
-			for (int n = 0; n <= m; n++) {
-				auto func = [l, m, n](double x, double y, double z) {
-					return std::legendre(l - m, z) * std::legendre(m - n, y) * std::legendre(n, x);
-				};
-				int p = 0;
-				for (int i = 0; i < order; i++) {
-					for (int j = 0; j < order; j++) {
-						for (int k = 0; k < order; k++) {
-							f[p++] = func(q.x[i], q.x[j], q.x[k]);
+	for (int k = 0; k < order; k++) {
+		for (int l = 0; l <= k; l++) {
+			for (int m = 0; m <= l; m++) {
+				for (int n = 0; n <= m; n++) {
+					auto func = [k, l, m, n](double x, double y, double z, double w) {
+						return std::legendre(k - l, w) * std::legendre(l - m, z) * std::legendre(m - n, y) * std::legendre(n, x);
+					};
+					int p = 0;
+					for (int i = 0; i < order; i++) {
+						for (int j = 0; j < order; j++) {
+							for (int k = 0; k < order; k++) {
+								for (int l = 0; l < order; l++) {
+									f[p++] = func(q.x[i], q.x[j], q.x[k], q.x[l]);
+								}
+							}
 						}
 					}
+					printf("%i %i %i %i: ", n, m - n, l - m, k - l);
+					auto const F = analyzeLegendre<double, order, dimensionCount>(std::move(f));
+					for (size_t p = 0; p < F.size(); p++) {
+						printf("%i ", (int) std::round(F[p]));
+					}
+					printf("\n");
 				}
-				printf("%i %i %i: ", n, m - n, l - m);
-				auto const F = analyzeLegendre<double, order, dimensionCount>(std::move(f));
-				for (size_t p = 0; p < F.size(); p++) {
-					printf("%i \t", (int) std::round(F[p]));
-				}
-				printf("\n");
 			}
 		}
 	}

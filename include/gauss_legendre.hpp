@@ -98,48 +98,51 @@ constexpr auto analyzeLegendre(auto f) {
 	constexpr int inSize = pow(P, D);
 	constexpr int outSize = binco(P + D - 1, D);
 	static_assert(f.size() == inSize);
-	constexpr auto transpose = [](auto &f, int d) {
-		if (d > 0) {
-			int const W = pow(P, d - 1);
-			int const loCount = pow(P, d - 1);
-			int const hiCount = pow(P, D - d - 1);
-			for (int hi = 0; hi < hiCount; hi++) {
-				int const i0 = P * W * P * hi;
-				for (int lo = 0; lo < loCount; lo++) {
-					for (int nd = 0; nd < P; nd++) {
-						for (int n0 = 0; n0 < nd; n0++) {
-							int const i1 = i0 + P * (W * nd + lo) + n0;
-							int const i2 = i0 + P * (W * n0 + lo) + nd;
-							std::swap(f[i1], f[i2]);
+	int Nhi = 1;
+	int PNlo = inSize;
+	int Nlo = inSize / P;
+	std::array<T, inSize> g { };
+	std::array<int, D> idx { };
+	for (int d = 0; d < D; d++) {
+		idx.fill(0);
+		T *srcPointer = f.data();
+		for (int nhi = 0; nhi < Nhi; nhi++) {
+			int const nend = P - std::accumulate(idx.begin(), idx.end(), 0);
+			if (nend > 0) {
+				auto dst = std::span(g.data(), PNlo);
+				auto src = std::span(srcPointer, PNlo);
+				std::fill_n(dst.begin(), PNlo, T(0));
+				for (int k = 0; k < P; k++) {
+					T Pnp1;
+					T Pn = T(1);
+					T Pnm1 = T(0);
+					for (int n = 0; n < nend; n++) {
+						for (int nlo = 0; nlo < Nlo; nlo++) {
+							dst[Nlo * n + nlo] += (T(2 * n + 1) / T(2)) * Pn * src[Nlo * k + nlo] * q.w[k];
+						}
+						if (n + 1 < P) {
+							Pnp1 = (T(2 * n + 1) * q.x[k] * Pn - T(n) * Pnm1) / T(n + 1);
+							Pnm1 = Pn;
+							Pn = Pnp1;
 						}
 					}
 				}
+				std::copy_n(dst.begin(), PNlo, src.begin());
 			}
-		}
-	};
-	for (int d = 0; d < D; d++) {
-		transpose(f, d);
-		for (size_t i = 0; i < f.size(); i += P) {
-			std::array<T, P> F { };
-			for (int k = 0; k < P; k++) {
-				T Pnp1;
-				T Pn = T(1);
-				T Pnm1 = T(0);
-				for (int n = 0; n < P; n++) {
-					F[n] += (n + T(0.5)) * Pn * f[i + k] * q.w[k];
-					if (n + 1 < P) {
-						Pnp1 = (T(2 * n + 1) * q.x[k] * Pn - T(n) * Pnm1) / T(n + 1);
-						Pnm1 = Pn;
-						Pn = Pnp1;
-					}
+			srcPointer += PNlo;
+			if (nhi + 1 < Nhi) {
+				int q = 0;
+				while (++idx[q] == P) {
+					idx[q++] = 0;
 				}
 			}
-			std::copy_n(F.begin(), P, f.begin() + i);
 		}
-		transpose(f, d);
+		Nhi *= P;
+		PNlo /= P;
+		Nlo /= P;
 	}
-	std::array<T, outSize> F;
-	std::array<int, D> idx { };
+	std::array<T, outSize> F { };
+	idx.fill(0);
 	for (int j = 0; j < inSize; j++) {
 		int k = 0, deg = 0;
 		for (int dim = 0; (dim < D) && (deg < P); dim++) {

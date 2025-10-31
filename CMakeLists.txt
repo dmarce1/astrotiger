@@ -155,8 +155,8 @@ set_property(TARGET astrotiger PROPERTY CUDA_ARCHITECTURES native)
 set_property(TARGET astrotiger PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 
 target_compile_options(astrotiger PUBLIC
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fno-omit-frame-pointer -fsanitize=address >>
   $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O3 -g -fopt-info-vec-optimized>>
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -O0 -g -fno-omit-frame-pointer >>
   $<$<CONFIG:Profile>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -g -pg -O2 -DNDEBUG>>
   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS} -G>>
   $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS} --use_fast_math -DNDEBUG Xcompiler=-Ofast>>
@@ -164,7 +164,7 @@ target_compile_options(astrotiger PUBLIC
 )
 
 target_link_options(astrotiger PUBLIC
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -rdynamic>>
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -rdynamic -fsanitize=address>>
 )
 
 # ------------------------------------------------------------------------------
