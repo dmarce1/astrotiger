@@ -107,8 +107,8 @@ constexpr auto analyzeLegendre(auto f) {
 		idx.fill(0);
 		T *srcPointer = f.data();
 		for (int nhi = 0; nhi < Nhi; nhi++) {
-			int const nend = P - std::accumulate(idx.begin(), idx.end(), 0);
-			if (nend > 0) {
+			int const Pend = P - std::accumulate(idx.begin(), idx.end(), 0);
+			if (Pend > 0) {
 				auto dst = std::span(g.data(), PNlo);
 				auto src = std::span(srcPointer, PNlo);
 				std::fill_n(dst.begin(), PNlo, T(0));
@@ -116,7 +116,7 @@ constexpr auto analyzeLegendre(auto f) {
 					T Pnp1;
 					T Pn = T(1);
 					T Pnm1 = T(0);
-					for (int n = 0; n < nend; n++) {
+					for (int n = 0; n < Pend; n++) {
 						for (int nlo = 0; nlo < Nlo; nlo++) {
 							dst[Nlo * n + nlo] += (T(2 * n + 1) / T(2)) * Pn * src[Nlo * k + nlo] * q.w[k];
 						}
@@ -127,7 +127,7 @@ constexpr auto analyzeLegendre(auto f) {
 						}
 					}
 				}
-				std::copy_n(dst.begin(), PNlo, src.begin());
+				std::copy_n(dst.begin(), Pend * Nlo, src.begin());
 			}
 			srcPointer += PNlo;
 			if (nhi + 1 < Nhi) {
