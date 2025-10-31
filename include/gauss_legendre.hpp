@@ -12,7 +12,7 @@ struct QuadraturePoint {
 	T w;
 };
 
-template<typename T, int P, int N>
+template<typename T, int order, int N>
 constexpr auto gaussLegendrePoint() {
 	using std::abs;
 	using std::atan;
@@ -30,7 +30,7 @@ constexpr auto gaussLegendrePoint() {
 		T dPndx, dPnp1dx, dPnm1dx;
 		Pn = Pnm1 = one;
 		dPndx = dPnm1dx = zero;
-		for (int n = 0; n < P; n++) {
+		for (int n = 0; n < order; n++) {
 			Pnp1 = (T(2 * n + 1) * x * Pn - T(n) * Pnm1) / T(n + 1);
 			dPnp1dx = (T(2 * n + 1) * (Pn + x * dPndx) - T(n) * dPnm1dx) / T(n + 1);
 			Pnm1 = Pn;
@@ -41,11 +41,11 @@ constexpr auto gaussLegendrePoint() {
 		return std::pair(Pn, dPndx);
 	};
 	T x, w;
-	if constexpr (P == ((N << 1) | 1)) {
+	if constexpr (order == ((N << 1) | 1)) {
 		x = zero;
 	} else {
 		T θ, θ1;
-		θ1 = π * (one - half * (T(2 * N + 1)) / T(P));
+		θ1 = π * (one - half * (T(2 * N + 1)) / T(order));
 		do {
 			θ = θ1;
 			x = cos(θ);
@@ -58,12 +58,12 @@ constexpr auto gaussLegendrePoint() {
 	return QuadraturePoint<T> { x, w };
 }
 
-template<typename T, int P, int N = 0>
+template<typename T, int order, int N = 0>
 constexpr auto gaussLegendrePoints() {
-	QuadraturePoint<std::array<T, P>> rc;
-	if constexpr (N < P) {
-		rc = gaussLegendrePoints<T, P, N + 1>();
-		auto const pt = gaussLegendrePoint<T, P, N>();
+	QuadraturePoint<std::array<T, order>> rc;
+	if constexpr (N < order) {
+		rc = gaussLegendrePoints<T, order, N + 1>();
+		auto const pt = gaussLegendrePoint<T, order, N>();
 		rc.x[N] = pt.x;
 		rc.w[N] = pt.w;
 	}
@@ -92,74 +92,74 @@ namespace detail {
 
 }
 
-template<typename T, int P, int D>
-constexpr auto analyzeLegendre(auto f) {
-	constexpr auto q = gaussLegendrePoints<T, P>();
-	constexpr int inSize = pow(P, D);
-	constexpr int outSize = binco(P + D - 1, D);
-	static_assert(f.size() == inSize);
-	int Nhi = 1;
-	int PNlo = inSize;
-	int Nlo = inSize / P;
-	std::array<T, inSize> g { };
-	std::array<int, D> idx { };
-	for (int d = 0; d < D; d++) {
-		idx.fill(0);
-		T *srcPointer = f.data();
-		for (int nhi = 0; nhi < Nhi; nhi++) {
-			int const Pend = P - std::accumulate(idx.begin(), idx.end(), 0);
-			if (Pend > 0) {
-				auto dst = std::span(g.data(), PNlo);
-				auto src = std::span(srcPointer, PNlo);
-				std::fill_n(dst.begin(), PNlo, T(0));
-				for (int k = 0; k < P; k++) {
-					T Pnp1;
-					T Pn = T(1);
-					T Pnm1 = T(0);
-					for (int n = 0; n < Pend; n++) {
-						for (int nlo = 0; nlo < Nlo; nlo++) {
-							dst[Nlo * n + nlo] += (T(2 * n + 1) / T(2)) * Pn * src[Nlo * k + nlo] * q.w[k];
+template<typename Type, int order, int dimensionCount>
+constexpr auto analyzeLegendre(auto inVector) {
+	constexpr auto q = gaussLegendrePoints<Type, order>();
+	constexpr int inSize = pow(order, dimensionCount);
+	constexpr int outSize = binco(order + dimensionCount - 1, dimensionCount);
+	static_assert(inVector.size() == inSize);
+	int blockCount = 1;
+	int batchSize = inSize / order;
+	int blockSize = batchSize * order;
+	std::array<Type, inSize> tmpStorage { };
+	std::array<int, dimensionCount> indices { };
+	for (int dimension = 0; dimension < dimensionCount; dimension++) {
+		indices.fill(0);
+		Type *sourcePtr = inVector.data();
+		for (int block = 0; block < blockCount; block++) {
+			int const endOrder = order - std::accumulate(indices.begin(), indices.end(), 0);
+			if (endOrder > 0) {
+				auto destin = std::span(tmpStorage.data(), blockSize);
+				auto source = std::span(sourcePtr, blockSize);
+				std::fill_n(destin.begin(), blockSize, Type(0));
+				for (int k = 0; k < order; k++) {
+					Type Pnp1;
+					Type Pn = 1;
+					Type Pnm1 = 0;
+					for (int n = 0; n < endOrder; n++) {
+						for (int index = 0; index < batchSize; index++) {
+							destin[batchSize * n + index] += ((2 * Type(n) + 1) / 2) * Pn * source[batchSize * k + index] * q.w[k];
 						}
-						if (n + 1 < P) {
-							Pnp1 = (T(2 * n + 1) * q.x[k] * Pn - T(n) * Pnm1) / T(n + 1);
+						if (n + 1 < order) {
+							Pnp1 = ((2 * Type(n) + 1) * q.x[k] * Pn - Type(n) * Pnm1) / Type(n + 1);
 							Pnm1 = Pn;
 							Pn = Pnp1;
 						}
 					}
 				}
-				std::copy_n(dst.begin(), Pend * Nlo, src.begin());
+				std::copy_n(destin.begin(), endOrder * batchSize, source.begin());
 			}
-			srcPointer += PNlo;
-			if (nhi + 1 < Nhi) {
-				int q = 0;
-				while (++idx[q] == P) {
-					idx[q++] = 0;
+			sourcePtr += blockSize;
+			if (block + 1 < blockCount) {
+				int dimIndex = 0;
+				while (++indices[dimIndex] == order) {
+					indices[dimIndex++] = 0;
 				}
 			}
 		}
-		Nhi *= P;
-		PNlo /= P;
-		Nlo /= P;
+		blockCount *= order;
+		blockSize = batchSize;
+		batchSize /= order;
 	}
-	std::array<T, outSize> F { };
-	idx.fill(0);
-	for (int j = 0; j < inSize; j++) {
-		int k = 0, deg = 0;
-		for (int dim = 0; (dim < D) && (deg < P); dim++) {
-			deg += idx[dim];
-			k += binco(deg + dim, dim + 1);
+	std::array<Type, outSize> outVector { };
+	indices.fill(0);
+	for (int inIndex = 0; inIndex < inSize; inIndex++) {
+		int outIndex = 0, degree = 0;
+		for (int dimension = 0; (dimension < dimensionCount) && (degree < order); dimension++) {
+			degree += indices[dimension];
+			outIndex += binco(degree + dimension, dimension + 1);
 		}
-		if (deg < P) {
-			F[k] = f[j];
+		if (degree < order) {
+			outVector[outIndex] = inVector[inIndex];
 		}
-		if (j + 1 < inSize) {
-			int d = D - 1;
-			while (++idx[d] == P) {
-				idx[d--] = 0;
+		if (inIndex + 1 < inSize) {
+			int dimIndex = dimensionCount - 1;
+			while (++indices[dimIndex] == order) {
+				indices[dimIndex--] = 0;
 			}
 		}
 	}
-	return F;
+	return outVector;
 }
 //
 //for (size_t k = 0; k < P; k++) {
