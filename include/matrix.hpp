@@ -3,6 +3,7 @@
 #include <iomanip>
 
 #include "matrix_fwd.hpp"
+#include "math.hpp"
 
 #define ASSIGN_BINARY_OP(op)                                            \
    template<typename OtherType>                                         \

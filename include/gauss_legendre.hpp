@@ -4,6 +4,7 @@
 #include <limits>
 #include <numbers>
 
+#include "matrix.hpp"
 #include "math.hpp"
 
 template<typename T>
@@ -81,15 +82,37 @@ constexpr auto gaussLegendrePoints() {
 //#define SHOW4( a, b, c, d )
 
 template<typename Type, int order, int dimensionCount>
-struct LegendreBasis {
+class LegendreBasis {
 	static constexpr int physicalSize = pow(order, dimensionCount);
 	static constexpr int spectralSize = binco(order + dimensionCount - 1, dimensionCount);
-	static constexpr auto qPts = gaussLegendrePoints<Type, order>();
-private:
 	static constexpr auto zero = Type(0);
 	static constexpr auto one = Type(1);
 	static constexpr auto two = Type(2);
 	static constexpr auto half = one / two;
+	static constexpr auto synthesisMatrix = []() {
+		constexpr auto quadraturePoints = gaussLegendrePoints<Type, order>();
+		SquareMatrix<Type, order> synthesisMatrix;
+		for (int k = 0; k < order; k++) {
+			Type Pn = one, Pnm1 = zero, Pnp1;
+			for (int n = 0; n < order; n++) {
+				synthesisMatrix(k, n) = Pn;
+				Pnp1 = (Type(2 * n + 1) * quadraturePoints.x[k] * Pn - Type(n) * Pnm1) / Type(n + 1);
+				Pnm1 = Pn;
+				Pn = Pnp1;
+			}
+		}
+		return synthesisMatrix;
+	}();
+	static constexpr auto analysisMatrix = []() {
+		constexpr auto quadraturePoints = gaussLegendrePoints<Type, order>();
+		SquareMatrix<Type, order> analysisMatrix;
+		for (int k = 0; k < order; k++) {
+			for (int n = 0; n < order; n++) {
+				analysisMatrix(n, k) = synthesisMatrix(k, n) * (half * Type(2 * n + 1)) * quadraturePoints.w[k];
+			}
+		}
+		return analysisMatrix;
+	}();
 	static constexpr int totalDegree(int index) {
 		if (index == 0) {
 			return 0;
@@ -111,39 +134,31 @@ private:
 		return physicalSize;
 	}
 	template<int dimension, int totalDegree, bool doSynthesis, int ... blockIndexes>
-	static void computeBlocksHelper(Type *source, std::integer_sequence<int, blockIndexes...>) {
+	static constexpr void computeBlocksHelper(Type *source, std::integer_sequence<int, blockIndexes...>) {
 		constexpr auto batchSize = pow<dimensionCount - dimension - 1>(order);
 		constexpr auto blockSize = batchSize * order;
 		(compute<dimension, blockIndexes, totalDegree + blockIndexes, doSynthesis>(source + blockIndexes * blockSize), ...);
 	}
 	template<int dimension, int totalDegree, bool doSynthesis>
-	static void computeBlocks(Type *source) {
+	static constexpr void computeBlocks(Type *source) {
 		computeBlocksHelper<dimension, totalDegree, doSynthesis>(source, std::make_integer_sequence<int, order> { });
 	}
 	template<int dimension, int block, int totalDegree, bool doSynthesis>
-	static void transform(Type *dst, Type const *src) {
+	static constexpr void transform(Type *dst, Type const *src) {
 		auto const endOrder = order - totalDegree;
 		constexpr auto batchSize = pow<dimensionCount - dimension - 1>(order);
-		auto const copySize = (doSynthesis ? order : endOrder) * batchSize;
 		if (endOrder > 0) {
 			for (int k = 0; k < order; k++) {
-				Type Pn = one, Pnm1 = zero, Pnp1;
 				for (int n = 0; n < endOrder; n++) {
 					for (int index = 0; index < batchSize; index++) {
 						if constexpr (doSynthesis) {
-							dst[batchSize * k + index] += Pn * src[batchSize * n + index];
+							dst[batchSize * k + index] += synthesisMatrix(k, n) * src[batchSize * n + index];
 						} else {
-							dst[batchSize * n + index] += Pn * src[batchSize * k + index] * (half * Type(2 * n + 1)) * qPts.w[k];
+							dst[batchSize * n + index] += analysisMatrix(n, k) * src[batchSize * k + index];
 						}
-					}
-					if (n + 1 < order) {
-						Pnp1 = (Type(2 * n + 1) * qPts.x[k] * Pn - Type(n) * Pnm1) / Type(n + 1);
-						Pnm1 = Pn;
-						Pn = Pnp1;
 					}
 				}
 			}
-			std::copy_n(dst, copySize, src);
 		}
 	}
 
@@ -156,8 +171,11 @@ private:
 				computeBlocks<dimension + 1, totalDegree, true>(source);
 			}
 			constexpr auto batchSize = pow<dimensionCount - dimension - 1>(order);
+			auto const endOrder = order - totalDegree;
+			auto const copySize = (doSynthesis ? order : endOrder) * batchSize;
 			std::array<Type, order * batchSize> dst { };
 			transform<dimension, block, totalDegree, doSynthesis>(dst.data(), source);
+			std::copy_n(dst.data(), copySize, source);
 			if constexpr (!doSynthesis) {
 				computeBlocks<dimension + 1, totalDegree, false>(source);
 			}
