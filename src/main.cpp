@@ -12,31 +12,37 @@ static constexpr PhysicalConstants<double> pc { };
 
 int hpx_main(int argc, char *argv[]) {
 	enableFPE();
-	constexpr int order = 4;
-	constexpr int dimensionCount = 4;
+	constexpr int order = 3;
+	constexpr int dimensionCount = 3;
+	LegendreBasis<double, order, dimensionCount> basis;
 	std::array<double, pow(order, dimensionCount)> f;
 	constexpr auto q = gaussLegendrePoints<double, order>();
-	for (int k = 0; k < order; k++) {
-		for (int l = 0; l <= k; l++) {
-			for (int m = 0; m <= l; m++) {
-				for (int n = 0; n <= m; n++) {
-					auto func = [k, l, m, n](double x, double y, double z, double w) {
-						return std::legendre(k - l, w) * std::legendre(l - m, z) * std::legendre(m - n, y) * std::legendre(n, x);
+	for (int degree = 0; degree < order; degree++) {
+		for (int l = 0; l <= degree; l++) {
+			for (int m = 0; m + l <= degree; m++) {
+				int const n = degree - (m + l);
+				if (n >= 0) {
+					auto func = [l, m, n](double x, double y, double z) {
+						return std::legendre(l, x) * std::legendre(m, y) * std::legendre(n, z);
 					};
-					int p = 0;
+					int b = 0;
 					for (int i = 0; i < order; i++) {
 						for (int j = 0; j < order; j++) {
-							for (int k = 0; k < order; k++) {
-								for (int l = 0; l < order; l++) {
-									f[p++] = func(q.x[i], q.x[j], q.x[k], q.x[l]);
-								}
+							for (int a = 0; a < order; a++) {
+								f[b++] = func(q.x[i], q.x[j], q.x[a]);
 							}
 						}
 					}
-					printf("%i %i %i %i: ", n, m - n, l - m, k - l);
-					auto const F = analyzeLegendre<double, order, dimensionCount>(std::move(f));
+					printf("%i %i %i: ", l, m, n);
+					auto F = basis.analyze(f);
 					for (size_t p = 0; p < F.size(); p++) {
 						printf("%i ", (int) std::round(F[p]));
+					}
+					printf("\n");
+					printf("%i %i %i: ", l, m, n);
+					auto const g = basis.synthesize(F);
+					for (size_t p = 0; p < g.size(); p++) {
+						printf("%e %e\n ", f[p], g[p]);
 					}
 					printf("\n");
 				}

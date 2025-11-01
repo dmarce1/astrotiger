@@ -80,100 +80,103 @@ constexpr auto gaussLegendrePoints() {
 //#define SHOW3( a, b, c )
 //#define SHOW4( a, b, c, d )
 
-namespace detail {
-
-//inline constexpr size_t basisSize(size_t P, size_t D, BasisT basisT) {
-//	if (basisT == BasisT::totalDegree) {
-//		return binco(P + D - 1, D);
-//	} else {
-//		return pow(P, D);
-//	}
-//}
-
-}
-
 template<typename Type, int order, int dimensionCount>
-constexpr auto analyzeLegendre(auto inVector) {
-	constexpr auto q = gaussLegendrePoints<Type, order>();
-	constexpr int inSize = pow(order, dimensionCount);
-	constexpr int outSize = binco(order + dimensionCount - 1, dimensionCount);
-	static_assert(inVector.size() == inSize);
-	int blockCount = 1;
-	int batchSize = inSize / order;
-	int blockSize = batchSize * order;
-	std::array<Type, inSize> tmpStorage { };
-	std::array<int, dimensionCount> indices { };
-	for (int dimension = 0; dimension < dimensionCount; dimension++) {
-		indices.fill(0);
-		Type *sourcePtr = inVector.data();
-		for (int block = 0; block < blockCount; block++) {
-			int const endOrder = order - std::accumulate(indices.begin(), indices.end(), 0);
+struct LegendreBasis {
+	static constexpr int physicalSize = pow(order, dimensionCount);
+	static constexpr int spectralSize = binco(order + dimensionCount - 1, dimensionCount);
+	static constexpr auto qPts = gaussLegendrePoints<Type, order>();
+private:
+	static constexpr auto zero = Type(0);
+	static constexpr auto one = Type(1);
+	static constexpr auto two = Type(2);
+	static constexpr auto half = one / two;
+	static constexpr int totalDegree(int index) {
+		if (index == 0) {
+			return 0;
+		}
+		return totalDegree(index / order) + (index % order);
+	}
+	static constexpr int nextIndex(int idx) {
+		int deg = totalDegree(idx);
+		int beg = idx + 1;
+		while (deg < order) {
+			for (idx = beg; idx != physicalSize; idx++) {
+				if (totalDegree(idx) == deg) {
+					return idx;
+				}
+			}
+			deg++;
+			beg = 0;
+		}
+		return physicalSize;
+	}
+	template<int dimension, int totalDegree, bool doSynthesis, int ... blockIndexes>
+	static void compute(Type *source, std::integer_sequence<int, blockIndexes...>) {
+		constexpr auto batchSize = pow<dimensionCount - dimension - 1>(order);
+		constexpr auto blockSize = batchSize * order;
+		(compute<dimension, blockIndexes, totalDegree + blockIndexes, doSynthesis>(source + blockIndexes * blockSize), ...);
+	}
+	template<int dimension, int totalDegree, bool doSynthesis>
+	static void compute(Type *source) {
+		compute<dimension, totalDegree, doSynthesis>(source, std::make_integer_sequence<int, order> { });
+	}
+	template<int dimension, int block, int totalDegree, bool doSynthesis>
+	static constexpr auto compute(Type *source) {
+		if constexpr (dimension == dimensionCount) {
+			return;
+		} else {
+			if constexpr (doSynthesis) {
+				compute<dimension + 1, totalDegree, true>(source);
+			}
+			constexpr auto batchSize = pow<dimensionCount - dimension - 1>(order);
+			auto const endOrder = order - totalDegree;
+			auto const copySize = (doSynthesis ? order : endOrder) * batchSize;
+			std::array<Type, order * batchSize> destin { };
 			if (endOrder > 0) {
-				auto destin = std::span(tmpStorage.data(), blockSize);
-				auto source = std::span(sourcePtr, blockSize);
-				std::fill_n(destin.begin(), blockSize, Type(0));
 				for (int k = 0; k < order; k++) {
-					Type Pnp1;
-					Type Pn = 1;
-					Type Pnm1 = 0;
+					Type Pn = one, Pnm1 = zero, Pnp1;
 					for (int n = 0; n < endOrder; n++) {
 						for (int index = 0; index < batchSize; index++) {
-							destin[batchSize * n + index] += ((2 * Type(n) + 1) / 2) * Pn * source[batchSize * k + index] * q.w[k];
+							if constexpr (doSynthesis) {
+								destin[batchSize * k + index] += Pn * source[batchSize * n + index];
+							} else {
+								destin[batchSize * n + index] += Pn * source[batchSize * k + index] * (half * Type(2 * n + 1)) * qPts.w[k];
+							}
 						}
 						if (n + 1 < order) {
-							Pnp1 = ((2 * Type(n) + 1) * q.x[k] * Pn - Type(n) * Pnm1) / Type(n + 1);
+							Pnp1 = (Type(2 * n + 1) * qPts.x[k] * Pn - Type(n) * Pnm1) / Type(n + 1);
 							Pnm1 = Pn;
 							Pn = Pnp1;
 						}
 					}
 				}
-				std::copy_n(destin.begin(), endOrder * batchSize, source.begin());
+				std::copy_n(destin.begin(), copySize, source);
 			}
-			sourcePtr += blockSize;
-			if (block + 1 < blockCount) {
-				int dimIndex = 0;
-				while (++indices[dimIndex] == order) {
-					indices[dimIndex++] = 0;
-				}
+			if constexpr (!doSynthesis) {
+				compute<dimension + 1, totalDegree, false>(source);
 			}
 		}
-		blockCount *= order;
-		blockSize = batchSize;
-		batchSize /= order;
 	}
-	std::array<Type, outSize> outVector { };
-	indices.fill(0);
-	for (int inIndex = 0; inIndex < inSize; inIndex++) {
-		int outIndex = 0, degree = 0;
-		for (int dimension = 0; (dimension < dimensionCount) && (degree < order); dimension++) {
-			degree += indices[dimension];
-			outIndex += binco(degree + dimension, dimension + 1);
-		}
-		if (degree < order) {
+public:
+	static constexpr auto analyze(std::array<Type, physicalSize> inVector) {
+		compute<0, 0, 0, false>(inVector.data());
+		std::array<Type, spectralSize> outVector { };
+		int inIndex = 0;
+		for (int outIndex = 0; outIndex < spectralSize; outIndex++) {
 			outVector[outIndex] = inVector[inIndex];
+			inIndex = nextIndex(inIndex);
 		}
-		if (inIndex + 1 < inSize) {
-			int dimIndex = dimensionCount - 1;
-			while (++indices[dimIndex] == order) {
-				indices[dimIndex--] = 0;
-			}
-		}
+		return outVector;
 	}
-	return outVector;
-}
-//
-//for (size_t k = 0; k < P; k++) {
-//	T Pnm1 = T(0);
-//	T Pn = T(1);
-//	T Pnp1;
-//	size_t const Mlo = order - k;
-//	SHOW(Mlo);
-//		for (size_t n = 0; n < order; n++) {
-////						F[dsti + ilo] += (n + T(0.5)) * Pn * f[srci + ilo] * q.w[k];
-//		}
-////					Pnp1 = (T(2 * n + 1) * q.x[k] * Pn - T(n) * Pnm1) / T(n + 1);
-////					Pnm1 = Pn;
-////					Pn = Pnp1;
-////					dsti += Mlo;
-//	srci += sourceStride;
-//}
+	static constexpr auto synthesize(std::array<Type, spectralSize> inVector) {
+		std::array<Type, physicalSize> outVector { };
+		int outIndex = 0;
+		for (int inIndex = 0; inIndex < spectralSize; inIndex++) {
+			outVector[outIndex] = inVector[inIndex];
+			outIndex = nextIndex(outIndex);
+		}
+		compute<0, 0, 0, true>(outVector.data());
+		return outVector;
+	}
+};
+
