@@ -111,49 +111,55 @@ private:
 		return physicalSize;
 	}
 	template<int dimension, int totalDegree, bool doSynthesis, int ... blockIndexes>
-	static void compute(Type *source, std::integer_sequence<int, blockIndexes...>) {
+	static void computeBlocksHelper(Type *source, std::integer_sequence<int, blockIndexes...>) {
 		constexpr auto batchSize = pow<dimensionCount - dimension - 1>(order);
 		constexpr auto blockSize = batchSize * order;
 		(compute<dimension, blockIndexes, totalDegree + blockIndexes, doSynthesis>(source + blockIndexes * blockSize), ...);
 	}
 	template<int dimension, int totalDegree, bool doSynthesis>
-	static void compute(Type *source) {
-		compute<dimension, totalDegree, doSynthesis>(source, std::make_integer_sequence<int, order> { });
+	static void computeBlocks(Type *source) {
+		computeBlocksHelper<dimension, totalDegree, doSynthesis>(source, std::make_integer_sequence<int, order> { });
 	}
+	template<int dimension, int block, int totalDegree, bool doSynthesis>
+	static void transform(Type *dst, Type const *src) {
+		auto const endOrder = order - totalDegree;
+		constexpr auto batchSize = pow<dimensionCount - dimension - 1>(order);
+		auto const copySize = (doSynthesis ? order : endOrder) * batchSize;
+		if (endOrder > 0) {
+			for (int k = 0; k < order; k++) {
+				Type Pn = one, Pnm1 = zero, Pnp1;
+				for (int n = 0; n < endOrder; n++) {
+					for (int index = 0; index < batchSize; index++) {
+						if constexpr (doSynthesis) {
+							dst[batchSize * k + index] += Pn * src[batchSize * n + index];
+						} else {
+							dst[batchSize * n + index] += Pn * src[batchSize * k + index] * (half * Type(2 * n + 1)) * qPts.w[k];
+						}
+					}
+					if (n + 1 < order) {
+						Pnp1 = (Type(2 * n + 1) * qPts.x[k] * Pn - Type(n) * Pnm1) / Type(n + 1);
+						Pnm1 = Pn;
+						Pn = Pnp1;
+					}
+				}
+			}
+			std::copy_n(dst, copySize, src);
+		}
+	}
+
 	template<int dimension, int block, int totalDegree, bool doSynthesis>
 	static constexpr auto compute(Type *source) {
 		if constexpr (dimension == dimensionCount) {
 			return;
 		} else {
 			if constexpr (doSynthesis) {
-				compute<dimension + 1, totalDegree, true>(source);
+				computeBlocks<dimension + 1, totalDegree, true>(source);
 			}
 			constexpr auto batchSize = pow<dimensionCount - dimension - 1>(order);
-			auto const endOrder = order - totalDegree;
-			auto const copySize = (doSynthesis ? order : endOrder) * batchSize;
-			std::array<Type, order * batchSize> destin { };
-			if (endOrder > 0) {
-				for (int k = 0; k < order; k++) {
-					Type Pn = one, Pnm1 = zero, Pnp1;
-					for (int n = 0; n < endOrder; n++) {
-						for (int index = 0; index < batchSize; index++) {
-							if constexpr (doSynthesis) {
-								destin[batchSize * k + index] += Pn * source[batchSize * n + index];
-							} else {
-								destin[batchSize * n + index] += Pn * source[batchSize * k + index] * (half * Type(2 * n + 1)) * qPts.w[k];
-							}
-						}
-						if (n + 1 < order) {
-							Pnp1 = (Type(2 * n + 1) * qPts.x[k] * Pn - Type(n) * Pnm1) / Type(n + 1);
-							Pnm1 = Pn;
-							Pn = Pnp1;
-						}
-					}
-				}
-				std::copy_n(destin.begin(), copySize, source);
-			}
+			std::array<Type, order * batchSize> dst { };
+			transform<dimension, block, totalDegree, doSynthesis>(dst.data(), source);
 			if constexpr (!doSynthesis) {
-				compute<dimension + 1, totalDegree, false>(source);
+				computeBlocks<dimension + 1, totalDegree, false>(source);
 			}
 		}
 	}
