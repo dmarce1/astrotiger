@@ -40,9 +40,16 @@ inline constexpr BaseType pow(BaseType x) {
 	return pow(x, exponent);
 }
 
+inline constexpr bool odd(int n) {
+	return bool(n & 1);
+}
+
+inline constexpr bool even(int n) {
+	return !odd(n);
+}
+
 inline constexpr int nonepow(int n) {
-	using std::abs;
-	return (abs(n) & 1) ? -1 : +1;
+	return odd(n) ? -1 : +1;
 }
 
 inline constexpr intmax_t factorial(intmax_t n) {
@@ -52,6 +59,14 @@ inline constexpr intmax_t factorial(intmax_t n) {
 		return n * factorial(n - one);
 	} else {
 		return one;
+	}
+}
+
+inline constexpr intmax_t doubleFactorial(intmax_t n) {
+	if (n >= 2) {
+		return n * doubleFactorial(n - 2);
+	} else {
+		return 1;
 	}
 }
 

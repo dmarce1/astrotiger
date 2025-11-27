@@ -162,6 +162,19 @@ struct Vector {
 	constexpr auto end() const {
 		return ν_.cend();
 	}
+	constexpr auto getSubvector(int i) const {
+		Vector<Type, Size - 1> v;
+		for (int n = 0; n < Size - 1; n++) {
+			v[n] = (*this)[n + int(n >= i)];
+		}
+		return v;
+	}
+	constexpr auto setSubvector(int i, Vector<Type, Size - 1> const &v) {
+		for (int n = 0; n < Size - 1; n++) {
+			(*this)[n + int(n >= i)] = v[n];
+		}
+		return *this;
+	}
 	constexpr operator std::array<Type, Size>() const {
 		return toArray();
 	}

@@ -1,9 +1,16 @@
 #pragma once
 
+#include <bitset>
+#include <cassert>
 #include <iomanip>
+#include <iostream>
+#include <limits>
+#include <numeric>
+#include <stack>
 
 #include "matrix_fwd.hpp"
 #include "math.hpp"
+#include "vector.hpp"
 
 #define ASSIGN_BINARY_OP(op)                                            \
    template<typename OtherType>                                         \
@@ -28,10 +35,10 @@ template<typename Type, int count, SymmetryType symmetry>
 inline Type trace(SquareMatrix<Type, count, symmetry> const &a);
 
 template<typename Type, int rowCount, int columnCount, SymmetryType symmetry>
-inline auto transpose(Matrix<Type, rowCount, columnCount, symmetry> const &a);
+inline auto constexpr transpose(Matrix<Type, rowCount, columnCount, symmetry> const &a);
 
 template<typename Type, int count, SymmetryType symmetry>
-inline Type determinant(SquareMatrix<Type, count, symmetry> const &a);
+constexpr Type determinant(SquareMatrix<Type, count, symmetry> const &a);
 
 template<typename Type, int count, SymmetryType symmetry>
 constexpr auto comatrix(SquareMatrix<Type, count, symmetry> const &a);
@@ -42,7 +49,7 @@ constexpr auto adjoint(SquareMatrix<Type, count, symmetry> const &a);
 template<typename Type, int count, SymmetryType symmetry>
 constexpr auto inverse(SquareMatrix<Type, count, symmetry> const &a);
 
-template<typename, int>
+template<typename, int, SymmetryType symmetry = SymmetryType::symmetric>
 constexpr auto identity();
 
 template<typename TypeA, typename TypeB, int rowCount, int columnCount>
@@ -120,45 +127,53 @@ struct Matrix {
 	constexpr reference operator()(int n, int m) {
 		return reference(sign(n, m), μ_[flatIndex(n, m)]);
 	}
-	constexpr auto getColumn(int m) const {
-		Vector<Type, rowCount> c;
-		for (int n = 0; n < rowCount; n++) {
-			c[n] = this->operator()(n, m);
-		}
-		return c;
-	}
 	constexpr auto getRow(int n) const {
-		Vector<Type, columnCount> c;
+		Vector<Type, columnCount> row;
 		for (int m = 0; m < columnCount; m++) {
-			c[m] = this->operator()(n, m);
+			row[m] = this->operator()(n, m);
 		}
-		return c;
+		return row;
 	}
-	constexpr Matrix& setColumn(int m, Vector<Type, rowCount> const &c) {
-		for (int n = 0; n < rowCount; n++) {
-			this->operator()(n, m) = c[n];
+	constexpr Matrix& setRow(int n, Vector<Type, columnCount> const &row) {
+		for (int m = 0; m < columnCount; m++) {
+			this->operator()(n, m) = row[m];
 		}
 		return *this;
 	}
-	constexpr Matrix& setRow(int n, Vector<Type, columnCount> const &r) {
-		for (int m = 0; m < columnCount; m++) {
-			this->operator()(n, m) = r[n];
+	constexpr auto getColumn(int m) const {
+		Vector<Type, rowCount> col;
+		for (int n = 0; n < rowCount; n++) {
+			col[n] = this->operator()(n, m);
+		}
+		return col;
+	}
+	constexpr Matrix& setColumn(int m, Vector<Type, rowCount> const &col) {
+		for (int n = 0; n < rowCount; n++) {
+			this->operator()(n, m) = col[n];
 		}
 		return *this;
 	}
 	constexpr Matrix& swapColumns(int nA, int nB) {
-		using std::swap;
+		if (nA == nB) {
+			return *this;
+		}
 		auto &a = *this;
-		for (int n = 0; n < columnCount; n++) {
-			swap(a(n, nB), a(n, nA));
+		for (int n = 0; n < rowCount; n++) {
+			Type const tmp = a(n, nA);
+			a(n, nA) = a(n, nB);
+			a(n, nB) = tmp;
 		}
 		return *this;
 	}
 	constexpr Matrix& swapRows(int nA, int nB) {
-		using std::swap;
+		if (nA == nB) {
+			return *this;
+		}
 		auto &a = *this;
-		for (int m = 0; m < rowCount; m++) {
-			swap(a(nA, m), a(nB, m));
+		for (int m = 0; m < columnCount; m++) {
+			Type const tmp = a(nA, m);
+			a(nA, m) = a(nB, m);
+			a(nB, m) = tmp;
 		}
 		return *this;
 	}
@@ -267,9 +282,20 @@ struct Matrix {
 			return c;
 		}
 	}
-	constexpr auto submatrix(int p, int q) const {
+	constexpr auto getSubMatrix(int p, int q) const {
 		auto const &a = *this;
 		Matrix<Type, rowCount - 1, columnCount - 1> sub;
+		for (int n = 0; n + 1 < rowCount; n++) {
+			int const j = int(n >= p);
+			for (int m = 0; m + 1 < columnCount; m++) {
+				int const k = int(m >= q);
+				sub(n, m) = a(n + j, m + k);
+			}
+		}
+		return sub;
+	}
+	constexpr auto setSubmatrix(int p, int q, Matrix<Type, rowCount - 1, columnCount - 1> const &sub) {
+		auto &a = *this;
 		for (int n = 0, j = 0; j + 1 < rowCount; j++, n++) {
 			if (n == p) {
 				n++;
@@ -278,10 +304,10 @@ struct Matrix {
 				if (m == q) {
 					m++;
 				}
-				sub(j, k) = a(n, m);
+				a(n, m) = sub(j, k);
 			}
 		}
-		return sub;
+		return *this;
 	}
 	constexpr Type minor(int, int) const;
 	constexpr Type cofactor(int, int) const;
@@ -297,6 +323,12 @@ struct Matrix {
 		} else {
 			return columnCount * rowCount;
 		}
+	}
+	constexpr bool isNearZero(int n, int m) const {
+		using std::abs;
+		using std::sqrt;
+		auto const z = sqrt(std::numeric_limits<Type>::epsilon()) * frobeniusNorm(*this);
+		return bool(abs((*this)(n, m)) < z);
 	}
 	template<typename, int, int, SymmetryType>
 	friend class Matrix;
@@ -373,7 +405,7 @@ constexpr auto operator*(Matrix<TypeA, rowCount, commonCount, symmetryA> const &
 
 template<typename Type, int rowCount, int columnCount, SymmetryType symmetry>
 constexpr Type Matrix<Type, rowCount, columnCount, symmetry>::minor(int row, int col) const {
-	return determinant(submatrix(row, col));
+	return determinant(getSubMatrix(row, col));
 }
 
 template<typename Type, int rowCount, int columnCount, SymmetryType symmetry>
@@ -391,7 +423,7 @@ inline Type trace(SquareMatrix<Type, count, symmetry> const &a) {
 }
 
 template<typename Type, int rowCount, int columnCount, SymmetryType symmetry>
-inline auto transpose(Matrix<Type, rowCount, columnCount, symmetry> const &a) {
+inline constexpr auto transpose(Matrix<Type, rowCount, columnCount, symmetry> const &a) {
 	if constexpr (symmetry == SymmetryType::symmetric) {
 		return a;
 	} else if constexpr (symmetry == SymmetryType::antisymmetric) {
@@ -408,11 +440,14 @@ inline auto transpose(Matrix<Type, rowCount, columnCount, symmetry> const &a) {
 }
 
 template<typename Type, int count, SymmetryType symmetry>
-inline Type determinant(SquareMatrix<Type, count, symmetry> const &a) {
+constexpr Type determinant(SquareMatrix<Type, count, symmetry> const &a) {
 	if constexpr (count > 1) {
 		Type det(0);
 		for (int n = 0; n < count; n++) {
-			det += a(0, n) * a.cofactor(0, n);
+			Type const az = a(0, n);
+			if (az != Type(0)) {
+				det += a(0, n) * a.cofactor(0, n);
+			}
 		}
 		return det;
 	} else {
@@ -445,9 +480,10 @@ constexpr auto inverse(SquareMatrix<Type, count, symmetry> const &a) {
 	return adjoint(a) / det;
 }
 
-template<typename Type, int count>
+template<typename Type, int count, SymmetryType symmetry>
 constexpr auto identity() {
-	SquareMatrix<Type, count, SymmetryType::symmetric> I;
+	static_assert(symmetry != SymmetryType::antisymmetric);
+	SquareMatrix<Type, count, symmetry> I;
 	for (int n = 0; n < count; n++) {
 		I(n, n) = Type(1);
 		for (int m = 0; m < n; m++) {
@@ -475,9 +511,9 @@ constexpr auto operator*(Vector<TypeA, rowCount> const &A, Matrix<TypeB, rowCoun
 	using ReturnType = decltype(TypeA() * TypeB());
 	Vector<ReturnType, columnCount> C;
 	for (int l = 0; l < columnCount; l++) {
-		C[l] = A(l, 0) * B[0];
+		C[l] = A[0] * B(0, l);
 		for (int m = 1; m < rowCount; m++) {
-			C[l] += A(l, m) * B[m];
+			C[l] += A[m] * B(m, l);
 		}
 	}
 	return C;
@@ -506,7 +542,6 @@ constexpr auto sqr(Vector<Type, count> const &a) {
 	}
 	return b;
 }
-
 
 template<typename Type, int count, SymmetryType symmetry>
 constexpr auto symmetrize(SquareMatrix<Type, count, symmetry> const &a) {
@@ -551,19 +586,20 @@ constexpr auto antisymmetrize(SquareMatrix<Type, count, symmetry> const &a) {
 	return c;
 }
 
-template<typename Type, int count, SymmetryType symmetry>
-constexpr auto frobeniusNorm(SquareMatrix<Type, count, symmetry> const &a) {
+template<typename Type, int N, int ncol, SymmetryType symmetry>
+constexpr auto frobeniusNorm(Matrix<Type, N, ncol, symmetry> const &a) {
+	using std::sqrt;
 	Type n2 = Type(0);
-	for (int j = 0; j < count; j++) {
-		for (int k = 0; k < count; k++) {
-			n2 += sqr(a(j, k));
+	for (int j = 0; j < N; j++) {
+		for (int k = 0; k < ncol; k++) {
+			n2 += a(j, k) * a(j, k);
 		}
 	}
 	return sqrt(n2);
 }
 
 template<typename Type, int count>
-SquareMatrix<Type, count, SymmetryType::symmetric> diagonal(Vector<Type, count> &λ) {
+constexpr auto diagonal(Vector<Type, count> const &λ) {
 	auto A = identity<Type, count>();
 	for (int i = 0; i < count; i++) {
 		A(i, i) = λ[i];
@@ -594,9 +630,19 @@ std::string toMathematica(Matrix<Type, R, C> const &M) {
 template<typename Type, int rowCount, int columnCount, SymmetryType symmetry>
 std::ostream& operator<<(std::ostream &os, Matrix<Type, rowCount, columnCount, symmetry> const &M) {
 	using std::max;
-	auto formatEntry = [](Type const &value) {
+	auto const isZero = [M](Type n) {
+		using std::abs;
+		using std::sqrt;
+		auto const z = sqrt(std::numeric_limits < Type > ::epsilon()) * frobeniusNorm(M);
+		return bool(abs(n) < z);
+	};
+	auto formatEntry = [isZero](Type const &value) {
 		std::ostringstream oss;
-		oss << std::scientific << std::setprecision(3) << value;
+		if (isZero(value)) {
+			oss << "";
+		} else {
+			oss << std::defaultfloat << std::setprecision(6) << value;
+		}
 		return oss.str();
 	};
 	size_t maxLen = 0;
@@ -622,5 +668,136 @@ std::ostream& operator<<(std::ostream &os, Matrix<Type, rowCount, columnCount, s
 	os << out;
 	return os;
 }
+
+template<typename T, auto N, auto ncol, auto P, auto Q, SymmetryType sym1, SymmetryType sym2>
+constexpr auto kroneckerProduct(Matrix<T, N, ncol, sym1> const &A, Matrix<T, P, Q, sym2> const &B) {
+	Matrix<T, N * P, ncol * Q> C;
+	for (int n = 0; n < N; n++) {
+		for (int p = 0; p < P; p++) {
+			for (int m = 0; m < ncol; m++) {
+				for (int q = 0; q < Q; q++) {
+					C(P * n + p, Q * m + q) = A(n, m) * B(p, q);
+				}
+			}
+		}
+	}
+	return C;
+}
+
+template<typename T, auto N>
+struct LUDecomposition {
+	SquareMatrix<T, N> L = SquareMatrix<T, N>(T(0));
+	SquareMatrix<T, N> U = SquareMatrix<T, N>(T(0));
+	SquareMatrix<T, N> P = identity<T, N, SymmetryType::asymmetric>();
+};
+
+/*  0 0 1 0
+ *  0 1 0 0
+ *  1 0 0 0
+ *  0 0 0 1
+ */
+template<typename T, auto N, int M = 0>
+auto luFactorize(SquareMatrix<T, N> const A, SquareMatrix<T, N> const P = identity<T, N, SymmetryType::asymmetric>()) {
+	using std::abs;
+	using std::numeric_limits;
+	using std::sqrt;
+	constexpr auto eps = sqrt(numeric_limits < T > ::epsilon());
+	if constexpr (N > M) {
+		auto const tiny = eps * frobeniusNorm(A);
+		for (int p = M; p < N; p++) {
+			if (abs(A(M, p)) >= tiny) {
+				auto B = A;
+				auto Q = P;
+				B.swapRows(M, p);
+				Q.swapRows(M, p);
+				for (int n = M + 1; n < N; n++) {
+					B(n, M) /= B(M, M);
+					for (int m = M + 1; m < N; m++) {
+						B(n, m) = B(n, m) - B(n, M) * B(M, m);
+					}
+				}
+				auto const rc = luFactorize<T, N, M + 1>(B, Q);
+				if (std::get<0>(rc)) {
+					return rc;
+				}
+			}
+		}
+		assert(M > 0);
+		return std::tuple(false, P, A);
+	}
+	return std::tuple(true, P, A);
+}
+
+template<typename T, auto N>
+auto luDecomposition(SquareMatrix<T, N> A) {
+	using std::abs;
+	using std::numeric_limits;
+	using std::sqrt;
+	using std::swap;
+	std::stack<SquareMatrix<T, N>> stack;
+	std::array<int, N> pivot;
+	LUDecomposition<T, N> lu;
+	auto [success, P, LU] = luFactorize(A);
+	lu.P = P;
+	for (int j = 0; j < N; j++) {
+		for (int k = 0; k <= j; k++) {
+			lu.L(j, k) = LU(j, k);
+		}
+		for (int k = j; k < N; k++) {
+			lu.U(j, k) = LU(j, k);
+		}
+		lu.L(j, j) = T(1);
+	}
+//	std::cout << transpose(lu.P);
+//	std::cout << lu.L;
+//	std::cout << lu.U;
+//	std::cout << A;
+//	std::cout << lu.L * lu.U *  transpose(lu.P);
+	return lu;
+}
+
+template<typename T, auto N>
+constexpr auto permutationMatrix(Vector<int, N> p) {
+	SquareMatrix<T, N> P(T(0));
+	for (int n = 0; n < N; n++) {
+		P(n, p[n]) = T(1);
+	}
+	return P;
+}
+
+template<typename T, auto N, auto ncol>
+auto inPlaceDecomposition(Matrix<T, N, ncol> A) {
+	using std::min;
+	using std::max;
+	constexpr auto nmin = min(N, ncol);
+	constexpr auto nmax = max(N, ncol);
+	constexpr auto I = identity<T, nmax, SymmetryType::asymmetric>();
+	SquareMatrix<T, nmin> LU;
+//	printf( "%i %i\n", N, ncol);
+
+	for (int n = 0; n < nmin; n++) {
+		for (int k = 0; k < nmin; k++) {
+			LU(n, k) = A(n, k);
+		}
+	}
+	auto const lu = luDecomposition(LU);
+	auto L = I;
+	auto U = I;
+	Matrix<T, N, ncol> R;
+	for (int n = 0; n < nmin; n++) {
+		for (int k = 0; k < nmin; k++) {
+			L(n, k) = lu.L(n, k);
+			U(n, k) = lu.U(n, k);
+			R(n, k) = lu.P(k, n);
+		}
+		for (int k = N; k < ncol; k++) {
+			R(n, k) = A(n, k);
+		}
+	}
+	return std::tuple(R, L, U);
+}
+
+template<typename T, int N>
+using SymmetricMatrix = SquareMatrix<T, N, SymmetryType::symmetric>;
 
 #undef ASSIGN_BINARY_OP

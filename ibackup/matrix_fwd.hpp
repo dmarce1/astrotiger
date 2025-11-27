@@ -8,7 +8,7 @@
 
 
 enum class SymmetryType : int {
-	antisymmetric = -1, asymmetric = 0, symmetric = +1
+	antisymmetric, asymmetric, symmetric, diagonal
 };
 
 template<typename, int>
