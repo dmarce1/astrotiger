@@ -62,13 +62,13 @@ int hpx_main(int argc, char *argv[]) {
 	constexpr FreeIndex<'i'> i;
 	constexpr FreeIndex<'j'> j;
 	constexpr FreeIndex<'k'> k;
-	constexpr auto tup = TraceSequence<int, 0, 0, 2, 1, 1, 5>::value;
-	printf("%i %i\n", 0, std::get<0>(tup)());
-	printf("%i %i\n", 1, std::get<1>(tup)());
-	printf("%i %i\n", 2, std::get<2>(tup)());
-	printf("%i %i\n", 3, std::get<3>(tup)());
-	printf("%i %i\n", 4, std::get<4>(tup)());
-	printf("%i %i\n", 5, std::get<5>(tup)());
+	printf("%i\n", CommonIndices<0, 1, 2, 3>::template type<3, 0, 5, 5>::value);
+//	printf("%i %i\n", 0, std::get<0>(tup)());
+//	printf("%i %i\n", 1, std::get<1>(tup)());
+//	printf("%i %i\n", 2, std::get<2>(tup)());
+//	printf("%i %i\n", 3, std::get<3>(tup)());
+//	printf("%i %i\n", 4, std::get<4>(tup)());
+//	printf("%i %i\n", 5, std::get<5>(tup)());
 //	for(int i = 0; i < A.size(); i++) {
 //		printf( "%i %i\n", i, A[i]);
 //	}

@@ -97,12 +97,12 @@ struct Expression {
 		});
 		return *this;
 	}
+private:
 	template<int ...I>
 	static constexpr auto access(auto const &Expr, std::integer_sequence<int, I...>, auto ...args) {
 		auto const tup = std::tuple(args...);
 		return Expr(std::get<I>(tup)...);
 	}
-private:
 	F1 const handle_;
 };
 
@@ -122,12 +122,12 @@ struct Expression<F1, D> {
 		handle_ = other.handle_;
 		return *this;
 	}
+private:
 	template<int ...I>
 	static constexpr auto access(auto const &Expr, std::integer_sequence<int, I...>, auto ...args) {
 		auto const tup = std::tuple(args...);
 		return Expr(std::get<I>(tup)...);
 	}
-private:
 	F1 const handle_;
 };
 
@@ -246,10 +246,6 @@ struct Tensor {
 	T& operator()(auto ...i) {
 		return data_[flatten(i...)];
 	}
-	template<auto Tup, typename F, int ...I>
-	static auto makeExpression(F f, std::tuple<std::integral_constant<int, I>...> seq) {
-		return Expression<F, D, std::get<I>(Tup)...>(f);
-	}
 	template<char ...C>
 	auto operator()(FreeIndex<C> ...) {
 		if constexpr (contractionRank<C...> == R) {
@@ -268,6 +264,10 @@ struct Tensor {
 		}
 	}
 private:
+	template<auto Tup, typename F, int ...I>
+	static auto makeExpression(F f, std::tuple<std::integral_constant<int, I>...> seq) {
+		return Expression<F, D, std::get<I>(Tup)...>(f);
+	}
 	template<int ...I>
 	static constexpr auto access(auto const &Expr, std::tuple<std::integral_constant<int, I>...>, auto ...args) {
 		auto const tup = std::tuple(args...);
@@ -299,5 +299,29 @@ private:
 	}
 	T data_;
 };
+
+template<char...>
+struct CommonIndices;
+
+template<char C0, char...C1>
+struct CommonIndices<C0, C1...> {
+	template<char...C2>
+	struct type {
+		static constexpr int value = int(((C0 == C2) || ...)) + CommonIndices<C1...>::template type<C2...>::value;
+	};
+};
+
+template<>
+struct CommonIndices<> {
+	template<char...C2>
+	struct type {
+		static constexpr int value = 0;
+	};
+};
+
+template<typename F1, typename F2, int D, char...C1, char...C2>
+auto operator*(Expression<F1, D, C1...> const&, Expression<F2, D, C2...> const&) {
+
+}
 
 }
