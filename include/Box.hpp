@@ -5,15 +5,21 @@
 #pragma once
 
 #include "Definitions.hpp"
-#include "Point.hpp"
 
 #include <climits>
 #include <cmath>
 #include <numeric>
 
-template<typename Type, size_t dimCount>
+#include "Child.hpp"
+#include "Face.hpp"
+#include "Point.hpp"
+
+template<typename Type, Dimension dimCount>
 struct Box {
-	static constexpr auto zero = Type(0.0);
+	using child_t = Child<dimCount>;
+	using point_t = Point<Type, dimCount>;
+	static constexpr Dimension dimMax = dimCount - 1;
+	static constexpr Type zero = Type(0.0);
 	template<typename Arc>
 	void serialize(Arc &&arc, unsigned) {
 		arc & a_;
@@ -32,18 +38,15 @@ struct Box {
 	constexpr bool operator!=(Box const &other) const {
 		return (a_ != other.a_) || (b_ != other.b_);
 	}
-	constexpr std::pair<Box, Box> split(Dimension dim) const {
+	constexpr point_t center() const {
 		using std::midpoint;
-		return split(dim, midpoint(a_[dim], b_[dim]));
+		point_t c;
+		for (Dimension dim = 0; dim < dimCount; dim++) {
+			c[dim] = midpoint(a_[dim], b_[dim]);
+		}
+		return c;
 	}
-	constexpr std::pair<Box, Box> split(Dimension dim, Type pos) const {
-		using std::numeric_limits;
-		std::pair<Box, Box> children(*this, *this);
-		children.first.b_[dim] = pos;
-		children.second.a_[dim] = nexttoward(pos, numeric_limits<Type>::max());
-		return children;
-	}
-	constexpr bool contains(Point<Type, dimCount> const &point) const {
+	constexpr bool contains(point_t const &point) const {
 		for (Dimension k = 0; k < dimCount; k++) {
 			if (point[k] < a_[k]) {
 				return false;
@@ -81,6 +84,23 @@ struct Box {
 	constexpr Type span(Dimension dim) const {
 		return Real(a_[dim] - b_[dim]);
 	}
+	constexpr std::pair<Box, Box> split(Dimension dim) const {
+		using std::midpoint;
+		return split(dim, midpoint(a_[dim], b_[dim]));
+	}
+	constexpr std::pair<Box, Box> split(Dimension dim, Type pos) const {
+		using std::numeric_limits;
+		std::pair<Box, Box> children(*this, *this);
+		children.first.b_[dim] = pos;
+		children.second.a_[dim] = nexttoward(pos, numeric_limits<Type>::max());
+		return children;
+	}
+	constexpr auto split(point_t pos) const {
+		return split(dimMax, pos);
+	}
+	constexpr auto split() const {
+		return splitHelper<dimMax>(center());
+	}
 	constexpr Type volume() const {
 		Type vol = Type(1);
 		for (Dimension k = 0; k < dimCount; k++) {
@@ -91,37 +111,53 @@ struct Box {
 		}
 		return vol;
 	}
-	friend constexpr Box bounding(Box const &boxA, Box const &boxB) {
-		using std::min;
-		using std::max;
-		Point<Type, dimCount> a, b;
-		for (Dimension k = 0; k < dimCount; k++) {
-			a[k] = min(boxA.a_[k], boxB.a_[k]);
-			b[k] = max(boxA.b_[k], boxB.b_[k]);
-		}
-		return Box(a, b);
-	}
 	static constexpr Box null() {
 		using std::min;
-		Point<Type, dimCount> a, b;
+		point_t a, b;
 		for (Dimension k = 0; k < dimCount; k++) {
-			b[k] = a[k] = Type::min();
+			a[k] = Type::max();
+			b[k] = Type::min();
 		}
 		return Box(a, b);
 	}
 	static constexpr Box cube(Type minValue, Type maxValue) {
-		Point<Type, dimCount> a, b;
+		point_t a, b;
 		for (Dimension k = 0; k < dimCount; k++) {
 			a[k] = minValue;
 			b[k] = maxValue;
 		}
 		return Box(a, b);
 	}
+	friend constexpr Box bounding(Box const &boxA, Box const &boxB) {
+		using std::min;
+		using std::max;
+		point_t a, b;
+		for (Dimension k = 0; k < dimCount; k++) {
+			a[k] = min(boxA.a_[k], boxB.a_[k]);
+			b[k] = max(boxA.b_[k], boxB.b_[k]);
+		}
+		return Box(a, b);
+	}
 private:
-	constexpr Box(Point<Type, dimCount> const &a, Point<Type, dimCount> const &b) :
+	template<Dimension dim>
+	constexpr auto splitHelper(point_t pos) const {
+		if constexpr (dim == 0) {
+			return std::array<std::pair<Box, Box>, 1> { split(0, pos[0]) };
+		} else {
+			constexpr size_t count = 1 << dim;
+			std::array<Box, count> rc;
+			auto const fine = splitHelper<dim - 1>(pos);
+			for (size_t i = 0; i < count; i++) {
+				rc[2 * i/**/] = fine[i].first;
+				rc[2 * i + 1] = fine[i].second;
+			}
+			return rc;
+		}
+	}
+	constexpr Box(point_t const &a, point_t const &b) :
 			a_(a), b_(b) {
 	}
-	Point<Type, dimCount> a_;
-	Point<Type, dimCount> b_;
+	point_t a_;
+	point_t b_;
 };
 

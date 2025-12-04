@@ -11,15 +11,26 @@ find_package(HDF5 REQUIRED COMPONENTS C CXX)
 find_package(HPX REQUIRED)
 set(astrotiger_src
    src/Main.cpp
+   src/Options.cpp
 )
 set(astrotiger_header
-   include/Bits.hpp
    include/Box.hpp
+   include/Child.hpp
    include/Definitions.hpp
+   include/Face.hpp
    include/FixedPrecision.hpp
+   include/Gas.hpp
    include/Integer.hpp
-   include/KDTree.hpp
+   include/IO.hpp
+   include/Leaf.hpp
+   include/Math.hpp
+   include/MortonKey.hpp
+   include/Multidices.hpp
+   include/Octree.hpp
+   include/Options.hpp
+   include/Permutation.hpp
    include/Point.hpp
+   include/Tensor.hpp
 )
 add_hpx_executable(
   astrotiger
@@ -39,5 +50,14 @@ target_compile_options(astrotiger PUBLIC
   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS} -G -Xcompiler=-O0>>
 )
 target_link_options(astrotiger PUBLIC
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>>
+)
+add_executable(codegen src/Codegen.cpp include/Indent.hpp)
+target_include_directories(codegen PUBLIC ${PROJECT_SOURCE_DIR}/include)
+target_compile_options(codegen PUBLIC
+  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -fPIE -DNDEBUG -Ofast>>
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -fPIE -g>>
+)
+target_link_options(codegen PUBLIC
   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>>
 )

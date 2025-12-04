@@ -5,11 +5,12 @@
 #pragma once
 
 #include "Definitions.hpp"
-#include "FixedPrecision.hpp"
 
 #include <array>
 
-template<typename Type, size_t dimCount>
+#include "FixedPrecision.hpp"
+
+template<typename Type, Dimension dimCount>
 struct Point {
 	static constexpr auto zero = Type(0.0);
 	template<typename Arc>
@@ -21,6 +22,9 @@ struct Point {
 	constexpr Point(Point&&) = default;
 	constexpr Point& operator=(Point const&) = default;
 	constexpr Point& operator=(Point&&) = default;
+	constexpr Point(Type i) {
+		coords_.fill(i);
+	}
 	constexpr Type operator[](size_t i) const {
 		return coords_[i];
 	}
@@ -29,7 +33,7 @@ struct Point {
 	}
 	constexpr Point operator-(Point const &other) const {
 		Point dif;
-		for(Dimension dim = 0; dim < dimCount; dim++){
+		for (Dimension dim = 0; dim < dimCount; dim++) {
 			dif.coords_[dim] = coords_[dim] - other.coords_[dim];
 		}
 		return dif;

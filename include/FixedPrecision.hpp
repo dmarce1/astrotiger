@@ -5,11 +5,12 @@
 #pragma once
 
 #include "Definitions.hpp"
-#include "Integer.hpp"
 
 #include <cmath>
 
-template<int width, typename Real = double>
+#include "Integer.hpp"
+
+template<int width, typename Real>
 struct FixedPrecision {
 	using real_type = Real;
 	constexpr FixedPrecision(FixedPrecision const&) = default;
