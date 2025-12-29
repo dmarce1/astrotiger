@@ -17,6 +17,8 @@ Indent indent;
 
 std::string codeFreeIndex() {
 	std::string code;
+	
+	
 	code += indent + "template<char C>\n";
 	code += indent + "struct FreeIndex {\n";
 	indent++;

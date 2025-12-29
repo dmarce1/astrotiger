@@ -4,8 +4,12 @@
 
 #pragma once
 
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <ranges>
+#include <type_traits>
 
 using Dimension = uint_fast8_t;
 using Rank = uint_fast8_t;
@@ -41,3 +45,25 @@ constexpr size_t faceCount = (dimCount << 1);
 
 template<Dimension dimCount>
 constexpr size_t childCount = (1 << dimCount);
+
+template<class T>
+concept Container = std::ranges::range < T > &&std::default_initializable < T > &&std::move_constructible < T > &&std::assignable_from<T&, T>;
+
+template<typename T, typename I>
+concept Indexed = std::integral<I> && requires(T t, I i) {
+	t[i];
+};
+
+template <std::unsigned_integral auto I>
+using int_least = std::conditional_t<
+I <= std::numeric_limits<uint_least8_t>::max(), uint_least8_t,
+std::conditional_t<I <= std::numeric_limits<uint_least16_t>::max(), uint_least16_t,
+std::conditional_t<I <= std::numeric_limits<uint_least32_t>::max(), uint_least32_t,
+std::conditional_t<I <= std::numeric_limits<uint_least64_t>::max(), uint_least64_t, void>>>>;
+
+template <std::unsigned_integral auto I>
+using int_fast = std::conditional_t<
+I <= std::numeric_limits<uint_fast8_t>::max(), uint_fast8_t,
+std::conditional_t<I <= std::numeric_limits<uint_fast16_t>::max(), uint_fast16_t,
+std::conditional_t<I <= std::numeric_limits<uint_fast32_t>::max(), uint_fast32_t,
+std::conditional_t<I <= std::numeric_limits<uint_fast64_t>::max(), uint_fast64_t, void>>>>;

@@ -9,6 +9,7 @@
 template<Dimension dimCount>
 struct Face {
 	using Type = signed char;
+
 	constexpr Face(Face const&);
 	constexpr Face(Face&&);
 	constexpr Face& operator=(Face const&);

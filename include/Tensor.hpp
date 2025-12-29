@@ -3,135 +3,104 @@
  *******************************************************************************/
 #pragma once
 
-#include "Definitions.hpp"
+#include "Math.hpp"
+#include "Matrix.hpp"
+#include "Rational.hpp"
+#include "Permutation.hpp"
 
 #include <array>
-#include <bit>
 #include <bitset>
-#include <concepts>
-#include <cstdint>
-#include <ranges>
+#include <cassert>
+#include <iostream>
+#include <numeric>
+#include <tuple>
 #include <type_traits>
+#include <utility>
 
-#include "Math.hpp"
+#define TENSOR_EXPRESSION_COMPOUND_ASSIGNMENT(op)                                                                                          \
+	template <typename F1, std::array<char, R> C1>                                                                                         \
+	Expression &operator op(Expression<F1, T, R, D, C1> const &other) {                                                                    \
+		auto in = createFreeIndexMap<R, C1>();                                                                                             \
+		std::array<int, R> out;                                                                                                            \
+		auto const lambda1 = [this, &out, &in, other = &other]<int I>(auto const &self) {                                                  \
+			if constexpr (I < R) {                                                                                                         \
+				for (int i = 0; i < D; i++) {                                                                                              \
+					out[I] = i;                                                                                                            \
+					std::get<std::tuple_element<I, FreeIndexMapType<R, C>>>(in).second = i;                                                \
+					self.template operator()<I + 1>(self);                                                                                 \
+				}                                                                                                                          \
+			} else {                                                                                                                       \
+				std::apply(handle_, out) = std::apply(other.handle_, out);                                                                 \
+			}                                                                                                                              \
+		};                                                                                                                                 \
+		lambda1.template operator()<0>(lambda1);                                                                                           \
+		return *this;                                                                                                                      \
+	}
+
+#define TENSOR_EXPRESSION_BINARY_OPERATOR(op)                                                                                              \
+	template <typename F1, std::array<char, R> C1>                                                                                         \
+	auto operator op(Expression<F1, T, R, D, C1> const &other) const {                                                                     \
+		auto const f = [this, other = &other](std::integral auto... args) {                                                                \
+			auto iB = createFreeIndexMap<R, C1>();                                                                                         \
+			std::array<int, R> const iA = {args...};                                                                                       \
+			auto const lambda1 = [this, iA, &iB, other = &other]<int I>(auto const &self) {                                                \
+				if constexpr (I < R) {                                                                                                     \
+					std::get<std::tuple_element<I, FreeIndexMapType<R, C>>>(iB).second = iA[I];                                            \
+					return self.template operator()<I + 1>(self);                                                                          \
+				} else {                                                                                                                   \
+					return std::apply(handle_, iA) + std::apply(other.handle_, iB);                                                        \
+				}                                                                                                                          \
+			};                                                                                                                             \
+			lambda1.template operator()<0>(lambda1);                                                                                       \
+		};                                                                                                                                 \
+		return Expression<decltype(f), T, R, D, C>(f);                                                                                     \
+	}
 
 namespace Tensors {
 
-template<typename, int, char...>
-struct Expression;
+//template <int R, int D>
+//class TensorSymmetry : public Matrix<Rational<int>, ipow(D, R)> {
+//	static constexpr int N = ipow(D, R);
+//	using type = Rational<int>;
+//	using base_type = Matrix<type, N>;
+//
+//public:
+//	constexpr TensorSymmetry() :
+//		base_type(base_type::identity()) {
+//	}
+//	template <auto M>
+//	constexpr TensorSymmetry(Cycle<M> const &cycle) :
+//		base_type{base_type::identity()} {
+//		using std::swap;
+//		base_type A = *this;
+//		base_type B{};
+//		for (int m = 0; m < M - 1; m++) {
+//			std::bitset<N> visited{};
+//			for (int n = 0; n < N; n++) {
+//				if (visited[n]) {
+//					continue;
+//				}
+//				std::array<int, N> indices{};
+//				int k = n;
+//				for (int l = 0; l < R; l++) {
+//					indices[R - 1 - l] = k % D;
+//					k /= D;
+//				}
+//				swap(indices[cycle[m]], indices[cycle[m + 1]]);
+//				k = 0;
+//				for (int l = 0; l < R; l++) {
+//					k = D * k + indices[l];
+//				}
+//				A.rowSwp(n, k);
+//				visited[n] = visited[k] = true;
+//			}
+//			B += A;
+//		}
+//		static_cast<base_type &>(*this) = B;
+//	}
+//};
 
-template<char>
-struct FreeIndex;
-
-template<auto, auto...>
-struct IndexOf;
-
-template<auto, typename, auto...>
-struct IndexOfImpl;
-
-template<int>
-struct MultiFor;
-
-template<auto...>
-struct Multiplicity;
-
-template<typename, auto...>
-struct Permute;
-
-template<typename, int, int>
-struct Tensor;
-
-template<char ...C>
-constexpr int contractionRank = (int(Multiplicity<C, C...>::value == 1) + ...);
-
-template<int D>
-struct IndexMap {
-	constexpr void set(char c, uint8_t v) {
-		if (c & 1) {
-			map_[c >> 1].u = v;
-		} else {
-			map_[c >> 1].l = v;
-		}
-	}
-	constexpr uint8_t get(char c) const {
-		if (c & 1) {
-			return map_[c >> 1].u;
-		} else {
-			return map_[c >> 1].l;
-		}
-	}
-	constexpr IndexMap() :
-			map_ { } {
-
-	}
-private:
-	union NibblePair {
-		uint8_t l :4;
-		uint8_t u :4;
-	};
-	static constexpr int size = 128;
-	std::array<NibblePair, size / 2> map_;
-};
-
-template<typename F1, int D, char ...C1>
-struct Expression {
-	static constexpr int R1 = sizeof...(C1);
-	constexpr Expression(F1 handle) :
-			handle_(handle) {
-	}
-	Expression() = delete;
-	Expression(Expression const&) = default;
-	auto operator()(auto ...i) const {
-		return handle_(i...);
-	}
-	auto& operator()(auto ...i) {
-		return handle_(i...);
-	}
-	template<typename F2, char ...C2>
-	constexpr auto& operator=(Expression<F2, D, C2...> &&other_) {
-		auto const other = std::move(other_);
-		using Seq = typename Permute<int, C1...>::type<C2...>;
-		MultiFor<D>::template call<R1>([this, other](auto ...i) {
-			constexpr Seq seq { };
-			(*this)(i...) = access(other, seq, i...);
-		});
-		return *this;
-	}
-private:
-	template<int ...I>
-	static constexpr auto access(auto const &Expr, std::integer_sequence<int, I...>, auto ...args) {
-		auto const tup = std::tuple(args...);
-		return Expr(std::get<I>(tup)...);
-	}
-	F1 const handle_;
-};
-
-
-template<typename F1, int D>
-struct Expression<F1, D> {
-	constexpr Expression(F1 handle) :
-			handle_(handle) {
-	}
-	Expression() = delete;
-	Expression(Expression const&) = default;
-	operator auto() const {
-		return handle_();
-	}
-	template<typename F2>
-	constexpr auto& operator=(Expression &&other) {
-		handle_ = other.handle_;
-		return *this;
-	}
-private:
-	template<int ...I>
-	static constexpr auto access(auto const &Expr, std::integer_sequence<int, I...>, auto ...args) {
-		auto const tup = std::tuple(args...);
-		return Expr(std::get<I>(tup)...);
-	}
-	F1 const handle_;
-};
-
-template<char C>
+template <char C>
 struct FreeIndex {
 	static constexpr char value = C;
 	constexpr operator char() const {
@@ -139,189 +108,316 @@ struct FreeIndex {
 	}
 };
 
-template<auto C1, auto ...Cs>
-struct IndexOf {
-	static constexpr int value = IndexOfImpl<C1, std::integral_constant<int, 0>, Cs...>::value;
-};
-
-template<auto C1, typename I, auto C2, auto ...Cs>
-struct IndexOfImpl<C1, I, C2, Cs...> {
-	static constexpr int value = (C1 == C2) ? int(I()) : IndexOfImpl<C1, std::integral_constant<int, int(I()) + 1>, Cs...>::value;
-};
-
-template<auto C1, typename I>
-struct IndexOfImpl<C1, I> {
-	static constexpr int value = int(I());
-};
-
-template<int, char...>
-struct FixedBits;
-
-template<int I, char C0, char ...C1>
-struct FixedBits<I, C0, C1...> {
-	template<char ...C2>
-	static constexpr int value = ((Multiplicity<C0, C2...>::value > 1) ? 0 : (1 << I)) | FixedBits<I - 1, C1...>::template value<C2...>;
-};
-
-template<int I>
-struct FixedBits<I> {
-	template<char ...C2>
-	static constexpr int value = 0;
-};
-
-template<char ...C>
-constexpr std::bitset<sizeof...(C)> fixedBits = FixedBits<sizeof...(C) - 1, C...>::template value<C...>;
-
-template<int D>
-struct MultiFor {
-	template<int R, typename F, int I = 0, typename ... Args>
-	static constexpr auto call(F const &f) noexcept {
-		if constexpr (I < D) {
-			if constexpr (R == 0) {
-				f(Args::value...);
-			} else {
-				call<R - 1, F, 0, Args..., std::integral_constant<int, I> >(f);
-				call<R, F, I + 1, Args...>(f);
-			}
-		}
-	}
-};
-
-template<auto A, auto B, auto ...C>
-struct Multiplicity<A, B, C...> {
-	static constexpr int value = int(A == B) + Multiplicity<A, C...>::value;
-};
-
-template<auto A>
-struct Multiplicity<A> {
-	static constexpr int value = 0;
-};
-
-template<typename T, auto ...C1>
-struct Permute {
-	template<auto ...C3>
-	using type = std::integer_sequence<T, IndexOf<C3, C1...>::value...>;
-};
-
-template<typename T, auto ...Cs>
-struct FixedSequence {
-	static constexpr auto value = std::tuple_cat((std::conditional_t<Multiplicity<Cs, Cs...>::value == 1,
-			std::tuple<std::integral_constant<T, IndexOf<Cs, Cs...>::value>>,
-			std::tuple<> >())...);
-};
-
-template<typename T, auto ...C2>
-struct FreeSequence;
-
-template<typename T, auto C1, auto ...C2>
-struct FreeSequence<T, C1, C2...> {
-	template<auto ...Cs>
-	struct type {
-		static constexpr auto value = std::tuple_cat(
-				std::conditional_t<Multiplicity<C1, C2...>::value >= 1, std::tuple<std::integral_constant<T, IndexOf<C1, Cs...>::value>>, std::tuple<> >(),
-				FreeSequence<T, C2...>::template type<Cs...>::value);
-	};
-};
-
-template<typename T, auto C1>
-struct FreeSequence<T, C1> {
-	template<auto ...Cs>
-	struct type {
-		static constexpr auto value = std::tuple<>();
-	};
-};
-
-template<typename T, auto ...Cs>
-class TraceSequence {
-	static constexpr auto freeIdx = FreeSequence<T, Cs...>::template type<Cs...>::value;
-public:
-	static constexpr auto value = std::tuple_cat(FixedSequence<T, Cs...>::value, freeIdx, freeIdx);
-};
-
-template<typename T, int R, int D>
-struct Tensor {
-	T operator()(auto ...i) const {
-		return data_[flatten(i...)];
-	}
-	T& operator()(auto ...i) {
-		return data_[flatten(i...)];
-	}
-	template<char ...C>
-	auto operator()(FreeIndex<C> ...) {
-		if constexpr (contractionRank<C...> == R) {
-			return Expression<Tensor&, D, C...>(*this);
-		} else {
-			Expression<Tensor const&, D, C...> expr(*this);
-			constexpr auto seq = FixedSequence<int, C...>::value;
-			constexpr auto R2 = R - std::tuple_size<decltype(seq)>::value;
-			return makeExpression<std::array { C... }>([expr](auto ...i) {
-				T sum = T(0);
-				MultiFor<D>::template call<R2 / 2>([&sum, expr, i...](auto ...j) {
-					sum += access(expr, TraceSequence<int, C...>::value, i..., j..., j...);
-				});
-				return sum;
-			}, seq);
-		}
-	}
-private:
-	template<auto Tup, typename F, int ...I>
-	static auto makeExpression(F f, std::tuple<std::integral_constant<int, I>...> seq) {
-		return Expression<F, D, std::get<I>(Tup)...>(f);
-	}
-	template<int ...I>
-	static constexpr auto access(auto const &Expr, std::tuple<std::integral_constant<int, I>...>, auto ...args) {
-		auto const tup = std::tuple(args...);
-		return Expr(std::get<I>(tup)...);
-	}
-	int flatten(auto ...i) const {
-		int j = 0;
-		((j = D * j + i),...);
-		return j;
-	}
-	static constexpr int size() {
-		return iPow(D, R);
-	}
-	std::array<T, size()> data_;
-};
-
-template<typename T, int D>
-struct Tensor<T, 0, D> {
-	operator T() const {
-		return data_;
-	}
-	Tensor& operator=(T const& value) const {
-		data_ = value;
+template <char C>
+struct FreeIndexMapElement {
+	constexpr FreeIndexMapElement &operator=(int i) {
+		index_ = i;
 		return *this;
 	}
-private:
-	static constexpr int size() {
-		return 1;
+	consteval operator int() const {
+		return index_;
 	}
-	T data_;
+
+private:
+	FreeIndex<C> free_;
+	int index_;
 };
 
-template<char...>
-struct CommonIndices;
+template <class T>
+struct IsFreeIndex : std::false_type {};
 
-template<char C0, char...C1>
-struct CommonIndices<C0, C1...> {
-	template<char...C2>
-	struct type {
-		static constexpr int value = int(((C0 == C2) || ...)) + CommonIndices<C1...>::template type<C2...>::value;
+template <char C>
+struct IsFreeIndex<FreeIndex<C>> : std::true_type {};
+
+template <class T>
+struct IsFixedIndex : std::is_integral<T> {};
+
+template <class T>
+concept Index = IsFixedIndex<std::remove_cvref_t<T>>::value || IsFreeIndex<std::remove_cvref_t<T>>::value;
+
+template <class T1, class... Ts>
+struct IsDummyIndex {
+	static constexpr int value = ((int(std::is_same_v<T1, Ts>) + ... + 0) > 1);
+};
+
+template <typename T, size_t... I>
+consteval auto concatenate(std::array<T, I> const &...arrays) {
+	constexpr int N = (0 + ... + I);
+	std::array<T, N> out{};
+	int index = 0;
+	auto append = [&out, &index](auto const &a) {
+		for (auto const &x : a) {
+			out[index++] = x;
+		}
 	};
-};
-
-template<>
-struct CommonIndices<> {
-	template<char...C2>
-	struct type {
-		static constexpr int value = 0;
-	};
-};
-
-template<typename F1, typename F2, int D, char...C1, char...C2>
-auto operator*(Expression<F1, D, C1...> const&, Expression<F2, D, C2...> const&) {
-
+	(append(arrays), ...);
+	return out;
 }
 
-}
+template <typename F, typename T, int R, int D, std::array<char, R> C>
+class Expression {
+	F handle_;
+
+	template <int R1, std::array<char, R1> C1>
+	static consteval auto commonIndexCount() {
+		int count = 0;
+		for (int i = 0; i < R; i++) {
+			for (int j = 0; j < R1; j++) {
+				if (C[i] == C1[j]) {
+					count++;
+					break;
+				}
+			}
+		}
+		return count;
+	}
+	template <int R1, std::array<char, R1> C1>
+	static consteval auto createFreeIndexMap() {
+		auto const lambda = []<int I>(auto const &self) {
+			if constexpr (I < R1) {
+				return std::tuple_cat(std::tuple(FreeIndexMapElement<C1[I]>{}), self.template operator()<I + 1>(self));
+			} else {
+				return std::tuple{};
+			}
+		};
+		return lambda.template operator()<0>(lambda);
+	};
+	template <int R1, std::array<char, R1> C1>
+	using FreeIndexMapType = decltype(createFreeIndexMap<R1, C1>());
+	template <int R1, std::array<char, R1> C1>
+	static constexpr void insertFreeIndices(FreeIndexMapType<R, C> &mapA, FreeIndexMapType<R1, C1> &mapB, std::integral auto... args) {
+		constexpr auto Cs = splitIndices<R, R1, C, C1>();
+		constexpr int Ra = std::get<0>(Cs).size();
+		constexpr int Rb = std::get<1>(Cs).size();
+		constexpr int Rt = Ra + Rb;
+		auto Ca = std::get<0>(Cs);
+		auto Cb = std::get<1>(Cs);
+		std::array<int, R + R1> indices;
+		std::array<int, sizeof...(args)> free = {args...};
+		auto const fill = [free, &mapA, &mapB]<int I>(auto const &self) {
+			if constexpr (I < Ra) {
+				std::get<std::tuple_element<I, decltype(Ca)>>(mapA) = free[I];
+			} else if constexpr (I < Rt) {
+				std::get<std::tuple_element<I - Ra, decltype(Cb)>>(mapB) = free[I];
+			} else {
+				return;
+			}
+			self.template operator()<I + 1>(self);
+		};
+		fill.template operator()<0>(fill);
+	}
+	template <int R1, std::array<char, R1> C1>
+	static consteval auto splitIndices() {
+		constexpr auto Rc = commonIndexCount<R, R1, C, C1>();
+		constexpr auto Ra = R - Rc;
+		constexpr auto Rb = R1 - Rc;
+		std::array<char, Ra> Ca;
+		std::array<char, Rb> Cb;
+		std::array<char, Rc> Cc;
+		std::bitset<R> common1{};
+		std::bitset<R1> common2{};
+		int k = 0;
+		for (int i = 0; i < R; i++) {
+			for (int j = 0; j < R1; j++) {
+				if (C[i] == C1[j]) {
+					common1[i] = common2[j] = true;
+					Cc[k++] = C[i];
+					break;
+				}
+			}
+		}
+		k = 0;
+		for (int i = 0; i < R; i++) {
+			if (!common1[i]) {
+				Ca[k++] = C1[i];
+			}
+		}
+		k = 0;
+		for (int j = 0; j < R1; j++) {
+			if (!common1[j]) {
+				Cb[k++] = C1[j];
+			}
+		}
+		return std::tuple(Ca, Cb, Cc);
+	}
+
+public:
+	Expression(F const &f) :
+		handle_(f) {
+	}
+	Expression &operator*=(T value) {
+		std::array<int, R> out;
+		auto const lambda1 = [this, &out, value]<int I>(auto const &self) {
+			if constexpr (I < R) {
+				for (int i = 0; i < D; i++) {
+					self.template operator()<I + 1>(self);
+				}
+			} else {
+				std::apply(handle_, out) *= value;
+			}
+		};
+		lambda1.template operator()<0>(lambda1);
+		return *this;
+	}
+	Expression &operator/=(T value) {
+		operator*=(T(1) / value);
+		return *this;
+	}
+	template <typename F1, int R1, std::array<char, R1> C1>
+	auto operator*(Expression<F1, T, R1, D, C1> const &vB) const {
+		constexpr auto Cs = splitIndices<R, R1, C, C1>();
+		constexpr auto Ca = std::get<0>(Cs);
+		constexpr auto Cb = std::get<1>(Cs);
+		constexpr auto Cc = std::get<2>(Cs);
+		constexpr int Ra = std::get<0>(Cs).size();
+		constexpr int Rb = std::get<1>(Cs).size();
+		constexpr int R2 = Ra + Rb;
+		auto const f = [vB, this](std::integral auto... args) {
+			auto mapA = createFreeIndexMap<R, C>();
+			auto mapB = createFreeIndexMap<R1, C1>();
+			auto const lambda = [&mapA, &mapB, vB, this, args...]<int I>(auto const &self) {
+				using type = std::tuple_element<I, decltype(Cc)>;
+				T sum = T(0);
+				if constexpr (I < Cc.size()) {
+					for (int i = 0; i < D; i++) {
+						std::get<type>(mapA) = std::get<type>(mapB) = i;
+						sum += self.template operator()<I + 1>(self);
+					}
+				} else {
+					insertFreeIndices(mapA, mapB, args...);
+					return std::apply(handle_, mapA) * std::apply(vB, mapB);
+				}
+			};
+			lambda.template operator()<0>(lambda);
+		};
+		return Expression<decltype(f), T, R, D, concatenate(Ca, Cb)>(f);
+	}
+	auto operator+() const {
+		return *this;
+	}
+	auto operator-() const {
+		auto const f = [this](std::integral auto... args) {
+			return -handle_(args...);
+		};
+		return Expression<decltype(f), T, R, D, C>(f);
+	}
+	TENSOR_EXPRESSION_BINARY_OPERATOR(+);
+	TENSOR_EXPRESSION_BINARY_OPERATOR(-);
+	TENSOR_EXPRESSION_COMPOUND_ASSIGNMENT(=);
+	TENSOR_EXPRESSION_COMPOUND_ASSIGNMENT(+=);
+	TENSOR_EXPRESSION_COMPOUND_ASSIGNMENT(-=);
+};
+
+template <typename T, int R, int D>
+class Tensor {
+	std::array<T, ipow(D, R)> data_;
+
+	template <typename... Args>
+	static auto computeStart(Args... args) {
+		constexpr auto R1 = sizeof...(Args);
+		constexpr auto strides = createStrides<R1>();
+		int i = 0;
+		int start = 0;
+		((IsFixedIndex<Args>::value ? (start += args * strides[i], i++) : i++), ...);
+		return start;
+	};
+	template <typename... Args>
+	static consteval auto createChars() {
+		return concatenate<char>([]() {
+			if constexpr (IsFreeIndex<Args>::value && !IsDummyIndex<Args, Args...>::value) {
+				return std::array<char, 1>{Args::value};
+			} else {
+				return std::array<char, 0>{};
+			}
+		}()...);
+	}
+	template <typename... Args>
+	static consteval auto createDummyStrides() {
+		constexpr int R1 = sizeof...(Args);
+		constexpr auto strides = createStrides<R1>();
+		constexpr auto N = (0 + ... + int(multiplicity<Args, Args...>() > 1)) / 2;
+		std::array<int, N> dummyStrides;
+		int i = 0;
+		int j = 0;
+		(
+			[strides, &i, &j, &dummyStrides]() {
+				constexpr int k = find<Args, Args...>();
+				if ((k != j) && multiplicity<Args, Args...>()) {
+					dummyStrides[i++] = strides[j] + strides[k];
+				}
+				j++;
+			}(),
+			...);
+		return dummyStrides;
+	}
+	template <typename... Args>
+	static consteval auto createFreeStrides() {
+		constexpr int R1 = sizeof...(Args);
+		constexpr int N = (0 + ... + int(IsFreeIndex<Args>::value && !IsDummyIndex<Args, Args...>::value));
+		constexpr std::array<bool, R1> flags = {IsFreeIndex<Args>::value && !IsDummyIndex<Args, Args...>::value...};
+		constexpr auto strides = createStrides<R1>();
+		std::array<int, N> freeStrides;
+		for (int i = 0, j = 0; i < R1; i++) {
+			if (flags[i]) {
+				freeStrides[j++] = strides[i];
+			}
+		}
+		return freeStrides;
+	};
+	template <int R1>
+	static consteval auto createStrides() {
+		std::array<int, R1> strides;
+		int stride = 1;
+		for (int i = 0; i < R1; i++) {
+			strides[R1 - 1 - i] = stride;
+			stride *= D;
+		}
+		return strides;
+	};
+	template <class T1, class... Ts>
+	static consteval int find() {
+		int i = 0;
+		int pos = -1;
+		((std::is_same<T1, Ts>::value ? (pos = i, i++) : i++), ...);
+		return pos;
+	}
+	template <class T1, class... Ts>
+	static consteval int multiplicity() {
+		return (0 + ... + int(std::is_same_v<T1, Ts>));
+	}
+
+public:
+	template <typename... Args>
+	auto operator()(Args... args) const {
+		constexpr int R1 = (0 + ... + int(IsFreeIndex<Args>::value && !IsDummyIndex<Args, Args...>::value));
+		auto const lambda = [this, args...](std::integral auto... i) {
+			constexpr auto freeStrides = createFreeStrides<Args...>();
+			constexpr auto dummyStrides = createDummyStrides<Args...>();
+			std::array<int, sizeof...(i)> indices = {i...};
+			auto const sum = [this, indices, freeStrides]<int I>(auto const &self, int start) {
+				if constexpr (I == 0) {
+					return data_[std::inner_product(indices.begin(), indices.end(), freeStrides.begin(), start)];
+				} else {
+					T result = T(0);
+					for (int d = 0; d < D; d++) {
+						result += self(self.template operator()<dummyStrides.size() - 1>, start + dummyStrides[d]);
+					}
+					return result;
+				}
+			};
+			sum(sum.template operator()<dummyStrides.size()>, computeStart(args...));
+		};
+		return Expression<decltype(lambda), T, R1, D, createChars<Args...>()>(lambda);
+	}
+	auto &operator()(std::integral auto... i) {
+		int j = 0;
+		((j = D * j + i), ...);
+		return data_[j];
+	}
+	template <char... C>
+	auto operator()(FreeIndex<C>...) const {
+		return Expression<Tensor, T, R, D, C...>(*this);
+	}
+};
+
+} // namespace Tensors
