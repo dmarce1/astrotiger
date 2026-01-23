@@ -3,8 +3,9 @@ project(astrotiger LANGUAGES CXX CUDA)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(ALL_FLAGS -Wall -Wno-comma-subscript -I${PROJECT_SOURCE_DIR}/include)
-set(CXX_FLAGS  ${ALL_FLAGS} -fconstexpr-ops-limit=1000000000 -march=native)
+set(ALL_FLAGS -fconstexpr-ops-limit=536870912 -Wall -Wno-comma-subscript -I${PROJECT_SOURCE_DIR}/include)
+#set(DEBUG_FLAGS -O1 -g3 -fno-omit-frame-pointer -fsanitize=address )
+set(CXX_FLAGS  ${ALL_FLAGS} -march=native)
 set(CUDA_FLAGS ${ALL_FLAGS} -Xcompiler=-march=native)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(HDF5 REQUIRED COMPONENTS C CXX)
@@ -21,22 +22,28 @@ set(astrotiger_header
    include/Face.hpp
    include/FixedPrecision.hpp
    include/Gas.hpp
+   include/Indices.hpp
    include/Integer.hpp
    include/IntegerPartition.hpp
    include/IO.hpp
    include/Leaf.hpp
+   include/LinarCombination.hpp
    include/Math.hpp
    include/Matrix.hpp
    include/MortonKey.hpp
-   include/Multidices.hpp
    include/Octree.hpp
    include/Options.hpp
    include/Point.hpp
    include/Rational.hpp
+   include/SparseMatrix.hpp
+   include/SparseVector.hpp
    include/Tensor.hpp
-   include/YoungTableau.hpp
+   include/TensorSymmetry.hpp
+   include/Young.hpp
    include/Vector.hpp
+   include/WeightedPermutation.hpp
 )
+
 add_hpx_executable(
   astrotiger
   COMPONENT_DEPENDENCIES
@@ -51,9 +58,10 @@ target_include_directories(astrotiger PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_compile_options(astrotiger PUBLIC
   $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -fPIE -DNDEBUG -Ofast>>
   $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS} -DNDEBUG -Xcompiler=-Ofast>>
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -fPIE -g>>
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -fPIE -O0 -g3>>
   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS} -G -Xcompiler=-O0>>
 )
 target_link_options(astrotiger PUBLIC
+  $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>>
   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS}>>
 )

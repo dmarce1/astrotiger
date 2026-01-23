@@ -7,16 +7,18 @@
 
 #pragma once
 
+#include "Definitions.hpp"
+#include "Indices.hpp"
 #include "IntegerPartition.hpp"
 #include "Math.hpp"
 #include "Matrix.hpp"
-#include "Multidices.hpp"
-#include "Permutation.hpp"
+#include "Rational.hpp"
+#include "WeightedPermutation.hpp"
 
 #include <utility>
 
 template <int... λ>
-	requires(nonIncreasing<λ...>())
+	requires(sizeof...(λ) > 0 && nonIncreasing<λ...>())
 struct YoungTableau : public Permutation<(0 + ... + λ)> {
 	using base_type = Permutation<(0 + ... + λ)>;
 	constexpr operator base_type() const {
@@ -25,6 +27,7 @@ struct YoungTableau : public Permutation<(0 + ... + λ)> {
 	static constexpr auto size() {
 		return (0 + ... + λ);
 	}
+
 	constexpr int operator()(int i, int j) const {
 		return base_type::operator[](start_[i] + j);
 	}
@@ -34,14 +37,20 @@ struct YoungTableau : public Permutation<(0 + ... + λ)> {
 	constexpr YoungTableau() {
 		std::iota(base_type::begin(), base_type::end(), 0);
 	}
+	constexpr YoungTableau(IntegerPartition<λ...> const &) {
+		std::iota(base_type::begin(), base_type::end(), 0);
+	}
+	constexpr YoungTableau(base_type const &init) :
+		base_type(init) {
+	}
 	static constexpr int rowPermutationCount() {
 		return (1 * ... * factorial<λ>());
 	}
-	static constexpr int columnPermutationCount() {
+	static constexpr int colPermutationCount() {
 		return YoungTableau{}.conj().rowPermutationCount();
 	}
 	static constexpr int permutationCount() {
-		return rowPermutationCount() * columnPermutationCount();
+		return rowPermutationCount() * colPermutationCount();
 	}
 	constexpr YoungTableau nextRowPermutation() const {
 		YoungTableau next = *this;
@@ -54,8 +63,25 @@ struct YoungTableau : public Permutation<(0 + ... + λ)> {
 		} while (!std::next_permutation(b, e) && (r < nRow));
 		return next;
 	}
-	constexpr YoungTableau nextColumnPermutation() const {
+	constexpr YoungTableau nextColPermutation() const {
 		return (conj().nextRowPermutation()).conj();
+	}
+	constexpr bool isStandard() const {
+		for (int r = 0; r + 1 < nRow; r++) {
+			for (int c = 0; c < nCol[r]; c++) {
+				if ((*this)(r, c) >= (*this)(r + 1, c)) {
+					return false;
+				}
+			}
+		}
+		for (int r = 0; r < nRow; r++) {
+			for (int c = 0; c + 1 < nCol[r]; c++) {
+				if ((*this)(r, c) >= (*this)(r, c + 1)) {
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 	friend std::ostream &operator<<(std::ostream &os, YoungTableau<λ...> const &yt) {
 		auto printHLine = [&](int row) {
@@ -77,6 +103,40 @@ struct YoungTableau : public Permutation<(0 + ... + λ)> {
 
 		return os;
 	}
+	static constexpr int standardCount() {
+		int den = 1;
+		for (int r1 = 0; r1 < nRow; r1++) {
+			for (int c = 0; c < nCol[r1]; c++) {
+				int h = nCol[r1] - c;
+				for (int r2 = r1 + 1; r2 < nRow; r2++) {
+					if (c >= nCol[r2]) {
+						break;
+					}
+					h++;
+				}
+				den *= h;
+			}
+		}
+		return factorial(size()) / den;
+	}
+	static constexpr int semistandardCount(int dimCount) {
+		int den = 1;
+		int num = 1;
+		for (int r1 = 0; r1 < nRow; r1++) {
+			for (int c = 0; c < nCol[r1]; c++) {
+				int h = nCol[r1] - c;
+				num *= dimCount + c - r1;
+				for (int r2 = r1 + 1; r2 < nRow; r2++) {
+					if (c >= nCol[r2]) {
+						break;
+					}
+					h++;
+				}
+				den *= h;
+			}
+		}
+		return num / den;
+	}
 	constexpr bool operator==(YoungTableau const &other) const {
 		return base_type::operator==(static_cast<base_type const &>(other));
 	}
@@ -92,14 +152,14 @@ private:
 			starts[n + 1] = starts[n] + nCol[n];
 		}
 		return starts;
-	};
+	}
 	static constexpr int nRow = sizeof...(λ);
 	static constexpr auto nCol = std::array<int, nRow>{λ...};
 	static constexpr auto start_ = genStarts();
 };
 
 template <int... λ>
-	requires(nonIncreasing<λ...>())
+	requires (sizeof...(λ) > 0 && nonIncreasing<λ...>())
 constexpr auto YoungTableau<λ...>::conj() const {
 	auto const create = []<int... δ>(std::integer_sequence<int, δ...>) {
 		constexpr auto conjPart = IntegerPartition<λ...>::conj();
@@ -113,79 +173,4 @@ constexpr auto YoungTableau<λ...>::conj() const {
 		}
 	}
 	return conjTab;
-}
-
-template <typename T, int N>
-constexpr Matrix<T, N, N> permutationMatrix(Permutation<N> const &p) {
-	Matrix<T, N, N> P{};
-	for (int n = 0; n < N; n++) {
-		P(n, p[n]) = T(1);
-	}
-	return P;
-}
-
-namespace detail {
-
-template <int... λ>
-consteval auto YoungSymmetrizerPermutations() {
-	constexpr int R = (0 + ... + λ);
-	YoungTableau<λ...> υ{};
-	constexpr int rowCount = υ.rowPermutationCount();
-	constexpr int colCount = υ.columnPermutationCount();
-	constexpr int size = rowCount * colCount;
-	std::array<std::pair<int8_t, Permutation<R>>, size> sum;
-	int i = 0;
-	YoungTableau<λ...> σ{};
-	do {
-		auto στ = σ;
-		do {
-			sum[i++] = std::pair<int8_t, Permutation<R>>(στ.parity() / σ.parity(), στ);
-			στ = στ.nextColumnPermutation();
-		} while (στ != σ);
-		σ = σ.nextRowPermutation();
-	} while (σ != υ);
-	return sum;
-}
-
-template <int D, int... λ>
-consteval auto YoungSymmetrizerMatrix() {
-	using Type = double;
-	constexpr int R = (0 + ... + λ);
-	constexpr int N = ipow(D, R);
-	Matrix<Type, N, N> Ω{};
-	auto const sum = YoungSymmetrizerPermutations<λ...>();
-	using itype = Multidices<R, D>;
-	for (auto const &q : sum) {
-		for (auto r = itype::ibegin(); r != itype::iend(); r++) {
-			auto const c = q.second.apply(r);
-			Ω(Index(r), Index(c)) += Type(q.first);
-		}
-	}
-	return Ω;
-}
-} // namespace detail
-
-template <int D, int... λ>
-consteval auto YoungSymmetrizer() {
-	using Type = double;
-	constexpr auto zero = Type(0);
-	constexpr auto one = Type(1);
-	constexpr auto A = detail::YoungSymmetrizerMatrix<D, λ...>();
-	constexpr auto Alit = A.literal();
-	constexpr int N = A.rowCount();
-	constexpr auto reducedA = rankReduce<Type, N, N, Alit>();
-	constexpr int M = reducedA.rowCount();
-	auto B = pseudoinverse(reducedA);
-	for (int m = 0; m < M; m++) {
-		Type factor = zero;
-		for (int n = 0; n < N; n++) {
-			if (B(n, m) != zero) {
-				factor = std::max(factor, one / std::abs(B(n, m)));
-			}
-		}
-		for (int n = 0; n < N; n++) {
-			B(n, m) *= factor;
-		}
-	}
-	return B;
 }

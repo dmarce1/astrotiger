@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Approximate.hpp"
+#include "Definitions.hpp"
 #include "Math.hpp"
 #include "Vector.hpp"
 
@@ -13,17 +13,15 @@
 #include <iomanip>
 #include <limits>
 
-template <typename T, int N, int M = N>
+template<typename T, int N, int M = N>
 struct Matrix;
 
-template <typename T, int N, int M>
+template<typename T, int N, int M>
 constexpr Matrix<T, N, M> inverse(Matrix<T, N, M>);
 
-template <typename T, int N, int M = N>
-using MatrixLiteral = std::array<std::array<T, M>, N>;
-
-template <typename T, int N, int M>
+template<typename T, int N, int M>
 struct Matrix {
+	using LiteralType = std::array<std::array<T, M>, N>;
 	static constexpr int rowCount() {
 		return N;
 	}
@@ -31,7 +29,7 @@ struct Matrix {
 		return M;
 	}
 	constexpr Matrix() = default;
-	template <int L>
+	template<int L>
 	constexpr Matrix(Vector<T, L> const &v) {
 		if constexpr ((N == 1) && (L == M)) {
 			data_[0] = v;
@@ -52,83 +50,77 @@ struct Matrix {
 		}
 	}
 	constexpr Matrix(Vector<Vector<T, M>, N> const &array) :
-		data_(array) {
+			data_(array) {
 	}
-	constexpr Matrix(Matrix const &) = default;
-	constexpr Matrix(Matrix &&) = default;
-	constexpr Matrix &operator=(Matrix const &) = default;
-	constexpr Matrix &operator=(Matrix &&) = default;
-	constexpr Matrix(MatrixLiteral<T, N, M> const &lit) {
-		for (int n = 0; n < N; n++) {
-			data_[n] = lit[n];
-		}
-	}
-	constexpr operator MatrixLiteral<T, N, M>() const {
-		return literal();
-	}
-	constexpr auto literal() const {
-		MatrixLiteral<T, N, M> lit;
-		for (int n = 0; n < N; n++) {
-			lit[n] = data_[n];
-		}
-		return lit;
-	}
+	constexpr Matrix(Matrix const&) = default;
+	constexpr Matrix(Matrix&&) = default;
+	constexpr Matrix& operator=(Matrix const&) = default;
+	constexpr Matrix& operator=(Matrix&&) = default;
 	constexpr T operator()(int n, int m) const {
 		return data_[n][m];
 	}
-	constexpr T &operator()(int n, int m) {
+	constexpr T& operator()(int n, int m) {
 		return data_[n][m];
 	}
-	constexpr Matrix &operator+=(Matrix const &B) {
+	constexpr Matrix& operator+=(Matrix const &B) {
 		*this = *this + B;
 		return *this;
 	}
-	constexpr Matrix &operator-=(Matrix const &B) {
+	constexpr Matrix& operator-=(Matrix const &B) {
 		*this = *this - B;
 		return *this;
 	}
-	constexpr Matrix &operator*=(Matrix const &B) {
-		static_assert(N == M);
+	constexpr Matrix& operator*=(Matrix const &B) {
+		static_assert(N && (N == M));
 		*this = *this * B;
 		return *this;
 	}
-	constexpr Matrix &operator/=(Matrix const &B) {
-		static_assert(N == M);
+	constexpr Matrix& operator/=(Matrix const &B) {
+		static_assert(N && (N == M));
 		*this = *this / B;
 		return *this;
 	}
-	constexpr Matrix &operator*=(T const &B) {
+	constexpr Matrix& operator*=(T const &B) {
 		*this = *this * B;
 		return *this;
 	}
-	constexpr Matrix &operator/=(T const &B) {
+	constexpr Matrix& operator/=(T const &B) {
 		return (*this *= one / B);
 	}
-	template <int I, int J>
+	template<int I, int J>
 	constexpr T cofactor() const {
-		static_assert(N == M);
+		static_assert(I > 1);
+		static_assert(J > 1);
+		static_assert(N && (N == M));
 		return nonepow<I + J>() * minor<I, J>();
 	}
 	constexpr Matrix comatrix() const {
 		static_assert(N == M);
 		Matrix A;
-		auto const lambda = [&A, this]<int PQ>(auto const &self) {
-			constexpr int P = PQ / M;
-			constexpr int Q = PQ % M;
-			A(P, Q) = cofactor<P, Q>();
-			if constexpr (PQ + 1 < N * M) {
-				self.template operator()<PQ + 1>(self);
-			}
-		};
-		lambda.template operator()<0>(lambda);
+		if constexpr (N == 1) {
+			A(0, 0) = one;
+		} else {
+			auto const lambda = [&A, this]<int PQ>(auto const &self) {
+				constexpr int P = PQ / M;
+				constexpr int Q = PQ % M;
+				A(P, Q) = cofactor<P, Q>();
+				if constexpr (PQ + 1 < N * M) {
+					self.template operator()<PQ + 1>(self);
+				}
+			};
+			lambda.template operator() < 0 > (lambda);
+		}
 		return A;
 	}
-	template <int I, int J>
+	template<int I, int J>
 	constexpr T minor() const {
-		static_assert(N == M);
-		return det(sub<I, J>());
+		static_assert(I > 1);
+		static_assert(J > 1);
+		static_assert(N && (N == M));
+		auto const s = sub<I, J>();
+		return det(s);
 	}
-	template <int I, int J>
+	template<int I, int J>
 	constexpr Matrix<T, N - 1, M - 1> sub() const {
 		Matrix<T, N - 1, M - 1> A;
 		auto const lambda = [&A, this]<int PQ>(auto const &self) {
@@ -151,11 +143,12 @@ struct Matrix {
 				self.template operator()<PQ + 1>(self);
 			}
 		};
-		lambda.template operator()<0>(lambda);
+		lambda.template operator() < 0 > (lambda);
 		return A;
 	}
 	static constexpr Matrix identity() {
-		static_assert(N == M);
+		static_assert(N && (N == M));
+		;
 		Matrix I;
 		for (int n = 0; n < N; n++) {
 			I.data_[n] = Vector<T, N>::unit(n);
@@ -174,7 +167,7 @@ struct Matrix {
 	friend constexpr Matrix operator-(Matrix A, Matrix const &B) {
 		return Matrix(A.data_ - B.data_);
 	}
-	template <int L>
+	template<int L>
 	constexpr Matrix<T, N, L> operator*(Matrix<T, M, L> B) const {
 		Matrix<T, N, L> C;
 		for (int n = 0; n < N; n++) {
@@ -220,7 +213,8 @@ struct Matrix {
 		if constexpr ((N == 1) && (M == 1)) {
 			return A(0, 0);
 		} else {
-			static_assert(N == M);
+			static_assert(N && (N == M));
+			;
 			auto const lambda = [A]<int I>(auto const &self) {
 				if constexpr (I == M) {
 					return zero;
@@ -232,7 +226,7 @@ struct Matrix {
 					}
 				}
 			};
-			return lambda.template operator()<0>(lambda);
+			return lambda.template operator() < 0 > (lambda);
 		}
 	}
 	friend constexpr Matrix norm(Matrix A) {
@@ -244,7 +238,7 @@ struct Matrix {
 		return sqrt(sum);
 	}
 	friend constexpr Matrix adjugate(Matrix const &A) {
-		static_assert(N == M);
+		static_assert(N && (N == M));
 		return transpose(A.comatrix());
 	}
 	friend constexpr auto pseudoinverse(Matrix const &A) {
@@ -258,34 +252,34 @@ struct Matrix {
 		}
 		return tr;
 	}
-	constexpr auto &rowSwp(int i, int j) {
+	constexpr auto& rowSwp(int i, int j) {
 		std::swap(data_[i], data_[j]);
 		return *this;
 	}
-	constexpr auto &rowMul(int i, T const &value) {
+	constexpr auto& rowMul(int i, T const &value) {
 		data_[i] *= value;
 		return *this;
 	}
-	constexpr auto &rowSub(int i, int j) {
+	constexpr auto& rowSub(int i, int j) {
 		data_[i] -= data_[j];
 		return *this;
 	}
-	constexpr auto &rowMulSub(int i, int j, T c) {
+	constexpr auto& rowMulSub(int i, int j, T c) {
 		data_[i] -= c * data_[j];
 		return *this;
 	}
-	constexpr auto &rowAdd(int i, int j) {
+	constexpr auto& rowAdd(int i, int j) {
 		data_[i] += data_[j];
 		return *this;
 	}
-	friend std::ostream &operator<<(std::ostream &os, Matrix<T, N, M> const &A) {
+	friend std::ostream& operator<<(std::ostream &os, Matrix<T, N, M> const &A) {
 		os << std::to_string(N) << "x" << std::to_string(M) << " matrix:" << std::endl;
 		int constexpr minCellWidth = 4;
 		int constexpr maxCellWidth = 32;
 		int cellWidth = minCellWidth;
 		for (int n = 0; n < N; n++) {
 			for (int m = 0; m < M; m++) {
-				if (A(n, m) == T{}) {
+				if (A(n, m) == T { }) {
 					continue;
 				}
 				std::ostringstream ss;
@@ -307,7 +301,7 @@ struct Matrix {
 			os << "+\n";
 		};
 		auto printCentered = [&os, cellWidth, capped](auto const &value) {
-			if (value == T{}) {
+			if (value == T { }) {
 				os << std::string(cellWidth, ' ');
 				return;
 			}
@@ -338,6 +332,21 @@ struct Matrix {
 		printHorizontal();
 		return os;
 	}
+	constexpr Matrix(LiteralType const &lit) {
+		for (int n = 0; n < N; n++) {
+			data_[n] = lit[n];
+		}
+	}
+	constexpr explicit operator LiteralType() const {
+		return literal();
+	}
+	constexpr auto literal() const {
+		LiteralType lit;
+		for (int n = 0; n < N; n++) {
+			lit[n] = data_[n];
+		}
+		return lit;
+	}
 
 private:
 	static constexpr T zero = T(0);
@@ -345,7 +354,12 @@ private:
 	Vector<Vector<T, M>, N> data_;
 };
 
-template <typename T, int N, int M>
+template<typename T, int N, int M>
+struct ConvertsToLiteral<Matrix<T, N, M>> {
+	static constexpr bool value = true;
+};
+
+template<typename T, int N, int M>
 constexpr Matrix<T, N, M> transpose(Matrix<T, M, N> const &A) {
 	Matrix<T, N, M> B;
 	for (int n = 0; n < N; n++) {
@@ -356,20 +370,20 @@ constexpr Matrix<T, N, M> transpose(Matrix<T, M, N> const &A) {
 	return B;
 }
 
-template <typename>
+template<typename >
 struct IsMatrix {
 	static constexpr bool value = false;
 };
 
-template <typename T, int N, int M>
+template<typename T, int N, int M>
 struct IsMatrix<Matrix<T, N, M>> {
 	static constexpr bool value = false;
 };
 
-template <typename T>
+template<typename T>
 concept MatrixType = IsMatrix<T>::value;
 
-template <typename T, int N, int M>
+template<typename T, int N, int M>
 constexpr Matrix<T, N, M> operator*(Vector<T, N> const &A, Vector<T, M> const &B) {
 	Matrix<T, N, M> C;
 	for (int n = 0; n < N; n++) {
@@ -378,17 +392,19 @@ constexpr Matrix<T, N, M> operator*(Vector<T, N> const &A, Vector<T, M> const &B
 	return C;
 }
 
-enum class GEType : int { full, half };
+enum class GEType : int {
+	full, half
+};
 
-template <GEType geType, typename T, int N, int M, int... Ms>
-constexpr auto gaussianElimination(Matrix<T, N, M> A, Matrix<T, N, Ms>... Bs) {
+template<GEType geType, typename T, int N, int M, int ... Ms>
+constexpr auto gaussianElimination(Matrix<T, N, M> A, Matrix<T, N, Ms> ... Bs) {
 	static_assert(M >= N);
 	using std::abs;
 	using std::numeric_limits;
 	using std::swap;
 	constexpr auto one = T(1);
 	auto const isZero = [](T v) {
-		if constexpr (std::is_integral_v<T>) {
+		if constexpr (!std::is_floating_point_v<T>) {
 			return v == T(0);
 		} else {
 			constexpr auto eps = T(8) * numeric_limits<T>::epsilon();
@@ -401,45 +417,45 @@ constexpr auto gaussianElimination(Matrix<T, N, M> A, Matrix<T, N, Ms>... Bs) {
 		}
 	};
 	auto const swapRowsB = [&](int r0, int r1) {
-		(
+	(
 			[&]<int K>(Matrix<T, N, K> &B) {
 				for (int m = 0; m < K; m++) {
 					swap(B(r0, m), B(r1, m));
 				}
 			}(Bs),
 			...);
-	};
+}	;
 	auto const scaleRowA = [&](int r, T s, int startCol) {
 		for (int m = startCol; m < M; m++) {
 			A(r, m) *= s;
 		}
 	};
 	auto const scaleRowB = [&](int r, T s) {
-		(
+	(
 			[&]<int K>(Matrix<T, N, K> &B) {
 				for (int m = 0; m < K; m++) {
 					B(r, m) *= s;
 				}
 			}(Bs),
 			...);
-	};
+}	;
 	auto const rowMulSubA = [&](int dst, int src, T p, int startCol) {
 		for (int m = startCol; m < M; m++) {
 			A(dst, m) -= p * A(src, m);
 		}
 	};
 	auto const rowMulSubB = [&](int dst, int src, T p) {
-		(
+	(
 			[&]<int K>(Matrix<T, N, K> &B) {
 				for (int m = 0; m < K; m++) {
 					B(dst, m) -= p * B(src, m);
 				}
 			}(Bs),
 			...);
-	};
+}	;
 	for (int n = 0; n < N; n++) {
 		int pivotRow = -1;
-		if constexpr (!std::is_integral_v<T>) {
+		if constexpr (!std::is_floating_point_v<T>) {
 			T best = T(0);
 			for (int r = n; r < N; r++) {
 				auto const v = abs(A(r, n));
@@ -493,6 +509,13 @@ constexpr auto gaussianElimination(Matrix<T, N, M> A, Matrix<T, N, Ms>... Bs) {
 				rowMulSubB(r, n, p);
 			}
 		}
+		for (int n = 0; n < N; n++) {
+			for (int m = 0; m < N; m++) {
+				if (isZero(A(n, m))) {
+					A(n, m) = T(0);
+				}
+			}
+		}
 		return std::tuple(A, Bs...);
 	} else {
 		auto const rowIsZeroA = [&](int r) {
@@ -513,25 +536,89 @@ constexpr auto gaussianElimination(Matrix<T, N, M> A, Matrix<T, N, Ms>... Bs) {
 				n++;
 			}
 		}
+		for (int n = 0; n < N; n++) {
+			for (int m = 0; m < N; m++) {
+				if (isZero(A(n, m))) {
+					A(n, m) = T(0);
+				}
+			}
+		}
 		return std::tuple(A, Bs..., r);
 	}
 }
 
-template <typename T, int N, int M, MatrixLiteral<T, N, M> Ain>
-constexpr auto rankReduce() {
-	constexpr auto tmpTup = gaussianElimination<GEType::half>(Matrix<T, N, M>(Ain));
-	constexpr auto A = std::get<0>(tmpTup);
-	constexpr auto L = std::get<1>(tmpTup);
-	Matrix<T, L, N> rA;
-	for (int n = 0; n < L; n++) {
+template<typename T, int N, int M>
+constexpr auto rankReduce(Matrix<T, N, M> A) {
+	static_assert(M >= N);
+	constexpr T zero = T(0);
+	constexpr T one = T(1);
+	auto const swapRows = [&A](int r0, int r1, int startCol) {
+		for (int m = startCol; m < M; m++) {
+			std::swap(A(r0, m), A(r1, m));
+		}
+	};
+	auto const scaleRow = [&A](int r, T s, int startCol) {
+		for (int m = startCol; m < M; m++) {
+			A(r, m) *= s;
+		}
+	};
+	auto const rowMulSub = [&A](int dst, int src, T p, int startCol) {
+		for (int m = startCol; m < M; m++) {
+			A(dst, m) -= p * A(src, m);
+		}
+	};
+	auto const rowIsZeroA = [&A](int r) {
 		for (int m = 0; m < M; m++) {
-			rA(n, m) = A(n, m);
+			if (A(r, m) != zero) {
+				return false;
+			}
+		}
+		return true;
+	};
+	for (int n = 0; n < N; n++) {
+		int pivotRow = -1;
+		T best = T(0);
+		for (int r = n; r < N; r++) {
+			auto const v = abs(A(r, n));
+			if ((v != zero) && (pivotRow < 0 || v > best)) {
+				best = v;
+				pivotRow = r;
+			}
+		}
+		if (pivotRow < 0) {
+			continue;
+		} else if (pivotRow != n) {
+			swapRows(pivotRow, n, n);
+		}
+		T const Ann = A(n, n);
+		if (Ann == zero) {
+			continue;
+		}
+		T const inv = one / Ann;
+		A(n, n) = one;
+		scaleRow(n, inv, n + 1);
+		for (int r = n + 1; r < N; r++) {
+			T const p = A(r, n);
+			if (p == zero) {
+				continue;
+			}
+			A(r, n) = zero;
+			rowMulSub(r, n, p, n + 1);
 		}
 	}
-	return rA;
+	int n, r;
+	for (n = 0, r = N; n < r;) {
+		if (rowIsZeroA(n)) {
+			r--;
+			swapRows(n, r, 0);
+		} else {
+			n++;
+		}
+	}
+	return A;
 }
 
-template <typename T, int N1, int N2, int M>
+template<typename T, int N1, int N2, int M>
 constexpr Matrix<T, N1 + N2, M> concatenateDown(Matrix<T, N1, M> const &H, Matrix<T, N2, M> const &L) {
 	Matrix<T, N1 + N2, M> A;
 	for (int i = 0; i < N1; i++) {
@@ -547,7 +634,7 @@ constexpr Matrix<T, N1 + N2, M> concatenateDown(Matrix<T, N1, M> const &H, Matri
 	return A;
 }
 
-template <typename T, int N, int M>
+template<typename T, int N, int M>
 constexpr Matrix<T, N, M> inverse(Matrix<T, N, M> A) {
 	static_assert(M == N);
 	if constexpr (N <= 2) {
@@ -557,12 +644,12 @@ constexpr Matrix<T, N, M> inverse(Matrix<T, N, M> A) {
 	}
 }
 
-template <typename T, int M, int N1, int N2>
+template<typename T, int M, int N1, int N2>
 constexpr Matrix<T, N1 + N2, M> concatenateUp(Matrix<T, N1, M> const &U, Matrix<T, N2, M> const &D) {
 	return concatenateDown(D, U);
 }
 
-template <typename T, int N, int M1, int M2>
+template<typename T, int N, int M1, int M2>
 constexpr Matrix<T, N, M1 + M2> concatenateRight(Matrix<T, N, M1> const &L, Matrix<T, N, M2> const &R) {
 	auto const trL = transpose(L);
 	auto const trR = transpose(R);
@@ -570,7 +657,22 @@ constexpr Matrix<T, N, M1 + M2> concatenateRight(Matrix<T, N, M1> const &L, Matr
 	return transpose(C);
 }
 
-template <typename T, int N, int M1, int M2>
+template<typename T, int N, int M1, int M2>
 constexpr Matrix<T, N, M1 + M2> concatenateLeft(Matrix<T, N, M1> const &L, Matrix<T, N, M2> const &R) {
 	return concatenateRight(R, L);
+}
+
+template<typename T, int N1, int M1, int N2, int M2>
+constexpr auto kroneckerProduct(Matrix<T, N1, M1> const &A, Matrix<T, N2, M2> const &B) {
+	Matrix<T, N1 * N2, M1 * M2> C;
+	for (int n1 = 0; n1 < N1; n1++) {
+		for (int m1 = 0; m1 < M1; m1++) {
+			for (int n2 = 0; n2 < N2; n2++) {
+				for (int m2 = 0; m2 < M2; m2++) {
+					C(N2 * n1 + n2, M2 * m1 + m2) = A(n1, m1) * B(n2, m2);
+				}
+			}
+		}
+	}
+	return C;
 }

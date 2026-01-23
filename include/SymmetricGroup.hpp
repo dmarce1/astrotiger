@@ -10,7 +10,7 @@
 #include "Approximate.hpp"
 #include "Math.hpp"
 #include "Matrix.hpp"
-#include "Multidices.hpp"
+#include "Indices.hpp"
 #include "Permutation.hpp"
 #include "Rational.hpp"
 
@@ -25,6 +25,14 @@ struct SymmetricGroup {
 	constexpr auto const& operator[](int i) const {
 		return elements_[i];
 	}
+	constexpr auto find(Permutation<N> const &p) const {
+		for (int i = 0; i < size(); i++) {
+			if (p == elements_[i]) {
+				return i;
+			}
+		}
+		return -1;
+	}
 	friend std::ostream& operator<<(std::ostream &os, SymmetricGroup<N> const &Sn) {
 		for (int i = 0; i < size(); i++) {
 			os << std::to_string(i + 1) << ". " << Sn[i] << std::endl;
@@ -38,7 +46,8 @@ private:static consteval auto genElements() {
 		int i = 0;
 		do {
 			elements[i++] = p;
-		}while (std::next_permutation(p.begin(), p.end()));
+		}
+		while (std::next_permutation(p.begin(), p.end()));
 		return elements;
 	}
 	static constexpr auto elements_ = genElements();

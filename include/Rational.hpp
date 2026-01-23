@@ -4,31 +4,34 @@
 
 #pragma once
 
+#include "Definitions.hpp"
+#include "Math.hpp"
 
 #include <cmath>
+#include <concepts>
 #include <cstdint>
 #include <numeric>
 #include <ostream>
 #include <type_traits>
 
 struct Rational {
-	using Type = int64_t;
+	using Type = intmax_t;
 	constexpr Rational() :
 			n_(0), d_(1) {
-		normalize();
 	}
-	constexpr Rational(Type n) :
-			n_(n), d_(1) {
-		normalize();
-	}
-	constexpr Rational(Type n, Type d) :
-			n_(n), d_(d) {
-		normalize();
+	constexpr Rational(std::integral auto n) :
+	n_(n), d_(1) {
+	}constexpr Rational(std::integral auto n, std::integral auto d) :
+	n_(n), d_(d) {
+	}constexpr Rational &operator=(std::integral auto i) {
+		n_ = i;
+		d_ = 1;
+
+		return *this;
 	}
 	constexpr Rational& operator=(Rational i) {
 		n_ = i.n_;
 		d_ = i.d_;
-		normalize();
 		return *this;
 	}
 	constexpr Rational& operator+=(Rational i) {
@@ -47,176 +50,126 @@ struct Rational {
 		*this = *this / i;
 		return *this;
 	}
-	constexpr Rational& operator=(Type i) {
-		n_ = i;
-		d_ = 1;
-		return *this;
-	}
-//	constexpr Rational& operator+=(Type i) {
-//		*this = *this + i;
-//		return *this;
-//	}
-//	constexpr Rational& operator-=(Type i) {
-//		*this = *this - i;
-//		return *this;
-//	}
-//	constexpr Rational& operator*=(Type i) {
-//		*this = *this * i;
-//		return *this;
-//	}
-//	constexpr Rational& operator/=(Type i) {
-//		*this = *this / i;
-//		return *this;
-//	}
 	friend constexpr Rational operator+(Rational b) {
 		return b;
 	}
 	friend constexpr Rational operator-(Rational a) {
 		a.n_ = -a.n_;
-		a.normalize();
 		return a;
 	}
 	friend constexpr Rational operator+(Rational b, Rational c) {
-	    Type const g = std::gcd(b.d_, c.d_);
-	    Type const bd1 = b.d_ / g;
-	    Type const cd1 = c.d_ / g;
-
-	    Rational a;
-	    a.n_ = b.n_ * cd1 + c.n_ * bd1;
-	    a.d_ = bd1 * c.d_;            // == bd1 * (g*cd1) == lcm(b.d_, c.d_)
-	    a.normalize();
-	    return a;
+		if (b.n_ == 0) {
+			return c;
+		} else if (c.n_ == 0) {
+			return b;
+		} else {
+			Rational a;
+			constexprAssert(b.d_);
+			constexprAssert(c.d_);
+			auto g = std::gcd(b.d_, c.d_);
+			auto const bd1 = b.d_ / g;
+			auto const cd1 = c.d_ / g;
+			a.n_ = b.n_ * cd1 + c.n_ * bd1;
+			a.d_ = c.d_ * bd1;
+			if (a.n_) {
+				g = std::gcd(a.n_, a.d_);
+				a.n_ /= g;
+				a.d_ /= g;
+			} else {
+				a.d_ = 1;
+			}
+			return a;
+		}
 	}
-//	friend constexpr Rational operator+(Rational a, Type b) {
-//		a.n_ += a.d_ * b;
-//		a.normalize();
-//		return a;
-//	}
-//	friend constexpr Rational operator+(Type a, Rational b) {
-//		b.n_ += b.d_ * a;
-//		b.normalize();
-//		return b;
-//	}
 	friend constexpr Rational operator-(Rational a, Rational b) {
 		return a + (-b);
 	}
-//	friend constexpr Rational operator-(Rational a, Type b) {
-//		return a + (-b);
-//	}
-//	friend constexpr Rational operator-(Type a, Rational b) {
-//		return a + (-b);
-//	}
-	friend constexpr Rational operator*(Rational a, Rational b) {
-		Type const g1 = std::gcd(a.n_, b.d_);
-		a.n_ /= g1;
-		b.d_ /= g1;
-		Type const g2 = std::gcd(b.n_, a.d_);
-		b.n_ /= g2;
-		a.d_ /= g2;
-		a.n_ *= b.n_;
-		a.d_ *= b.d_;
-		a.normalize();
+	friend constexpr Rational operator*(Rational b, Rational c) {
+		if ((b.n_ == 0) && (c.n_ == 0)) {
+			return Rational(0);
+		} else {
+			Rational a;
+			a.n_ = b.n_ * c.n_;
+			a.d_ = b.d_ * c.d_;
+			if (a.n_) {
+				auto const g = std::gcd(a.n_, a.d_);
+				a.n_ /= g;
+				a.d_ /= g;
+			}
+			return a;
+		}
+	}
+	friend constexpr Rational operator*(std::integral auto b, Rational c) {
+		if ((b == 0) && (c.n_ == 0)) {
+			return Rational(0);
+		} else {
+			Rational a;
+			a.n_ = b * c.n_;
+			a.d_ = c.d_;
+			if (a.n_) {
+				auto const g = std::gcd(a.n_, a.d_);
+				a.n_ /= g;
+				a.d_ /= g;
+			}
+			return a;
+		}
+	}
+	friend constexpr Rational operator*(Rational b, std::integral auto c) {
+		return c * b;
+	}
+	constexpr Rational reciprocal() const {
+		Rational a = *this;
+		std::swap(a.n_, a.d_);
+		if (a.d_ < 0) {
+			a.n_ = -a.n_;
+			a.d_ = -a.d_;
+		}
 		return a;
 	}
-//	friend constexpr Rational operator*(Rational a, Type b) {
-//		a.n_ *= b;
-//		a.normalize();
-//		return a;
-//	}
-//	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
-//	friend constexpr Real operator+(Rational a, Real b) {
-//		return (a.n_ + a.d_ * b) / a.d_;
-//	}
-//	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
-//	friend constexpr Real operator+(Real a, Rational b) {
-//		return b + a;
-//	}
-//	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
-//	friend constexpr Real operator-(Rational a, Real b) {
-//		return a + (-b);
-//	}
-//	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
-//	friend constexpr Real operator-(Real a, Rational b) {
-//		return a + (-b);
-//	}
-//	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
-//	friend constexpr Real operator*(Rational a, Real b) {
-//		b *= a.n_;
-//		b /= a.d_;
-//		return b;
-//	}
-//	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
-//	friend constexpr Real operator*(Real a, Rational b) {
-//		return b * a;
-//	}
-//	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
-//	friend constexpr Real operator/(Rational a, Real b) {
-//		return a.n_ / (b * a.d_);
-//	}
-//	template<typename Real, std::enable_if<std::is_floating_point<Real>::value, int>::type = 0>
-//	friend constexpr Real operator/(Real a, Rational b) {
-//		a *= b.d_;
-//		a /= b.n_;
-//		return a;
-//	}
-//	friend constexpr Rational operator*(Type a, Rational b) {
-//		return b * a;
-//	}
-	friend constexpr Rational operator/(Rational a, Rational b) {
-	    Type const g1 = std::gcd(a.n_, b.n_);
-	    a.n_ /= g1;
-	    b.n_ /= g1;
-
-	    Type const g2 = std::gcd(b.d_, a.d_);
-	    b.d_ /= g2;
-	    a.d_ /= g2;
-
-	    a.n_ *= b.d_;
-	    a.d_ *= b.n_;
-
-	    a.normalize();
-	    return a;
+	friend constexpr Rational operator/(Rational b, Rational c) {
+		return b * c.reciprocal();
 	}
-//	friend constexpr Rational operator/(Type b, Rational a) {
-//		std::swap(a.n_, a.d_);
-//		a.n_ *= b;
-//		a.normalize();
-//		return a;
-//	}
-//	friend constexpr Rational operator/(Rational a, Type b) {
-//		a.d_ *= b;
-//		a.normalize();
-//		return a;
-//	}
+	friend constexpr Rational operator/(std::integral auto b, Rational c) {
+		return b * c.reciprocal();
+	}friend constexpr Rational operator/(Rational b, std::integral auto c) {
+		return (c / b).reciprocal();
+	}
 	friend constexpr bool operator==(Rational a, Rational b) {
+		auto const gn = std::gcd(a.n_, b.n_);
+		auto const gd = std::gcd(a.d_, b.d_);
+		if (gn) {
+			a.n_ /= gn;
+			b.n_ /= gn;
+		}
+		a.d_ /= gd;
+		b.d_ /= gd;
 		return (a.n_ * b.d_) == (a.d_ * b.n_);
 	}
-	friend constexpr bool operator!=(Rational a, Rational b) {
-		return (a.n_ * b.d_) != (a.d_ * b.n_);
-	}
 	friend constexpr bool operator<(Rational a, Rational b) {
+		auto const gn = std::gcd(a.n_, b.n_);
+		auto const gd = std::gcd(a.d_, b.d_);
+		if (gn) {
+			a.n_ /= gn;
+			b.n_ /= gn;
+		}
+		a.d_ /= gd;
+		b.d_ /= gd;
 		return (a.n_ * b.d_) < (a.d_ * b.n_);
 	}
-	friend constexpr bool operator>(Rational a, Rational b) {
-		return (a.n_ * b.d_) > (a.d_ * b.n_);
-	}
-	friend constexpr bool operator<=(Rational a, Rational b) {
-		return (a.n_ * b.d_) <= (a.d_ * b.n_);
+	friend constexpr bool operator!=(Rational a, Rational b) {
+		return !(a == b);
 	}
 	friend constexpr bool operator>=(Rational a, Rational b) {
-		return (a.n_ * b.d_) >= (a.d_ * b.n_);
+		return !(a < b);
+	}
+	friend constexpr bool operator>(Rational a, Rational b) {
+		return b < a;
+	}
+	friend constexpr bool operator<=(Rational a, Rational b) {
+		return b >= a;
 	}
 	constexpr operator double() const {
 		return double(n_) / double(d_);
-	}
-	constexpr void normalize() {
-		if (n_ == 0) {
-			d_ = 1;
-		} else {
-			auto d = icopysign(std::gcd(n_, d_), d_);
-			n_ /= d;
-			d_ /= d;
-		}
 	}
 	constexpr Type denominator() const {
 		return d_;
@@ -225,17 +178,32 @@ struct Rational {
 		return n_;
 	}
 	friend constexpr Rational abs(Rational v) {
-		v.n_ = (v.n_ >= 0) ? v.n_ : -v.n_;
-		v.normalize();
+		v.n_ = (v.n_ >= 0) ? +v.n_ : -v.n_;
 		return v;
 	}
 	friend std::ostream& operator<<(std::ostream &os, Rational f) {
-		os << f.n_;
+		os << "(" << f.n_;
 		if (f.d_ != 1) {
 			os << "/" << f.d_;
 		}
+		os << ")";
 		return os;
+	}
+	using LiteralType = std::pair<Type, Type>;
+	constexpr Rational(LiteralType const &lit) :
+			n_(lit.first), d_(lit.second) {
+	}
+	constexpr explicit operator LiteralType() const {
+		return LiteralType(n_, d_);
+	}
+	constexpr LiteralType literal() const {
+		return LiteralType(*this);
 	}
 	Type n_ = 0;
 	Type d_ = 1;
+};
+
+template<>
+struct ConvertsToLiteral<Rational> {
+	static constexpr bool value = true;
 };
