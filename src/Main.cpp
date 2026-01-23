@@ -23,6 +23,8 @@ int hpx_main(int argc, char *argv[]) {
 	auto const iA = Rational(factorial(R)) *  SparseMatrix<Rational>(N, std::get<0>(p), std::get<2>(p));
 	std::cout << A;
 	std::cout << iA;
+	rankReduce(iA);
+	std::cout << iA;
 	//Tensor<double, 3, 3> T;
 //	std::cout << pseudoinverse(rankReduce<T, N / (D * D), N / (D * D), B.literal()>());
 //	constexpr auto A = genTransform<sym>();
