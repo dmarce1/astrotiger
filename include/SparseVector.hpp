@@ -85,6 +85,23 @@ struct SparseVector {
 		SparseVector<T> &ref_ { };
 		int index_;
 	};
+	template<typename U>
+	constexpr operator SparseVector<U>() const {
+		SparseVector<U> vec;
+		for (auto i = begin(); i != end(); i++) {
+			vec[i->first] = static_cast<U>(i->second);
+		}
+		return vec;
+	}
+	friend constexpr auto normalize(SparseVector const &v) {
+		using std::sqrt;
+		auto const v2 = v * v;
+		if (v2 == zero) {
+			return v;
+		} else {
+			return v / sqrt(v2);
+		}
+	}
 	constexpr SparseVector operator+() const {
 		return *this;
 	}
@@ -167,6 +184,9 @@ struct SparseVector {
 	constexpr int sparsity() const {
 		return N_ - density();
 	}
+	constexpr int size() const {
+		return N_;
+	}
 	constexpr auto begin() const {
 		return V_.begin();
 	}
@@ -180,6 +200,39 @@ struct SparseVector {
 		SparseVector U(N);
 		U[n] = one;
 		return U;
+	}
+	friend constexpr std::ostream& operator<<(std::ostream &os, SparseVector<T> const &A) {
+		NUMERICAL_CONSTANTS(T);
+		auto const N = A.size();
+		SparseVector<int> widths(N);
+		int maxWidth = 1;
+		for (int n = 0; n < N; n++) {
+			if (A[n] != zero) {
+				std::ostringstream ss;
+				ss << A[n];
+				widths[n] = ss.str().size();
+				maxWidth = std::max(maxWidth, (int) ss.str().size());
+			}
+		}
+		auto printHorizontal = [&os, maxWidth, N]() {
+			for (int m = 0; m < N; m++) {
+				os << '+' << std::string(maxWidth, '-');
+			}
+			os << "+\n";
+		};
+		printHorizontal();
+		for (int m = 0; m < N; m++) {
+			os << '|';
+			if (A[m] != zero) {
+				int const padding = maxWidth - widths[m];
+				os << std::string(padding / 2, ' ') << A[m] << std::string((padding + 1) / 2, ' ');
+			} else {
+				os << std::string(maxWidth, ' ');
+			}
+		}
+		os << "|\n";
+		printHorizontal();
+		return os;
 	}
 private:
 	NUMERICAL_CONSTANTS (T);

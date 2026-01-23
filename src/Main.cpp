@@ -13,18 +13,16 @@
 
 int hpx_main(int argc, char *argv[]) {
 	using namespace Tensors;
-	constexpr auto Λ = IntegerPartition<3> { };
+	constexpr auto Λ = IntegerPartition<2, 2> { };
 	constexpr int R = Λ.size();
-	constexpr int D = 3;
-	constexpr int N = ipow(D, R);
-
-	constexpr auto p = createTensorSymmetry<Λ, D>();
-	auto const A = SparseMatrix<Rational>(std::get<0>(p), N, std::get<1>(p)) / Rational(factorial(R));
-	auto const iA = Rational(factorial(R)) *  SparseMatrix<Rational>(N, std::get<0>(p), std::get<2>(p));
+	constexpr int D = 4;
+//	constexpr int N = ipow(D, R);
+//
+	auto p = createTensorSymmetry<Λ, D>();
+	int const N = std::get<0>(p);
+	int const M = std::get<1>(p);
+	auto A = SparseMatrix<double>(N, M, std::get<2>(p));
 	std::cout << A;
-	std::cout << iA;
-	rankReduce(iA);
-	std::cout << iA;
 	//Tensor<double, 3, 3> T;
 //	std::cout << pseudoinverse(rankReduce<T, N / (D * D), N / (D * D), B.literal()>());
 //	constexpr auto A = genTransform<sym>();

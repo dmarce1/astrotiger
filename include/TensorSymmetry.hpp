@@ -118,26 +118,20 @@ constexpr auto createTensorSymmetry() {
 			A(Index(ns), Index(ms)) += c;
 		}
 	}
-	auto const rank = rankReduce(A);
-	auto const iA = rightPseudoinverse(A);
-	//	auto const iA = A;
+	rankReduce(A);
+	A = rightPseudoinverse(A);
+	auto B = static_cast<SparseMatrix<double>>(A);
+	B = normalize(B);
 	if constexpr(sizeOnly) {
-		return std::pair(A.density(), iA.density());
+		return B.density();
 	} else {
 		constexpr auto sz = createTensorSymmetry<Λ, D, true>();
-		constexpr auto Asz = sz.first;
-		constexpr auto iAsz = sz.second;
-		std::array<std::pair<std::pair<int, int>, Rational>, Asz> Alit {};
-		std::array<std::pair<std::pair<int, int>, Rational>, iAsz> iAlit {};
-		auto const Blit = A.literal();
-		auto const iBlit = iA.literal();
-		for(int i = 0; i < Asz; i++) {
-			Alit[i] = Blit[i];
+		std::array<std::pair<std::pair<int, int>, double>, sz> rc {};
+		auto const Blit = B.literal();
+		for(int i = 0; i < sz; i++) {
+			rc[i] = Blit[i];
 		}
-		for(int i = 0; i < iAsz; i++) {
-			iAlit[i] = iBlit[i];
-		}
-		return std::tuple(A.rowCount(), Alit, iAlit);
+		return std::tuple(B.rowCount(), B.colCount(), rc);
 	}
 }
 

@@ -73,18 +73,21 @@ struct SparseMatrix {
 		}
 	}
 	constexpr SparseMatrix& operator+=(SparseMatrix const &other) {
+		ASSERT((N_ == other.N_) && (M_ == other.M_));
 		for (int r = 0; r < N_; r++) {
 			rows_[r] += other.rows_[r];
 		}
 		return *this;
 	}
 	constexpr SparseMatrix& operator-=(SparseMatrix const &other) {
+		ASSERT((N_ == other.N_) && (M_ == other.M_));
 		for (int r = 0; r < N_; r++) {
 			rows_[r] -= other.rows_[r];
 		}
 		return *this;
 	}
 	constexpr SparseMatrix& operator*=(SparseMatrix const &other) {
+		ASSERT(isSquare() && (N_ == other.N_) && (M_ == other.M_));
 		*this = *this * other;
 		return *this;
 	}
@@ -111,11 +114,13 @@ struct SparseMatrix {
 		return *this * (-one);
 	}
 	constexpr SparseMatrix operator+(SparseMatrix const &other) const {
+		ASSERT((N_ == other.N_) && (M_ == other.M_));
 		auto result = *this;
 		result += other;
 		return result;
 	}
 	constexpr SparseMatrix operator-(SparseMatrix const &other) const {
+		ASSERT((N_ == other.N_) && (M_ == other.M_));
 		auto result = *this;
 		result -= other;
 		return result;
@@ -126,6 +131,7 @@ struct SparseMatrix {
 		return result;
 	}
 	friend constexpr SparseMatrix operator*(SparseMatrix const &A, SparseMatrix const &B) {
+		ASSERT(A.M_ == B.N_);
 		SparseMatrix < T > C(A.N_, B.M_);
 		auto const trB = transpose(B);
 		for (int n = 0; n < A.N_; n++) {
@@ -160,8 +166,23 @@ struct SparseMatrix {
 	constexpr bool isSquare() const {
 		return N_ == M_;
 	}
+	template<typename U>
+	constexpr operator SparseMatrix<U>() const {
+		SparseMatrix<U> A(N_, M_);
+		for (int n = 0; n < N_; n++) {
+			A.rows_[n] = static_cast<SparseVector<U>>(rows_[n]);
+		}
+		return A;
+	}
+	friend constexpr auto normalize(SparseMatrix const &B) {
+		SparseMatrix A(B.N_, B.M_);
+		for (int n = 0; n < B.N_; n++) {
+			A.rows_[n] = normalize(B.rows_[n]);
+		}
+		return A;
+	}
 	friend constexpr SparseMatrix transpose(SparseMatrix const &A) {
-		SparseMatrix<T> trA(A.M_, A.N_);
+		SparseMatrix < T > trA(A.M_, A.N_);
 		auto const &src = A.rows_;
 		auto &dst = trA.rows_;
 		for (int ri = 0; ri < A.N_; ri++) {
@@ -197,9 +218,9 @@ struct SparseMatrix {
 		A.rows_.resize(p);
 		A.N_ = p;
 		return p;
-	}
-	friend constexpr void gaussJordanElimination(SparseMatrix& A, SparseMatrixType auto&... B) {
+	}friend constexpr void gaussJordanElimination(SparseMatrix& A, SparseMatrixType auto&... B) {
 		rankReduce(A, B...);
+		ASSERT((true && ... && (A.N_ == B.N_)));
 		for (int n = A.rowCount() - 1; n >= 0; n--) {
 			for (int j = 0; j < n; j++) {
 				if (A(j, n) != zero) {
@@ -208,6 +229,19 @@ struct SparseMatrix {
 				}
 			}
 		}
+	}
+	friend constexpr SparseVector<T> operator*(SparseMatrix<T> const &A, SparseVector<T> const &x) {
+		ASSERT(A.colCount() == x.size());
+		auto const N = A.rowCount();
+		SparseVector < T > v(A.rowCount());
+		for (int n = 0; n < N; n++) {
+			v[n] = A.rows_[n] * x;
+		}
+		return v;
+	}
+	friend constexpr SparseVector<T> operator*(SparseVector<T> const &x, SparseMatrix<T> const &A) {
+		ASSERT(A.rowCount() == x.size());
+		return transpose(A) * x;
 	}
 	friend constexpr std::ostream& operator<<(std::ostream &os, SparseMatrix<T> const &A) {
 		NUMERICAL_CONSTANTS(T);
@@ -265,6 +299,8 @@ struct SparseMatrix {
 		}
 		return I;
 	}
+	template<typename>
+	friend class SparseMatrix;
 	friend struct reference;
 private:
 	constexpr SparseVector<T>& operator[](int i) {
