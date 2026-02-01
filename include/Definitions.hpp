@@ -85,6 +85,16 @@ constexpr void constexprAssert(bool cond) {
 template<typename T>
 concept Number = std::integral<T> || std::floating_point<T>;
 
+template <typename>
+struct IsIntegralArray : std::false_type {};
+
+template <typename T, size_t N>
+struct IsIntegralArray<std::array<T, N>> : std::bool_constant<std::integral<T>> {};
+
+
+template <typename T>
+concept IntegralArray = IsIntegralArray<std::remove_cvref_t<T>>::value;
+
 template<Number T>
 constexpr int largest = std::numeric_limits<T>::max();
 

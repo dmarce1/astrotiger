@@ -23,7 +23,8 @@
 //				}));
 //	};
 
-template <IntegerPartitionType auto Λ>
+template <int... λ>
+	requires(nonIncreasing<λ...>())
 struct YoungTableau {
 	static constexpr int rowCount() {
 		return Λ.count();
@@ -207,6 +208,7 @@ struct YoungTableau {
 	}
 
 private:
+	static constexpr IntegerPartition<λ...> Λ{};
 	static constexpr auto conjΛ = Λ.conj();
 	static constexpr auto rowIndex = []() {
 		std::array<Index, rowCount()> starts;
@@ -232,9 +234,10 @@ struct IsYoungTableau<YoungTableau<Λ>> {
 template <typename T>
 concept YoungTableauType = IsYoungTableau<std::remove_cvref_t<T>>::value;
 
-template <IntegerPartitionType auto Λ>
+template <int... λ>
+	requires(nonIncreasing<λ...>())
 constexpr auto genYoungPermutations() {
-	YoungTableau<Λ> Y{};
+	YoungTableau<λ...> Y{};
 	auto const rank = Y.size();
 	auto const count = Y.permutationCount();
 	using SignedPermutation = std::pair<Sign, Permutation<rank>>;
@@ -252,8 +255,10 @@ constexpr auto genYoungPermutations() {
 	return permutations;
 }
 
-template <IntegerPartitionType auto Λ>
+template <int... λ>
+	requires(nonIncreasing<λ...>())
 constexpr auto genHookLengths() {
+	constexpr IntegerPartition<λ...> Λ{};
 	std::array<int, Λ.size()> h;
 	constexpr auto conjΛ = Λ.conj();
 	int i = 0;
@@ -290,7 +295,7 @@ constexpr auto genSemistandardTableau() {
 	constexpr int count = countSemistandardTableau<Λ, D>();
 	std::array<TableType, count> tabs;
 	TableType Y{};
-	if (Y.rowCount()  > D) {
+	if (Y.rowCount() > D) {
 		return tabs;
 	}
 	int i = 0;

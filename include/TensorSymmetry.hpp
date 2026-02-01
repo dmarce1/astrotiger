@@ -60,7 +60,7 @@ struct SymmetryElement {
 	}
 };
 
-template <IntegerPartitionType auto Λ, std::integral auto D>
+template <std::integral auto D, IntegerPartitionType auto Λ>
 constexpr auto symmetrizer() {
 	constexpr YoungTableau<Λ> Y{};
 	auto const lambda = [&Y]<int phase>() {
