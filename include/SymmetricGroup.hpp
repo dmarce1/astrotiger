@@ -15,6 +15,7 @@
 #include "Rational.hpp"
 
 #include <algorithm>
+#include <numeric>
 #include <utility>
 
 template<int N>

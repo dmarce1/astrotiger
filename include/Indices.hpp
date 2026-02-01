@@ -21,7 +21,7 @@ struct Indices {
 	constexpr Index& operator[](Dimension d) {
 		return idx_[d];
 	}
-	constexpr explicit operator Index() const {
+	constexpr operator Index() const {
 		Index i = 0;
 		for (Dimension d = 0; d < D; d++) {
 			i = N * i + idx_[d];
@@ -132,9 +132,9 @@ struct Indices {
 		idx.fill(~Index(0));
 		return Indices(idx);
 	}
-private:
 	constexpr Indices(std::array<Index, D> const &idx) :
 			idx_(idx) {
 	}
+private:
 	std::array<Index, D> idx_;
 };

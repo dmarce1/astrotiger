@@ -12,38 +12,38 @@
 #include <utility>
 #include <vector>
 
-template<typename T>
+template <typename T>
 struct SparseVector;
 
-template<typename T>
+template <typename T>
 struct SparseMatrix;
 
-template<typename T>
+template <typename T>
 struct SparseVector {
-	friend class SparseMatrix<T> ;
+	friend class SparseMatrix<T>;
 	constexpr SparseVector() = default;
 	constexpr SparseVector(int n) :
-			N_(n) {
+		N_(n) {
 	}
-	constexpr SparseVector(SparseVector const&) = default;
-	constexpr SparseVector(SparseVector&&) = default;
-	constexpr SparseVector& operator=(SparseVector const&) = default;
-	constexpr SparseVector& operator=(SparseVector&&) = default;
+	constexpr SparseVector(SparseVector const &) = default;
+	constexpr SparseVector(SparseVector &&) = default;
+	constexpr SparseVector &operator=(SparseVector const &) = default;
+	constexpr SparseVector &operator=(SparseVector &&) = default;
 	struct reference {
 		constexpr reference(SparseVector<T> &ref, int index) :
-				ref_(ref), index_(index) {
+			ref_(ref), index_(index) {
 		}
-		constexpr reference& operator=(T value) {
-			if (value != zero) {
+		constexpr reference &operator=(T value) {
+			if (!isZero(value)) {
 				ref_.set(index_, value);
 			} else {
 				ref_.remove(index_);
 			}
 			return *this;
 		}
-		constexpr reference& operator*=(T value) {
+		constexpr reference &operator*=(T value) {
 			if (value != one) {
-				if (value == zero) {
+				if (isZero(value)) {
 					ref_.remove(index_);
 				} else {
 					auto *ptr = ref_.getPointer(index_);
@@ -54,18 +54,18 @@ struct SparseVector {
 			}
 			return *this;
 		}
-		constexpr reference& operator/=(T value) {
+		constexpr reference &operator/=(T value) {
 			*this *= one / value;
 			return *this;
 		}
-		constexpr reference& operator+=(T value) {
-			if (value != zero) {
+		constexpr reference &operator+=(T value) {
+			if (!isZero(value)) {
 				auto *ptr = ref_.getPointer(index_);
 				if (ptr == nullptr) {
 					ref_.set(index_, value);
 				} else {
 					auto const sum = *ptr + value;
-					if (sum == zero) {
+					if (isZero(sum)) {
 						ref_.remove(index_);
 					} else {
 						ref_.set(index_, sum);
@@ -74,20 +74,21 @@ struct SparseVector {
 			}
 			return *this;
 		}
-		constexpr reference& operator-=(T value) {
+		constexpr reference &operator-=(T value) {
 			*this += -value;
 			return *this;
 		}
 		constexpr operator T() const {
 			return ref_.get(index_).second;
 		}
+
 	private:
-		SparseVector<T> &ref_ { };
+		SparseVector<T> &ref_{};
 		int index_;
 	};
-	template<typename U>
+	template <typename U>
 	constexpr operator SparseVector<U>() const {
-		SparseVector<U> vec;
+		SparseVector<U> vec(N_);
 		for (auto i = begin(); i != end(); i++) {
 			vec[i->first] = static_cast<U>(i->second);
 		}
@@ -96,7 +97,7 @@ struct SparseVector {
 	friend constexpr auto normalize(SparseVector const &v) {
 		using std::sqrt;
 		auto const v2 = v * v;
-		if (v2 == zero) {
+		if (isZero(v2)) {
 			return v;
 		} else {
 			return v / sqrt(v2);
@@ -137,11 +138,11 @@ struct SparseVector {
 	constexpr SparseVector operator/(T scale) const {
 		return *this * (one / scale);
 	}
-	constexpr SparseVector& operator+=(SparseVector const &other) {
+	constexpr SparseVector &operator+=(SparseVector const &other) {
 		for (auto const &i : other.V_) {
 			auto [exists, value] = get(i.first);
 			value += i.second;
-			if (value == zero) {
+			if (isZero(value)) {
 				if (exists) {
 					remove(i.first);
 				}
@@ -151,12 +152,12 @@ struct SparseVector {
 		}
 		return *this;
 	}
-	constexpr SparseVector& operator-=(SparseVector const &other) {
+	constexpr SparseVector &operator-=(SparseVector const &other) {
 		*this += -other;
 		return *this;
 	}
-	constexpr SparseVector& operator*=(T scale) {
-		if (scale == zero) {
+	constexpr SparseVector &operator*=(T scale) {
+		if (isZero(scale)) {
 			V_.clear();
 			return *this;
 		}
@@ -168,7 +169,7 @@ struct SparseVector {
 		}
 		return *this;
 	}
-	constexpr SparseVector& operator/=(T scale) {
+	constexpr SparseVector &operator/=(T scale) {
 		*this *= (one / scale);
 		return *this;
 	}
@@ -187,11 +188,17 @@ struct SparseVector {
 	constexpr int size() const {
 		return N_;
 	}
-	constexpr auto begin() const {
+	constexpr auto begin() {
 		return V_.begin();
 	}
-	constexpr auto end() const {
+	constexpr auto end() {
 		return V_.end();
+	}
+	constexpr auto begin() const {
+		return V_.cbegin();
+	}
+	constexpr auto end() const {
+		return V_.cend();
 	}
 	friend constexpr SparseVector operator*(T scale, SparseVector const &v) {
 		return v * scale;
@@ -201,29 +208,22 @@ struct SparseVector {
 		U[n] = one;
 		return U;
 	}
-	friend constexpr std::ostream& operator<<(std::ostream &os, SparseVector<T> const &A) {
+	friend constexpr std::ostream &operator<<(std::ostream &os, SparseVector<T> const &A) {
 		NUMERICAL_CONSTANTS(T);
 		auto const N = A.size();
 		SparseVector<int> widths(N);
-		int maxWidth = 1;
+		int maxWidth = 3;
 		for (int n = 0; n < N; n++) {
-			if (A[n] != zero) {
+			if (!isZero(A[n])) {
 				std::ostringstream ss;
 				ss << A[n];
 				widths[n] = ss.str().size();
-				maxWidth = std::max(maxWidth, (int) ss.str().size());
+				maxWidth = std::max(maxWidth, (int)ss.str().size());
 			}
 		}
-		auto printHorizontal = [&os, maxWidth, N]() {
-			for (int m = 0; m < N; m++) {
-				os << '+' << std::string(maxWidth, '-');
-			}
-			os << "+\n";
-		};
-		printHorizontal();
 		for (int m = 0; m < N; m++) {
 			os << '|';
-			if (A[m] != zero) {
+			if (!isZero(A[m])) {
 				int const padding = maxWidth - widths[m];
 				os << std::string(padding / 2, ' ') << A[m] << std::string((padding + 1) / 2, ' ');
 			} else {
@@ -231,11 +231,11 @@ struct SparseVector {
 			}
 		}
 		os << "|\n";
-		printHorizontal();
 		return os;
 	}
+
 private:
-	NUMERICAL_CONSTANTS (T);
+	NUMERICAL_CONSTANTS(T);
 	constexpr static auto cmp = [](auto const &a, auto const &b) {
 		return a.first < b.first;
 	};
@@ -247,7 +247,7 @@ private:
 		}
 		return std::pair(rc, rc ? it->second : zero);
 	}
-	constexpr auto* getPointer(int i) {
+	constexpr auto *getPointer(int i) {
 		auto it = std::lower_bound(V_.begin(), V_.end(), std::pair(i, zero), cmp);
 		auto rc = it != V_.end();
 		if (rc) {
@@ -255,7 +255,7 @@ private:
 		}
 		return rc ? &it->second : nullptr;
 	}
-	constexpr auto const* getPointer(int i) const {
+	constexpr auto const *getPointer(int i) const {
 		auto it = std::lower_bound(V_.begin(), V_.end(), std::pair(i, zero), cmp);
 		auto rc = it != V_.end();
 		if (rc) {
@@ -264,7 +264,7 @@ private:
 		return rc ? &it->second : nullptr;
 	}
 	constexpr void set(int i, T v) {
-		if (v != zero) {
+		if (!isZero(v)) {
 			auto it = std::lower_bound(V_.begin(), V_.end(), std::pair(i, zero), cmp);
 			auto rc = it != V_.end();
 			if (rc) {
@@ -273,7 +273,7 @@ private:
 			if (rc) {
 				it->second = v;
 			} else {
-				V_.insert(it, { i, v });
+				V_.insert(it, {i, v});
 			}
 		} else {
 			remove(i);
@@ -290,8 +290,44 @@ private:
 		}
 		return false;
 	}
-	std::vector<std::pair<int, T>> V_ { };
-	int N_ { };
+	static constexpr bool isZero(T const &value) {
+		if constexpr (std::is_floating_point<T>::value) {
+			constexpr T ε = std::sqrt(std::numeric_limits<T>::epsilon());
+			return ((-ε < value) && (value < +ε));
+		} else {
+			return value == zero;
+		}
+	}
+	std::vector<std::pair<int, T>> V_{};
+	int N_{};
 };
+
+template <typename T>
+constexpr bool areLinearlyIndependent(SparseVector<T> const &u, SparseVector<T> const &v) {
+	NUMERICAL_CONSTANTS(T);
+	if ((u.density() == 0) || (v.density() == 0) || (u.density() != v.density())) {
+		return true;
+	}
+	auto i = u.begin();
+	auto j = v.begin();
+	if (i->first != j->first) {
+		return true;
+	}
+	auto const scale = j->second / i->second;
+	while (1) {
+		i++;
+		j++;
+		if (i == u.end()) {
+			break;
+		}
+		if (i->first != j->first) {
+			return true;
+		}
+		if (j->second != scale * i->second) {
+			return true;
+		}
+	};
+	return false;
+}
 
 #endif /* INCLUDE_SPARSEVECTOR_HPP_ */

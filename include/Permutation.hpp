@@ -8,6 +8,7 @@
 #pragma once
 
 #include "Definitions.hpp"
+#include "Indices.hpp"
 #include "Math.hpp"
 
 #include <algorithm>
@@ -18,8 +19,8 @@
 #include <numeric>
 #include <vector>
 
-struct Cycle: public std::vector<int> {
-	friend std::ostream& operator<<(std::ostream &os, Cycle const &p) {
+struct Cycle : public std::vector<int> {
+	friend std::ostream &operator<<(std::ostream &os, Cycle const &p) {
 		os << "(";
 		os << std::to_string(p[0]);
 		for (size_t i = 1; i < p.size(); i++) {
@@ -31,18 +32,27 @@ struct Cycle: public std::vector<int> {
 	}
 };
 
-template<int N>
-struct Permutation: public std::array<int, N> {
+template <int N>
+struct Permutation : public std::array<Index, N> {
+	constexpr Permutation() = default;
+	template <typename T>
+	constexpr Permutation(std::initializer_list<T> const &list) {
+		std::copy(list.begin(), list.end(), this->begin());
+	}
+	template <std::integral auto M>
+	constexpr Permutation(Indices<N, M> const &indices) {
+		std::copy(indices.begin(), indices.end(), this->begin());
+	}
 };
 
-template<int N>
+template <int N>
 constexpr auto identityPermutation() {
 	Permutation<N> p;
 	std::iota(p.begin(), p.end(), 0);
 	return p;
 }
 
-template<int N>
+template <int N>
 constexpr Permutation<N> operator*(Permutation<N> const &A, Permutation<N> const &B) {
 	Permutation<N> C;
 	for (int i = 0; i < N; i++) {
@@ -51,13 +61,13 @@ constexpr Permutation<N> operator*(Permutation<N> const &A, Permutation<N> const
 	return C;
 }
 
-template<int N>
-constexpr Permutation<N>& operator*=(Permutation<N> &A, Permutation<N> const &B) {
+template <int N>
+constexpr Permutation<N> &operator*=(Permutation<N> &A, Permutation<N> const &B) {
 	A = A * B;
 	return A;
 }
 
-template<int N, Indexed<size_t> Container>
+template <int N, Indexed<size_t> Container>
 constexpr auto apply(Permutation<N> const &P, Container const &A) {
 	Container B = A;
 	for (int i = 0; i < N; i++) {
@@ -66,7 +76,7 @@ constexpr auto apply(Permutation<N> const &P, Container const &A) {
 	return B;
 }
 
-template<int N, int I, int ... Is>
+template <int N, int I, int... Is>
 constexpr auto deleteAt(Permutation<N> const &A) {
 	Permutation<N - 1> B;
 	int const delVal = A[I];
@@ -83,15 +93,17 @@ constexpr auto deleteAt(Permutation<N> const &A) {
 	}
 }
 
-template<typename T, int N>
+template <typename T, int N>
 concept PermutationType = std::is_base_of_v<std::array<int, N>, T>;
 
-template <int N>
-constexpr auto parity(PermutationType<N> auto P) {
+template <typename Begin, typename End>
+constexpr Sign parity(Begin const &begin, End const &end) {
 	Sign p = +1;
-	for (int i = 0; i < N; i++) {
-		for (int j = i + 1; j < N; j++) {
-			if (P[i] > P[j]) {
+	for (auto it1 = begin; it1 != end; it1++) {
+		for (auto it2 = it1 + 1; it2 != end; it2++) {
+			if (*it1 == *it2) {
+				return Sign(0);
+			} else if (*it1 > *it2) {
 				p = -p;
 			}
 		}
@@ -99,17 +111,22 @@ constexpr auto parity(PermutationType<N> auto P) {
 	return p;
 }
 
-template<int N>
+template <int N>
+constexpr auto parity(Permutation<N> const &p) {
+	return parity(p.begin(), p.end());
+}
+
+template <int N>
 constexpr Permutation<N> inverse(Permutation<N> const &P) {
-	Permutation<N> iP { };
+	Permutation<N> iP{};
 	for (int i = 0; i < N; i++) {
 		iP[P[i]] = i;
 	}
 	return iP;
 }
 
-template<int N>
-std::ostream& operator<<(std::ostream &os, Permutation<N> const &p) {
+template <int N>
+std::ostream &operator<<(std::ostream &os, Permutation<N> const &p) {
 	os << "(";
 	os << std::to_string(p[0]);
 	for (int i = 1; i < N; i++) {
@@ -120,7 +137,7 @@ std::ostream& operator<<(std::ostream &os, Permutation<N> const &p) {
 	return os;
 }
 
-template<int N>
+template <int N>
 constexpr bool operator==(Permutation<N> const &A, Permutation<N> const &B) {
 	for (int n = 0; n < N; n++) {
 		if (A[n] != B[n]) {
@@ -130,19 +147,19 @@ constexpr bool operator==(Permutation<N> const &A, Permutation<N> const &B) {
 	return true;
 }
 
-template<int N>
+template <int N>
 constexpr bool operator!=(Permutation<N> const &A, Permutation<N> const &B) {
 	return !(A == B);
 }
 
-template<std::integral ... Args>
-constexpr auto createPermutation(Args ... args) {
+template <std::integral... Args>
+constexpr auto createPermutation(Args... args) {
 	constexpr int N = sizeof...(Args);
-	Permutation<N> P = { args... };
+	Permutation<N> P = {args...};
 	return P;
 }
 
-template<int N1, int N2>
+template <int N1, int N2>
 constexpr auto concatenate(Permutation<N1> const &P1, Permutation<N2> const &P2) {
 	constexpr int N = N1 + N2;
 	Permutation<N> P;

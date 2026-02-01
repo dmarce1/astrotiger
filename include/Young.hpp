@@ -15,162 +15,296 @@
 #include "Rational.hpp"
 #include "WeightedPermutation.hpp"
 
+#include <functional>
 #include <utility>
+//	auto const createView = [&](auto &data, auto const &idx) {
+//		return (idx | std::views::transform([&](int i) -> int & {
+//					return data[i];
+//				}));
+//	};
 
-template <int... λ>
-	requires(sizeof...(λ) > 0 && nonIncreasing<λ...>())
-struct YoungTableau : public Permutation<(0 + ... + λ)> {
-	using base_type = Permutation<(0 + ... + λ)>;
-	constexpr operator base_type() const {
-		return static_cast<base_type const &>(*this);
+template <IntegerPartitionType auto Λ>
+struct YoungTableau {
+	static constexpr int rowCount() {
+		return Λ.count();
+	}
+	static constexpr int colCount() {
+		return Λ[0];
+	}
+	static constexpr int rowLength(int r) {
+		return Λ[r];
+	}
+	static constexpr int colLength(int c) {
+		return conjΛ[c];
 	}
 	static constexpr auto size() {
-		return (0 + ... + λ);
-	}
-
-	constexpr int operator()(int i, int j) const {
-		return base_type::operator[](start_[i] + j);
-	}
-	constexpr int &operator()(int i, int j) {
-		return base_type::operator[](start_[i] + j);
-	}
-	constexpr YoungTableau() {
-		std::iota(base_type::begin(), base_type::end(), 0);
-	}
-	constexpr YoungTableau(IntegerPartition<λ...> const &) {
-		std::iota(base_type::begin(), base_type::end(), 0);
-	}
-	constexpr YoungTableau(base_type const &init) :
-		base_type(init) {
+		return Λ.size();
 	}
 	static constexpr int rowPermutationCount() {
-		return (1 * ... * factorial<λ>());
+		int count = 1;
+		for (int i = 0; i < rowCount(); i++) {
+			count *= factorial(Λ[i]);
+		}
+		return count;
 	}
 	static constexpr int colPermutationCount() {
-		return YoungTableau{}.conj().rowPermutationCount();
+		int count = 1;
+		for (int i = 0; i < colCount(); i++) {
+			count *= factorial(conjΛ[i]);
+		}
+		return count;
 	}
 	static constexpr int permutationCount() {
 		return rowPermutationCount() * colPermutationCount();
 	}
-	constexpr YoungTableau nextRowPermutation() const {
-		YoungTableau next = *this;
-		int *b, *e;
-		int r = 0;
-		do {
-			b = &(next(r, 0));
-			e = &(next(r, nCol[r]));
-			r++;
-		} while (!std::next_permutation(b, e) && (r < nRow));
-		return next;
+	constexpr operator Permutation<size()>() const {
+		Permutation<size()> p;
+		std::copy_n(data_.begin(), size(), p.begin());
+		return p;
 	}
-	constexpr YoungTableau nextColPermutation() const {
-		return (conj().nextRowPermutation()).conj();
+	constexpr bool nextRowPermutation() {
+		if (colCount() == 1) {
+			return false;
+		}
+		int begin = 0;
+		auto const it = data_.begin();
+		int i, j, r, end;
+		for (r = 0; r < rowCount(); r++) {
+			end = begin + Λ[r];
+			for (i = end - 2; i >= begin; i--) {
+				if (data_[i] < data_[i + 1]) {
+					break;
+				}
+			}
+			if (i >= begin) {
+				break;
+			}
+			std::reverse(it + begin, it + end);
+			begin = end;
+		}
+		if (r == rowCount()) {
+			return false;
+		}
+		for (j = end - 1;; j--) {
+			if (data_[j] > data_[i]) {
+				break;
+			}
+		}
+		std::swap(data_[i], data_[j]);
+		std::reverse(it + i + 1, it + end);
+		return true;
 	}
-	constexpr bool isStandard() const {
-		for (int r = 0; r + 1 < nRow; r++) {
-			for (int c = 0; c < nCol[r]; c++) {
-				if ((*this)(r, c) >= (*this)(r + 1, c)) {
+	constexpr Sign nextColPermutation() {
+		if (rowCount() == 1) {
+			return 0;
+		}
+		constexpr auto idx = [] {
+			std::array<int, size()> idx;
+			int i = 0;
+			for (int c = 0; c < colCount(); c++) {
+				int colIdx = c;
+				for (int r = 0; r < conjΛ[c]; r++) {
+					idx[i++] = colIdx;
+					colIdx += Λ[r];
+				}
+			}
+			return idx;
+		}();
+		int i, j, c, end;
+		int begin = 0;
+		Sign sgn = +1;
+		for (c = 0; c < colCount(); c++) {
+			int const n = conjΛ[c];
+			end = begin + n;
+			for (i = end - 2; i >= begin; i--) {
+				if (data_[idx[i]] < data_[idx[i + 1]]) {
+					break;
+				}
+			}
+			if (i >= begin) {
+				break;
+			}
+			for (int i1 = begin, i2 = end - 1; i1 < i2; i1++, i2--) {
+				std::swap(data_[idx[i1]], data_[idx[i2]]);
+				sgn = -sgn;
+			}
+			begin += n;
+		}
+		if (c == colCount()) {
+			return 0;
+		}
+		for (j = end - 1;; j--) {
+			if (data_[idx[j]] > data_[idx[i]]) {
+				break;
+			}
+		}
+		std::swap(data_[idx[i]], data_[idx[j]]);
+		sgn = -sgn;
+		for (int i1 = i + 1, i2 = end - 1; i1 < i2; i1++, i2--) {
+			std::swap(data_[idx[i1]], data_[idx[i2]]);
+			sgn = -sgn;
+		}
+		return sgn;
+	}
+	constexpr bool isSemistandard() const {
+		for (int r = 0; r < rowCount(); r++) {
+			for (int c = 1; c < rowLength(r); c++) {
+				if ((*this)(r, c) < (*this)(r, c - 1)) {
 					return false;
 				}
 			}
 		}
-		for (int r = 0; r < nRow; r++) {
-			for (int c = 0; c + 1 < nCol[r]; c++) {
-				if ((*this)(r, c) >= (*this)(r, c + 1)) {
+		for (int c = 0; c < colCount(); c++) {
+			for (int r = 1; r < colLength(c); r++) {
+				if ((*this)(r, c) <= (*this)(r - 1, c)) {
 					return false;
 				}
 			}
 		}
 		return true;
 	}
-	friend std::ostream &operator<<(std::ostream &os, YoungTableau<λ...> const &yt) {
-		auto printHLine = [&](int row) {
-			os << "+";
-			for (int m = 0; m < nCol[std::max(row - 1, 0)]; m++) {
-				os << "---+";
+	constexpr Index operator[](int i) const {
+		return data_[i];
+	}
+	constexpr Index &operator[](int i) {
+		return data_[i];
+	}
+	constexpr Index operator()(int r, int c) const {
+		return data_[rowIndex[r] + c];
+	}
+	constexpr Index &operator()(int r, int c) {
+		return data_[rowIndex[r] + c];
+	}
+	constexpr auto begin() const {
+		return data_.cbegin();
+	}
+	constexpr auto end() const {
+		return data_.cend();
+	}
+	constexpr auto begin() {
+		return data_.begin();
+	}
+	constexpr auto end() {
+		return data_.end();
+	}
+	template <std::integral auto D>
+	constexpr explicit operator Indices<size(), D>() const {
+		return Indices<size(), D>(data_);
+	}
+	template <std::integral auto D>
+	constexpr Index index() const {
+		return Index(Indices<size(), D>(data_));
+	}
+	friend std::ostream &operator<<(std::ostream &os, YoungTableau const &Y) {
+		for (int r = 0; r < rowCount(); r++) {
+			for (int c = 0; c < rowLength(r); c++) {
+				os << Y(r, c) << " ";
 			}
-			os << '\n';
-		};
-		for (int n = 0; n < nRow; n++) {
-			printHLine(n);
-			os << "|";
-			for (int m = 0; m < nCol[n]; m++) {
-				os << " " << yt(n, m) << " |";
-			}
-			os << '\n';
+			os << std::endl;
 		}
-		printHLine(nRow - 1);
-
+		os << std::endl;
 		return os;
 	}
-	static constexpr int standardCount() {
-		int den = 1;
-		for (int r1 = 0; r1 < nRow; r1++) {
-			for (int c = 0; c < nCol[r1]; c++) {
-				int h = nCol[r1] - c;
-				for (int r2 = r1 + 1; r2 < nRow; r2++) {
-					if (c >= nCol[r2]) {
-						break;
-					}
-					h++;
-				}
-				den *= h;
-			}
-		}
-		return factorial(size()) / den;
-	}
-	static constexpr int semistandardCount(int dimCount) {
-		int den = 1;
-		int num = 1;
-		for (int r1 = 0; r1 < nRow; r1++) {
-			for (int c = 0; c < nCol[r1]; c++) {
-				int h = nCol[r1] - c;
-				num *= dimCount + c - r1;
-				for (int r2 = r1 + 1; r2 < nRow; r2++) {
-					if (c >= nCol[r2]) {
-						break;
-					}
-					h++;
-				}
-				den *= h;
-			}
-		}
-		return num / den;
-	}
-	constexpr bool operator==(YoungTableau const &other) const {
-		return base_type::operator==(static_cast<base_type const &>(other));
-	}
-	constexpr bool operator!=(YoungTableau const &other) const {
-		return base_type::operator!=(static_cast<base_type const &>(other));
-	}
-	constexpr auto conj() const;
 
 private:
-	static constexpr auto genStarts() {
-		std::array<int, nRow + 1> starts{};
-		for (int n = 0; n < nRow; n++) {
-			starts[n + 1] = starts[n] + nCol[n];
+	static constexpr auto conjΛ = Λ.conj();
+	static constexpr auto rowIndex = []() {
+		std::array<Index, rowCount()> starts;
+		starts[0] = 0;
+		for (int i = 0; i < rowCount() - 1; i++) {
+			starts[i + 1] = starts[i] + Λ[i];
 		}
 		return starts;
-	}
-	static constexpr int nRow = sizeof...(λ);
-	static constexpr auto nCol = std::array<int, nRow>{λ...};
-	static constexpr auto start_ = genStarts();
+	}();
+	std::array<Index, Λ.size()> data_{};
 };
 
-template <int... λ>
-	requires (sizeof...(λ) > 0 && nonIncreasing<λ...>())
-constexpr auto YoungTableau<λ...>::conj() const {
-	auto const create = []<int... δ>(std::integer_sequence<int, δ...>) {
-		constexpr auto conjPart = IntegerPartition<λ...>::conj();
-		return YoungTableau<conjPart[δ]...>{};
-	};
-	constexpr auto seq = std::make_integer_sequence<int, nCol[0]>{};
-	auto conjTab = create(seq);
-	for (int r = 0; r < nRow; r++) {
-		for (int c = 0; c < nCol[r]; c++) {
-			conjTab(c, r) = (*this)(r, c);
+template <typename T>
+struct IsYoungTableau {
+	static constexpr bool value = false;
+};
+
+template <IntegerPartitionType auto Λ>
+struct IsYoungTableau<YoungTableau<Λ>> {
+	static constexpr bool value = true;
+};
+
+template <typename T>
+concept YoungTableauType = IsYoungTableau<std::remove_cvref_t<T>>::value;
+
+template <IntegerPartitionType auto Λ>
+constexpr auto genYoungPermutations() {
+	YoungTableau<Λ> Y{};
+	auto const rank = Y.size();
+	auto const count = Y.permutationCount();
+	using SignedPermutation = std::pair<Sign, Permutation<rank>>;
+	std::array<SignedPermutation, count> permutations;
+	Sign parity = 1;
+	std::iota(Y.begin(), Y.end(), 0);
+	for (int i = 0; i < count; i++) {
+		permutations[i] = SignedPermutation(parity, Y);
+		parity *= Y.nextColPermutation();
+		if (parity == 0) {
+			parity = +1;
+			Y.nextRowPermutation();
 		}
 	}
-	return conjTab;
+	return permutations;
+}
+
+template <IntegerPartitionType auto Λ>
+constexpr auto genHookLengths() {
+	std::array<int, Λ.size()> h;
+	constexpr auto conjΛ = Λ.conj();
+	int i = 0;
+	for (int r = 0; r < Λ.count(); r++) {
+		int η = Λ[r] + conjΛ[0] - 1 - r;
+		h[i++] = η;
+		for (int c = 0; c + 1 < Λ[r]; c++) {
+			η += conjΛ[c + 1] - conjΛ[c] - 1;
+			h[i++] = η;
+		}
+	}
+	return h;
+}
+
+template <IntegerPartitionType auto Λ, std::integral auto D>
+constexpr auto countSemistandardTableau() {
+	constexpr auto conjΛ = Λ.conj();
+	constexpr auto h = genHookLengths<Λ>();
+	int n = 1;
+	int d = 1;
+	int i = 0;
+	for (int r = 0; r < Λ.count(); r++) {
+		for (int c = 0; c < Λ[r]; c++) {
+			n *= D + c - r;
+			d *= h[i++];
+		}
+	}
+	return n / d;
+}
+
+template <IntegerPartitionType auto Λ, std::integral auto D>
+constexpr auto genSemistandardTableau() {
+	using TableType = YoungTableau<Λ>;
+	constexpr int count = countSemistandardTableau<Λ, D>();
+	std::array<TableType, count> tabs;
+	TableType Y{};
+	if (Y.rowCount()  > D) {
+		return tabs;
+	}
+	int i = 0;
+	while (true) {
+		if (Y.isSemistandard()) {
+			tabs[i++] = Y;
+		}
+		if (i == count) {
+			break;
+		}
+		int j = 0;
+		while (++Y[j] >= D) {
+			Y[j++] = 0;
+		}
+	}
+	return tabs;
 }

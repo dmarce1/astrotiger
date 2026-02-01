@@ -105,6 +105,6 @@ constexpr int tiny = std::numeric_limits<T>::min();
 	}
 
 #define NUMERICAL_CONSTANTS(T)          \
-		constexpr static T zero = T(0); \
-		constexpr static T one = T(1);
+		constexpr static auto zero = static_cast<T>(0); \
+		constexpr static auto one = static_cast<T>(1);
 

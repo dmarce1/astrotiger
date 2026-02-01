@@ -3,7 +3,7 @@ project(astrotiger LANGUAGES CXX CUDA)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(ALL_FLAGS -fconstexpr-ops-limit=536870912 -Wall -Wno-comma-subscript -I${PROJECT_SOURCE_DIR}/include)
+set(ALL_FLAGS -fconstexpr-ops-limit=2147483648 -Wall -Wno-comma-subscript -I${PROJECT_SOURCE_DIR}/include)
 #set(DEBUG_FLAGS -O1 -g3 -fno-omit-frame-pointer -fsanitize=address )
 set(CXX_FLAGS  ${ALL_FLAGS} -march=native)
 set(CUDA_FLAGS ${ALL_FLAGS} -Xcompiler=-march=native)
@@ -58,7 +58,7 @@ target_include_directories(astrotiger PUBLIC ${PROJECT_SOURCE_DIR}/include)
 target_compile_options(astrotiger PUBLIC
   $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -fPIE -DNDEBUG -Ofast>>
   $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS} -DNDEBUG -Xcompiler=-Ofast>>
-  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -fPIE -O0 -g3>>
+  $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CXX>:${CXX_FLAGS} -fPIE -O0 -g3 -ftemplate-backtrace-limit=15 -fconcepts-diagnostics-depth=3 -fdiagnostics-show-template-tree>>
   $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CUDA>:${CUDA_FLAGS} -G -Xcompiler=-O0>>
 )
 target_link_options(astrotiger PUBLIC

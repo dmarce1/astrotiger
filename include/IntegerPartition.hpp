@@ -50,6 +50,12 @@ public:
 	constexpr int operator[](int i) const {
 		return values[i];
 	}
+	constexpr auto begin() const {
+		return values.cbegin();
+	}
+	constexpr auto end() const {
+		return values.cend();
+	}
 };
 
 template<typename T>
