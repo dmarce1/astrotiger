@@ -26,6 +26,14 @@
 template <int... λ>
 	requires(nonIncreasing<λ...>())
 struct YoungTableau {
+	template <std::integral auto... Is>
+	constexpr YoungTableau() {
+		int i = 0;
+		((data_[i++] = Is), ...);
+	}
+	constexpr YoungTableau() :
+		data_{} {
+	}
 	static constexpr int rowCount() {
 		return Λ.count();
 	}
@@ -273,10 +281,16 @@ constexpr auto genHookLengths() {
 	return h;
 }
 
+template <int... λ>
+	requires(nonIncreasing<λ...>())
+constexpr auto genHookLengths(IntegerPartition<λ...> const &Λ) {
+	return genHookLengths<λ...>();
+}
+
 template <IntegerPartitionType auto Λ, std::integral auto D>
 constexpr auto countSemistandardTableau() {
 	constexpr auto conjΛ = Λ.conj();
-	constexpr auto h = genHookLengths<Λ>();
+	constexpr auto h = genHookLengths(Λ);
 	int n = 1;
 	int d = 1;
 	int i = 0;
@@ -291,10 +305,9 @@ constexpr auto countSemistandardTableau() {
 
 template <IntegerPartitionType auto Λ, std::integral auto D>
 constexpr auto genSemistandardTableau() {
-	using TableType = YoungTableau<Λ>;
 	constexpr int count = countSemistandardTableau<Λ, D>();
-	std::array<TableType, count> tabs;
-	TableType Y{};
+	auto Y = createYoungTableau(Λ);
+	std::array<decltype(Y), count> tabs;
 	if (Y.rowCount() > D) {
 		return tabs;
 	}
@@ -312,4 +325,14 @@ constexpr auto genSemistandardTableau() {
 		}
 	}
 	return tabs;
+}
+
+template <std::integral auto... λ>
+constexpr auto createYoungTableau(IntegerPartition<λ...> const &Λ) {
+	return YoungTableau<λ...>{};
+}
+
+template <std::integral auto... λ>
+constexpr auto genYoungPermutations(IntegerPartition<λ...> const &Λ) {
+	return genYoungPermutations<λ...>();
 }

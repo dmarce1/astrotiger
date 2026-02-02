@@ -1,7 +1,6 @@
-// #pragma once
+#pragma once
 //
 // #include "Indices.hpp"
-// #include "IntegerPartition.hpp"
 // #include "Matrix.hpp"
 // #include "Permutation.hpp"
 // #include "Rational.hpp"
@@ -62,10 +61,10 @@ struct SymmetryElement {
 
 template <std::integral auto D, IntegerPartitionType auto Λ>
 constexpr auto symmetrizer() {
-	constexpr YoungTableau<Λ> Y{};
+	constexpr auto Y = createYoungTableau(Λ);
 	auto const lambda = [&Y]<int phase>() {
 		constexpr auto basis = genSemistandardTableau<Λ, D>();
-		constexpr auto ps = genYoungPermutations<Λ>();
+		constexpr auto ps = genYoungPermutations(Λ);
 		constexpr int R = basis.size();
 		constexpr int O = Y.size();
 		constexpr int N = ipow(D, O);

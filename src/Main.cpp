@@ -133,7 +133,7 @@ std::vector<TensorDefinition> readTensorDefinitionFile(std::string const &filena
 //    return data[i];
 //});
 
-#include "Permutation.hpp"
+#include "TensorSymmetry.hpp"
 #include <algorithm>
 #include <functional>
 #include <numeric>
@@ -144,7 +144,7 @@ int hpx_main(int argc, char *argv[]) {
 	constexpr IntegerPartition<2, 2> Λ;
 	constexpr int O = Λ.size();
 	constexpr int D = 3;
-	constexpr auto ele = symmetrizer<Λ, D>();
+	constexpr auto ele = symmetrizer<D, Λ>();
 	for (auto e : ele) {
 		std::cout << e << std::endl;
 	}
