@@ -1,53 +1,7 @@
 #pragma once
-//
-// #include "Indices.hpp"
-// #include "Matrix.hpp"
-// #include "Permutation.hpp"
-// #include "Rational.hpp"
+#include "Matrix.hpp"
 #include "SparseMatrix.hpp"
-// #include "SparseVector.hpp"
 #include "Young.hpp"
-//
-// #include <array>
-// #include <bitset>
-// #include <concepts>
-// #include <tuple>
-// #include <type_traits>
-// #include <utility>
-//
-// template <IntegerPartitionType auto Λ>
-// constexpr auto hookLengths() {
-//	std::array<int, Λ.size()> h;
-//	constexpr auto conjΛ = Λ.conj();
-//	int i = 0;
-//	for (int r = 0; r < Λ.count(); r++) {
-//		int η = Λ[r] + conjΛ[0] - 1 - r;
-//		h[i++] = η;
-//		for (int c = 0; c + 1 < Λ[r]; c++) {
-//			η += conjΛ[c + 1] - conjΛ[c] - 1;
-//			h[i++] = η;
-//		}
-//	}
-//	return h;
-//}
-//
-// template <IntegerPartitionType auto Λ, std::integral auto D>
-// constexpr auto countSemistandardTableau() {
-//	constexpr auto conjΛ = Λ.conj();
-//	constexpr auto h = hookLengths<Λ>();
-//	int n = 1;
-//	int d = 1;
-//	int i = 0;
-//	for (int r = 0; r < Λ.count(); r++) {
-//		for (int c = 0; c < Λ[r]; c++) {
-//			n *= D + c - r;
-//			d *= h[i++];
-//		}
-//	}
-//	return n / d;
-//}
-//
-//
 
 struct SymmetryElement {
 	Index row;
@@ -59,18 +13,119 @@ struct SymmetryElement {
 	}
 };
 
-template <std::integral auto D, IntegerPartitionType auto Λ>
+namespace detail {
+template <std::integral auto O, std::integral auto D, IntegralArray auto... Ts>
+constexpr auto countDetracerConditions() {
+	int count = 0;
+	((count +=
+	  [](unsigned n) {
+		  return n * (n - 1) / 2;
+	  }(Ts.size())),
+	 ...);
+	return ipow(D, O - 2) * count;
+}
+
+template <std::integral auto O, std::integral auto D, std::integral auto Ndof, IntegralArray auto... Ts>
+constexpr auto detracer(MatrixType auto Q) {
+	constexpr int N = Q.rowCount();
+	constexpr int R = Q.colCount();
+	constexpr int L = countDetracerConditions<O, D, Ts...>();
+	SparseMatrix<double> Ω(L, N);
+	using IndexType = Indices<O, D>;
+	int n = 0;
+	(([&n, &Ω](IntegralArray auto T) {
+		 for (unsigned i1 = 0; i1 < T.size(); i1++) {
+			 auto const k1 = T[i1];
+			 for (unsigned i2 = i1 + 1; i2 < T.size(); i2++) {
+				 auto const k2 = T[i2];
+				 IndexType ms{};
+				 int const count = ipow(D, O - 2);
+				 for (int ci = 0; ci < count; ci++) {
+					 for (ms[k1] = ms[k2] = 0; ms[k1] < D; ms[k1] = ++ms[k2]) {
+						 auto const m = Index(ms);
+						 assert(n <= L);
+						 assert(m <= N);
+						 Ω(n, m) = 1;
+					 }
+					 if (ci + 1 < count) {
+						 for (unsigned k = O - 1; k >= 0; k--) {
+							 if (k == k1) continue;
+							 if (k == k2) continue;
+							 if (++ms[k] != D) break;
+							 ms[k] = 0;
+						 }
+					 }
+					 n++;
+				 }
+			 }
+		 }
+	 }(Ts)),
+	 ...);
+	auto V = (Ω * Q).reducedRowEchelonForm();
+	if constexpr (Ndof < 0) {
+		return R - V.rowCount();
+	} else {
+		SparseMatrix<double> A(N, Ndof);
+		std::bitset<R> isPivot{};
+		for (int r = 0; r < V.rowCount(); r++) {
+			isPivot[V[r].begin()->first] = true;
+		}
+		auto W = SparseMatrix<double>(Q);
+		Matrix<double, N, Ndof> X{};
+		int k = 0;
+		for (int m = 0; m < R; m++) {
+			if (isPivot[m]) {
+				int j;
+				for (j = 0; W(j, m) != 1.0; j++) {
+				}
+				for (int n = 0; n < N; n++) {
+					if (W(n, m) != 0.0) {
+						W[n] -= W(n, m) * W[j];
+					}
+				}
+			} else {
+				k++;
+			}
+		}
+		k = 0;
+		for (int m = 0; m < R; m++) {
+			if (!isPivot[m]) {
+				for (int n = 0; n < N; n++) {
+					X(n, k) = W(n, m);
+				}
+				k++;
+			}
+		}
+		return X;
+	}
+}
+
+} // namespace detail
+
+// template <std::integral auto O, std::integral auto D, IntegralArray auto... Ts>
+// constexpr auto detracer(MatrixType auto Q) {
+//	constexpr auto N1 = ipow(D, O);
+//	constexpr auto N2 = detail::detracer<O, D, -1, Ts...>(Q);
+//	return detail::detracer<O, D, N2, Ts...>(Q);
+// }
+
+template <std::integral auto D, IntegerPartitionType auto Λ, IntegralArray auto... Ts>
 constexpr auto symmetrizer() {
-	constexpr auto Y = createYoungTableau(Λ);
-	auto const lambda = [&Y]<int phase>() {
+	if constexpr (sizeof...(Ts)) {
+		constexpr int O = Λ.size();
+		constexpr auto Q = symmetrizer<D, Λ>();
+		constexpr auto N1 = ipow(D, O);
+		constexpr auto N2 = detail::detracer<O, D, -1, Ts...>(Q);
+		return detail::detracer<O, D, N2, Ts...>(Q);
+	} else {
+		constexpr auto Y = createYoungTableau(Λ);
 		constexpr auto basis = genSemistandardTableau<Λ, D>();
 		constexpr auto ps = genYoungPermutations(Λ);
 		constexpr int R = basis.size();
 		constexpr int O = Y.size();
 		constexpr int N = ipow(D, O);
 		using IndexType = Indices<O, D>;
-		auto const pCount = Y.permutationCount();
-		SparseMatrix<double> V(R, N);
+		Matrix<double, R, N> Ψ{};
 		int i = 0;
 		std::bitset<N> isBasis{};
 		for (auto const &b : basis) {
@@ -79,42 +134,20 @@ constexpr auto symmetrizer() {
 		for (auto ns = IndexType::ibegin(); ns != IndexType ::iend(); ns++) {
 			auto const n = Index(ns);
 			if (isBasis[n]) {
-				SparseVector<double> vRow(N);
 				for (auto p : ps) {
 					auto const ms = apply<O>(p.second, ns);
 					auto const m = Index(ms);
-					vRow[m] += p.first;
+					Ψ(i, m) += p.first;
 				}
 				for (auto p : ps) {
 					auto const ms = apply<O>(p.second, ns);
 					auto const m = Index(ms);
-					if (vRow[m] > 0) {
-						vRow[m] = 1;
-					} else if (vRow[m] < 0) {
-						vRow[m] = -1;
-					}
+					auto &v = Ψ(i, m);
+					v = std::max(std::min(v, 1.0), -1.0);
 				}
-				V[i++] = std::move(vRow);
+				i++;
 			}
 		}
-		if constexpr (phase == 0) {
-			return V.density();
-		} else if constexpr (phase == 1) {
-			return transpose(V);
-		}
-	};
-	constexpr int eleCount = lambda.template operator()<0>();
-	auto const Q = lambda.template operator()<1>();
-	std::array<SymmetryElement, eleCount> elements;
-	SymmetryElement ele;
-	int i = 0;
-	for (unsigned r = 0; r < Q.rowCount(); r++) {
-		ele.row = r;
-		for (auto const &col : Q[r]) {
-			ele.col = col.first;
-			ele.value = col.second;
-			elements[i++] = ele;
-		}
+		return transpose(Ψ);
 	}
-	return elements;
 }

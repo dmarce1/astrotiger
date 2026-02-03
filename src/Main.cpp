@@ -143,11 +143,9 @@ std::vector<TensorDefinition> readTensorDefinitionFile(std::string const &filena
 int hpx_main(int argc, char *argv[]) {
 	constexpr IntegerPartition<2, 2> Λ;
 	constexpr int O = Λ.size();
-	constexpr int D = 3;
-	constexpr auto ele = symmetrizer<D, Λ>();
-	for (auto e : ele) {
-		std::cout << e << std::endl;
-	}
+	constexpr int D = 4;
+	constexpr auto R4 = symmetrizer<D, Λ, std::array<int, 2>{0, 1}>();
+	std::cout << R4 << std::endl;
 	return hpx::local::finalize();
 }
 

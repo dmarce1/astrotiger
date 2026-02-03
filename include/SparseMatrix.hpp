@@ -13,6 +13,7 @@
 #include <type_traits>
 
 #include "Definitions.hpp"
+#include "Matrix.hpp"
 #include "SparseVector.hpp"
 
 template <typename T>
@@ -66,6 +67,18 @@ struct SparseMatrix {
 		int col_;
 	};
 	friend struct reference;
+	template <std::integral auto N, std::integral auto M>
+	constexpr SparseMatrix(Matrix<T, N, M> const &A) :
+		rows_(N, SparseVector<T>(M)), N_(N), M_(M) {
+		for (int n = 0; n < N; n++) {
+			for (int m = 0; m < M; m++) {
+				auto const Anm = A(n, m);
+				if (!isZero(Anm)) {
+					rows_[n][m] = Anm;
+				}
+			}
+		}
+	}
 	constexpr SparseMatrix(int n, int m) :
 		rows_(n, SparseVector<T>(m)), N_(n), M_(m) {
 	}
@@ -123,7 +136,7 @@ struct SparseMatrix {
 		*this *= (one / scale);
 		return *this;
 	}
-	constexpr const SparseVector<T>& operator[](int i) const {
+	constexpr const SparseVector<T> &operator[](int i) const {
 		return rows_[i];
 	}
 	constexpr SparseVector<T> &operator[](int i) {
@@ -313,26 +326,26 @@ struct SparseMatrix {
 		φ = transpose(φ);
 		return φ;
 	}
-	friend constexpr void gaussJordanElimination(SparseMatrix &A, SparseMatrixType auto &B) {
+	friend constexpr void gaussJordanElimination(SparseMatrix &A, SparseMatrixType auto &...B) {
 		auto const N = A.rowCount();
 		int k = 0;
 		for (int n = 0; n < N; n++) {
 			for (int j = k; j < N; j++) {
 				T const Aⱼₙ = A(j, n);
 				if (!isZero(Aⱼₙ)) {
-					std::swap(B[j], B[k]);
+					((std::swap(B[j], B[k])), ...);
 					std::swap(A[j], A[k]);
 					break;
 				}
 			}
 			T const Aₖₙ = A(k, n);
 			if (!isZero(Aₖₙ)) {
-				B[k] /= Aₖₙ;
+				((B[k] /= Aₖₙ), ...);
 				A[k] /= Aₖₙ;
 				for (int j = k + 1; j < N; j++) {
 					T const Aⱼₙ = A(j, n);
 					if (!isZero(Aⱼₙ)) {
-						B[j] -= Aⱼₙ * B[k];
+						((B[j] -= Aⱼₙ * B[k]), ...);
 						A[j] -= Aⱼₙ * A[k];
 					}
 				}
@@ -343,11 +356,47 @@ struct SparseMatrix {
 			for (int j = 0; j < n; j++) {
 				T const Aⱼₙ = A(j, n);
 				if (!isZero(Aⱼₙ)) {
-					B[j] -= Aⱼₙ * B[n];
+					((B[j] -= Aⱼₙ * B[n]), ...);
 					A[j] -= Aⱼₙ * A[n];
 				}
 			}
 		}
+	}
+	constexpr auto rowEchelonForm() const {
+		auto A = *this;
+		auto const N = A.rowCount();
+		int k = 0;
+		for (int n = 0; n < N; n++) {
+			for (int j = k; j < N; j++) {
+				T const Aⱼₙ = A(j, n);
+				if (!isZero(Aⱼₙ)) {
+					std::swap(A[j], A[k]);
+					break;
+				}
+			}
+			T const Aₖₙ = A(k, n);
+			if (!isZero(Aₖₙ)) {
+				A[k] /= Aₖₙ;
+				for (int j = k + 1; j < N; j++) {
+					T const Aⱼₙ = A(j, n);
+					if (!isZero(Aⱼₙ)) {
+						A[j] -= Aⱼₙ * A[k];
+					}
+				}
+				k++;
+			}
+		}
+	}
+	constexpr auto reducedRowEchelonForm() const {
+		auto A = *this;
+		gaussJordanElimination(A);
+		for (int r = 0; r < A.N_; r++) {
+			if (A.rows_[r].density() == 0) {
+				A.N_ = r;
+				A.rows_.resize(r);
+			}
+		}
+		return A;
 	}
 	friend constexpr SparseVector<T> operator*(SparseMatrix<T> const &A, SparseVector<T> const &x) {
 		ASSERT(A.colCount() == x.size());
@@ -471,6 +520,40 @@ constexpr auto kroneckerProduct(SparseMatrix<T> const &A, SparseMatrix<T> const 
 				for (int m2 = 0; m2 < M2; m2++) {
 					C(N2 * n1 + n2, M2 * m1 + m2) = A(n1, m1) * B(n2, m2);
 				}
+			}
+		}
+	}
+	return C;
+}
+
+template <typename T, std::integral auto N, std::integral auto L>
+constexpr auto operator*(Matrix<T, N, L> const &A, SparseMatrix<T> const &B) {
+	NUMERICAL_CONSTANTS(T);
+	assert(L == B.rowCount());
+	int const M = B.colCount();
+	SparseMatrix<T> C(N, M);
+	for (int n = 0; n < N; n++) {
+		for (int m = 0; m < M; m++) {
+			C(n, m) = zero;
+			for (int l = 0; l < L; l++) {
+				C(n, m) += A(n, l) * B(l, m);
+			}
+		}
+	}
+	return C;
+}
+
+template <typename T, std::integral auto L, std::integral auto M>
+constexpr auto operator*(SparseMatrix<T> const &A, Matrix<T, L, M> const &B) {
+	NUMERICAL_CONSTANTS(T);
+	assert(L == A.colCount());
+	int const N = A.rowCount();
+	SparseMatrix<T> C(N, M);
+	for (int n = 0; n < N; n++) {
+		for (int m = 0; m < M; m++) {
+			C(n, m) = zero;
+			for (int l = 0; l < L; l++) {
+				C(n, m) += A(n, l) * B(l, m);
 			}
 		}
 	}

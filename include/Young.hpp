@@ -289,7 +289,6 @@ constexpr auto genHookLengths(IntegerPartition<λ...> const &Λ) {
 
 template <IntegerPartitionType auto Λ, std::integral auto D>
 constexpr auto countSemistandardTableau() {
-	constexpr auto conjΛ = Λ.conj();
 	constexpr auto h = genHookLengths(Λ);
 	int n = 1;
 	int d = 1;
